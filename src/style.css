@@ -84,18 +84,9 @@ button.danger { color: var(--danger); background: transparent; border-color: tra
   position: relative; flex: 1; min-height: 0; display: flex;
   font-family: var(--mono); font-size: 14px; line-height: 1.6;
 }
-.source { flex: 1; min-width: 0; display: flex; }
-.gutter {
-  flex: none; position: relative; overflow: hidden; min-width: 3.5em; text-align: right;
-  color: var(--muted); background: var(--panel); border-right: 1px solid var(--border);
-  user-select: none;
-}
-.gutter-lines { position: absolute; top: 0; left: 0; right: 0; padding: 0 10px; will-change: transform; }
+.source { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.source > .cm-editor { flex: 1; min-height: 0; }
 .storage-info { margin-top: 16px; }
-.pane textarea {
-  flex: 1; margin: 0; padding: 12px; border: 0; resize: none; outline: none;
-  font: inherit; color: var(--fg); background: var(--bg); tab-size: 2; white-space: pre;
-}
 .status {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding: 4px 16px;
   font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); background: var(--panel);
@@ -116,7 +107,6 @@ button.toggle[aria-pressed='true'] {
   border-color: var(--accent);
   color: var(--accent);
 }
-.pane textarea.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
 .banner.info {
   background: color-mix(in srgb, var(--accent) 10%, var(--bg));
   border-bottom-color: var(--accent);
@@ -153,11 +143,6 @@ button.link:hover { color: var(--fg); }
 }
 .toast button { background: transparent; color: inherit; border-color: color-mix(in srgb, var(--bg) 40%, transparent); }
 
-.match-mark {
-  position: absolute; pointer-events: none; border-radius: 2px;
-  background: color-mix(in srgb, #f5c400 45%, transparent);
-  outline: 1px solid color-mix(in srgb, #c99a00 80%, transparent);
-}
 
 @media (max-width: 600px) {
   .toolbar { flex-wrap: wrap; }
@@ -176,6 +161,8 @@ button.link:hover { color: var(--fg); }
 .font-size { display: inline-flex; align-items: center; gap: 2px; }
 button.mini { font-size: 12px; padding: 0 6px; line-height: 18px; border-color: transparent; background: transparent; color: var(--muted); }
 button.mini:hover { border-color: var(--border); color: var(--fg); }
+button.mini.position { font-size: inherit; padding: 0 4px; margin-left: -4px; }
+.goto-label { font-size: 13px; color: var(--muted); }
 
 /* Markdown preview: side by side on wide screens, instead of the text on narrow ones */
 .pane.preview-on .source { flex: 1 1 50%; border-right: 1px solid var(--border); }

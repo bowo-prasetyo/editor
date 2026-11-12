@@ -25,3 +25,37 @@ export function viewSettings(doc) {
     spellcheck: doc?.spellcheck ?? (prose && small),
   }
 }
+
+// How to comment out a line, by file extension, for Ctrl/Cmd+/. Files without
+// line comments use block comments; unknown types use "#" (config files,
+// scripts and notes most often do).
+const SLASHES = { line: '//', block: { open: '/*', close: '*/' } }
+const HASH = { line: '#' }
+const HTML = { block: { open: '<!--', close: '-->' } }
+const COMMENTS = {
+  ...Object.fromEntries(
+    ['js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'c', 'h', 'cc', 'cpp', 'hpp', 'cs', 'java', 'kt', 'kts', 'scala',
+      'go', 'rs', 'swift', 'dart', 'php', 'jsonc', 'json5', 'scss', 'less', 'groovy', 'gradle', 'proto', 'zig']
+      .map((e) => [e, SLASHES]),
+  ),
+  ...Object.fromEntries(
+    ['py', 'rb', 'sh', 'bash', 'zsh', 'fish', 'ps1', 'pl', 'r', 'yaml', 'yml', 'toml', 'conf', 'cfg', 'env',
+      'gitignore', 'dockerignore', 'properties', 'mk', 'nix', 'tf', 'cmake', 'coffee', 'jl', 'ex', 'exs', 'nim']
+      .map((e) => [e, HASH]),
+  ),
+  ...Object.fromEntries(['sql', 'lua', 'hs', 'elm', 'ada'].map((e) => [e, { line: '--' }])),
+  ...Object.fromEntries(['tex', 'sty', 'bib', 'm', 'erl'].map((e) => [e, { line: '%' }])),
+  ...Object.fromEntries(['ini', 'lisp', 'clj', 'cljs', 'el', 'scm', 'asm', 's'].map((e) => [e, { line: ';' }])),
+  ...Object.fromEntries(['html', 'htm', 'xml', 'svg', 'vue', 'svelte', 'md', 'markdown', 'mdown'].map((e) => [e, HTML])),
+  css: { block: SLASHES.block },
+  bat: { line: 'REM' },
+  cmd: { line: 'REM' },
+  vb: { line: "'" },
+  vim: { line: '"' },
+}
+const BY_NAME = { dockerfile: HASH, makefile: HASH, gemfile: HASH, rakefile: HASH, '.gitignore': HASH, '.env': HASH }
+
+export function commentTokensFor(name = '') {
+  const base = name.trim().split(/[\\/]/).pop().toLowerCase()
+  return BY_NAME[base] ?? COMMENTS[extension(name)] ?? HASH
+}
