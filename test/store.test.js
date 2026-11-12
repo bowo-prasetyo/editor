@@ -131,3 +131,40 @@ test('a deletion in another tab removes the doc unless it has unsaved edits', as
   s.flushAll()
   assert.ok(localStorage.getItem('editor.doc.' + b.id))
 })
+
+test('trash: delete is reversible, persists, and "delete forever" frees the key', async () => {
+  const s = await load()
+  const a = s.createDoc('a.txt', 'keep me')
+  const before = a.updatedAt
+  s.trashDoc(a.id)
+  assert.ok(JSON.parse(localStorage.getItem('editor.doc.' + a.id)).deletedAt)
+  assert.equal(s.getDoc(a.id).updatedAt, before, 'trashing is not an edit')
+  s.restoreDoc(a.id)
+  assert.equal(JSON.parse(localStorage.getItem('editor.doc.' + a.id)).deletedAt, undefined)
+  s.trashDoc(a.id)
+  s.emptyTrash()
+  assert.equal(s.getDoc(a.id), undefined)
+  assert.equal(localStorage.getItem('editor.doc.' + a.id), null)
+})
+
+test('trash: documents older than the retention period are purged on load', async () => {
+  const day = 24 * 60 * 60 * 1000
+  const put = (id, deletedAt) =>
+    localStorage.setItem('editor.doc.' + id, JSON.stringify({ id, name: id, content: '', updatedAt: 1, deletedAt }))
+  put('old', Date.now() - 31 * day)
+  put('recent', Date.now() - 2 * day)
+  put('live', undefined)
+  const s = await load()
+  assert.deepEqual(s.state.docs.map((d) => d.id).sort(), ['live', 'recent'])
+  assert.equal(localStorage.getItem('editor.doc.old'), null)
+})
+
+test('view options are saved without bumping updatedAt', async () => {
+  const s = await load()
+  const a = s.createDoc('a.txt', 'x')
+  const before = a.updatedAt
+  s.setDocOptions(a.id, { wrap: false })
+  s.flushAll()
+  assert.equal(JSON.parse(localStorage.getItem('editor.doc.' + a.id)).wrap, false)
+  assert.equal(s.getDoc(a.id).updatedAt, before)
+})
