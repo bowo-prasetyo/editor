@@ -16,6 +16,7 @@ import { showToast } from '../toast'
 import { canSaveInPlace, saveDoc } from '../fileaccess'
 import { countWords } from '../stats'
 import { createEditor } from '../cm'
+import { AUTO, PLAIN, findLanguage, languageNames, loadLanguage } from '../languages'
 import FindBar from '../components/FindBar.vue'
 import GoToBar from '../components/GoToBar.vue'
 
@@ -154,7 +155,37 @@ watch([host, () => props.id], mountEditor, { flush: 'post' })
 watch(content, (text) => editor.value?.setText(text))
 watch(() => view.value.wrap, (on) => editor.value?.setWrap(on))
 watch(() => view.value.spellcheck, (on) => editor.value?.setSpellcheck(on))
-watch(name, (n) => editor.value?.setName(n))
+// --- Language (syntax highlighting) --------------------------------------------
+
+// Chosen from the file name, unless the user picked one in the status bar.
+const languageChoice = computed({
+  get: () => doc.value?.language ?? AUTO,
+  set: (v) => setDocOptions(props.id, { language: v === AUTO ? undefined : v }),
+})
+// Very large files start as plain text: colouring them takes the browser a
+// while. Picking a language in the status bar still turns it on.
+const HIGHLIGHT_LIMIT = 5_000_000
+const tooBig = computed(() => content.value.length > HIGHLIGHT_LIMIT)
+const detected = computed(() =>
+  tooBig.value ? 'Plain text (large file)' : (findLanguage(name.value)?.name ?? 'Plain text'),
+)
+const language = computed(() =>
+  languageChoice.value === AUTO && tooBig.value ? null : findLanguage(name.value, languageChoice.value),
+)
+let languageLoads = 0
+watch(
+  [language, editor],
+  async ([desc, ed]) => {
+    if (!ed) return
+    const load = ++languageLoads
+    const support = await loadLanguage(desc)
+    // Ignore a slow load that a newer choice (or another document) replaced.
+    if (load === languageLoads && editor.value === ed) ed.setLanguage(name.value, support)
+  },
+  { immediate: true },
+)
+// Renaming can change the fallback comment syntax even if the language doesn't.
+watch(name, async (n) => editor.value?.setLanguage(n, await loadLanguage(language.value)))
 watch(
   () => prefs.fontSize,
   () => nextTick(() => editor.value?.view.requestMeasure()),
@@ -355,6 +386,16 @@ onBeforeUnmount(() => {
         </select>
         <select v-model="eol" aria-label="Line endings used when downloading" title="Line endings">
           <option v-for="(label, v) in EOLS" :key="v" :value="v">{{ label }}</option>
+        </select>
+        <select
+          v-model="languageChoice"
+          class="language"
+          aria-label="Language for syntax highlighting"
+          title="Language for syntax highlighting"
+        >
+          <option :value="AUTO" title="Chosen from the file name">{{ detected }} (auto)</option>
+          <option :value="PLAIN">Plain text</option>
+          <option v-for="n in languageNames" :key="n" :value="n">{{ n }}</option>
         </select>
         <span class="font-size" role="group" aria-label="Text size">
           <button class="mini" aria-label="Smaller text" title="Smaller text" @click="stepFontSize(-1)">A−</button>

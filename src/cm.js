@@ -1,7 +1,8 @@
-// The text editor: CodeMirror 6, set up for plain text and code without
-// syntax highlighting. It handles very large documents (only the visible
-// lines are drawn), several cursors, and the usual editing commands.
-import { Compartment, EditorSelection, EditorState } from '@codemirror/state'
+// The text editor: CodeMirror 6, set up for plain text and code, with
+// syntax highlighting for the document's language (see languages.js). It
+// handles very large documents (only the visible lines are drawn), several
+// cursors, and the usual editing commands.
+import { Compartment, EditorSelection, EditorState, Prec } from '@codemirror/state'
 import {
   EditorView,
   Decoration,
@@ -18,7 +19,8 @@ import {
   rectangularSelection,
 } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from '@codemirror/commands'
-import { indentUnit } from '@codemirror/language'
+import { HighlightStyle, bracketMatching, indentUnit, syntaxHighlighting } from '@codemirror/language'
+import { tags as t } from '@lezer/highlight'
 import { highlightSelectionMatches, selectNextOccurrence, selectSelectionMatches } from '@codemirror/search'
 import { commentTokensFor } from './filetype.js'
 import { searchRegExp } from './find.js'
@@ -66,7 +68,10 @@ export function goToPosition(doc, input) {
 }
 
 // Comment syntax for Ctrl/Cmd+/, from the file name.
-export const commentData = (name) => EditorState.languageData.of(() => [{ commentTokens: commentTokensFor(name) }])
+// The loaded language's own comment syntax wins (it also knows about
+// embedded languages, like CSS inside HTML); this is the fallback.
+export const commentData = (name) =>
+  Prec.lowest(EditorState.languageData.of(() => [{ commentTokens: commentTokensFor(name) }]))
 
 // Editing behaviour that doesn't need a page: several cursors, two-space
 // indents. (Exported for tests.)
@@ -94,12 +99,42 @@ const theme = EditorView.theme({
     backgroundColor: 'color-mix(in srgb, var(--accent) 28%, transparent) !important',
   },
   '.cm-selectionMatch': { backgroundColor: 'color-mix(in srgb, var(--accent) 14%, transparent)' },
+  '&.cm-focused .cm-matchingBracket': {
+    backgroundColor: 'color-mix(in srgb, var(--accent) 22%, transparent)',
+    outline: '1px solid color-mix(in srgb, var(--accent) 55%, transparent)',
+  },
+  '&.cm-focused .cm-nonmatchingBracket': {
+    backgroundColor: 'color-mix(in srgb, var(--danger) 22%, transparent)',
+  },
   '.cm-findMatch': {
     backgroundColor: 'color-mix(in srgb, #f5c400 40%, transparent)',
     outline: '1px solid color-mix(in srgb, #c99a00 70%, transparent)',
     borderRadius: '2px',
   },
 })
+
+// Syntax colours, as CSS variables defined in style.css for light and dark.
+const syntax = (v) => ({ color: `var(--syn-${v})` })
+export const highlightStyle = HighlightStyle.define([
+  { tag: [t.keyword, t.modifier, t.operatorKeyword, t.controlKeyword, t.definitionKeyword, t.moduleKeyword], ...syntax('keyword') },
+  { tag: [t.string, t.special(t.string), t.regexp, t.character, t.attributeValue], ...syntax('string') },
+  { tag: [t.number, t.bool, t.null, t.atom, t.unit], ...syntax('number') },
+  { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], ...syntax('comment'), fontStyle: 'italic' },
+  { tag: [t.function(t.variableName), t.function(t.propertyName), t.macroName], ...syntax('function') },
+  { tag: [t.typeName, t.className, t.namespace, t.tagName, t.standard(t.tagName)], ...syntax('type') },
+  { tag: [t.propertyName, t.attributeName, t.labelName], ...syntax('property') },
+  { tag: [t.definition(t.variableName), t.constant(t.variableName), t.self], ...syntax('variable') },
+  { tag: [t.operator, t.punctuation, t.separator, t.angleBracket], ...syntax('punctuation') },
+  { tag: [t.meta, t.processingInstruction, t.annotation], ...syntax('meta') },
+  { tag: [t.escape, t.special(t.variableName)], ...syntax('escape') },
+  { tag: t.heading, ...syntax('heading'), fontWeight: 'bold' },
+  { tag: [t.link, t.url], ...syntax('link'), textDecoration: 'underline' },
+  { tag: t.emphasis, fontStyle: 'italic' },
+  { tag: t.strong, fontWeight: 'bold' },
+  { tag: t.strikethrough, textDecoration: 'line-through' },
+  { tag: [t.inserted], ...syntax('inserted') },
+  { tag: [t.deleted, t.invalid], ...syntax('deleted') },
+])
 
 // --- Find highlighting ----------------------------------------------------
 
@@ -123,7 +158,8 @@ function findHighlighter(re) {
 // --- The editor -----------------------------------------------------------
 
 // options: { parent, text, name, wrap, spellcheck, onChange(text), onSelection(info) }
-// Returns a small API used by the editor page and the find bar.
+// Returns a small API used by the editor page and the find bar. The language
+// is set separately with setLanguage(), since it loads asynchronously.
 export function createEditor({ parent, text, name, wrap, spellcheck, onChange, onSelection }) {
   const wrapping = new Compartment()
   const spelling = new Compartment()
@@ -165,6 +201,8 @@ export function createEditor({ parent, text, name, wrap, spellcheck, onChange, o
         crosshairCursor(),
         highlightActiveLine(),
         highlightSelectionMatches(),
+        syntaxHighlighting(highlightStyle),
+        bracketMatching(),
         keymap.of([
           { key: 'Enter', run: newlineKeepIndent },
           { key: 'Tab', run: indentOrInsert, shift: indentLess },
@@ -201,7 +239,11 @@ export function createEditor({ parent, text, name, wrap, spellcheck, onChange, o
 
     setWrap: (on) => view.dispatch({ effects: wrapping.reconfigure(on ? EditorView.lineWrapping : []) }),
     setSpellcheck: (on) => view.dispatch({ effects: spelling.reconfigure(spellAttrs(on)) }),
-    setName: (n) => view.dispatch({ effects: language.reconfigure(commentData(n)) }),
+    // Highlight as `support` (a loaded LanguageSupport, or null for plain
+    // text); `name` picks the fallback comment syntax.
+    setLanguage(n, support) {
+      view.dispatch({ effects: language.reconfigure([commentData(n), support ?? []]) })
+    },
 
     // Replace the whole text after a change made elsewhere (another tab, a
     // recovered copy). Ignores the page echoing back our own text.
