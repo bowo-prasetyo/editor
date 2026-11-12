@@ -1,21 +1,36 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   state,
   createDoc,
   deleteDoc,
+  downloadBackup,
   emptyTrash,
-  importFile,
+  importBackup,
   restoreDoc,
   trashDoc,
   TRASH_DAYS,
 } from '../store'
+import { displayName } from '../naming'
+import { openFiles, TEXT_ACCEPT } from '../openFiles'
+import { showToast } from '../toast'
 
 const router = useRouter()
 const fileInput = ref(null)
+const backupInput = ref(null)
+const query = ref('')
+
 const byRecent = (a, b) => b.updatedAt - a.updatedAt
-const docs = computed(() => state.docs.filter((d) => !d.deletedAt).sort(byRecent))
+const live = computed(() => state.docs.filter((d) => !d.deletedAt))
+// Filter by name or content, ignoring case.
+const docs = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  const list = q
+    ? live.value.filter((d) => d.name.toLowerCase().includes(q) || d.content.toLowerCase().includes(q))
+    : live.value
+  return [...list].sort(byRecent)
+})
 const trash = computed(() =>
   state.docs.filter((d) => d.deletedAt).sort((a, b) => b.deletedAt - a.deletedAt),
 )
@@ -26,31 +41,40 @@ function newDoc() {
   router.push({ name: 'edit', params: { id: doc.id } })
 }
 
-async function onFile(e) {
-  const file = e.target.files[0]
-  if (!file) return
-  const doc = await importFile(file)
+async function onFiles(e) {
+  const files = [...e.target.files]
   e.target.value = ''
-  router.push({ name: 'edit', params: { id: doc.id } })
+  await openFiles(files, router)
 }
 
-// Deleting is undoable, so no confirmation dialog: show a toast instead.
-const toast = ref(null) // { doc }
-let toastTimer
+async function onBackup(e) {
+  const file = e.target.files[0]
+  e.target.value = ''
+  if (!file) return
+  try {
+    const { added, skipped } = importBackup(JSON.parse(await file.text()))
+    const docs = (n) => `${n} document${n === 1 ? '' : 's'}`
+    showToast(
+      !added
+        ? `Nothing to restore: ${skipped === 1 ? 'that document is' : `all ${docs(skipped)} are`} already here.`
+        : `Restored ${docs(added)}.` + (skipped ? ` ${skipped} already here ${skipped === 1 ? 'was' : 'were'} skipped.` : ''),
+    )
+  } catch (err) {
+    showToast(err instanceof SyntaxError ? "This file isn't an editor backup." : err.message)
+  }
+}
+
+// Deleting is undoable, so no confirmation dialog: offer Undo instead.
 function remove(doc) {
   trashDoc(doc.id)
-  toast.value = { doc }
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => (toast.value = null), 8000)
+  showToast(`Moved “${displayName(doc.name)}” to Trash.`, {
+    action: { label: 'Undo', run: () => restoreDoc(doc.id) },
+    timeout: 8000,
+  })
 }
-function undoRemove() {
-  if (toast.value) restoreDoc(toast.value.doc.id)
-  toast.value = null
-}
-onBeforeUnmount(() => clearTimeout(toastTimer))
 
 function deleteForever(doc) {
-  if (confirm(`Delete "${doc.name || 'Untitled'}" forever? This can't be undone.`)) deleteDoc(doc.id)
+  if (confirm(`Delete "${displayName(doc.name)}" forever? This can't be undone.`)) deleteDoc(doc.id)
 }
 function onEmptyTrash() {
   const n = trash.value.length
@@ -67,22 +91,42 @@ const daysLeft = (d) =>
   <section class="home">
     <div class="actions">
       <button class="primary" @click="newDoc">New document</button>
-      <button @click="fileInput.click()">Open file…</button>
-      <input ref="fileInput" type="file" hidden @change="onFile" />
+      <button @click="fileInput.click()">Open files…</button>
+      <input ref="fileInput" type="file" multiple :accept="TEXT_ACCEPT" hidden @change="onFiles" />
+      <span class="spacer" />
+      <button title="Download every document as one backup file" @click="downloadBackup">
+        Export all
+      </button>
+      <button title="Add the documents from a backup file" @click="backupInput.click()">
+        Import backup…
+      </button>
+      <input ref="backupInput" type="file" accept=".json,application/json" hidden @change="onBackup" />
     </div>
 
-    <p v-if="!docs.length" class="empty">No documents yet. Create one to get started.</p>
+    <input
+      v-if="live.length"
+      v-model="query"
+      class="filter"
+      type="search"
+      placeholder="Filter documents"
+      aria-label="Filter documents by name or text"
+    />
+
+    <p v-if="!live.length" class="empty">
+      No documents yet. Create one, open a file, or drop files anywhere on this page.
+    </p>
+    <p v-else-if="!docs.length" class="empty">No documents match “{{ query }}”.</p>
 
     <ul v-else class="doc-list">
       <li v-for="doc in docs" :key="doc.id">
         <RouterLink :to="{ name: 'edit', params: { id: doc.id } }" class="doc-link">
-          <strong>{{ doc.name }}</strong>
+          <strong :class="{ untitled: !doc.name?.trim() }">{{ displayName(doc.name) }}</strong>
           <small>{{ fmt(doc.updatedAt) }} · {{ doc.content.length }} chars</small>
         </RouterLink>
         <button
           class="danger"
-          :title="`Move ${doc.name} to Trash`"
-          :aria-label="`Move ${doc.name} to Trash`"
+          :title="`Move ${displayName(doc.name)} to Trash`"
+          :aria-label="`Move ${displayName(doc.name)} to Trash`"
           @click="remove(doc)"
         >
           ✕
@@ -102,7 +146,7 @@ const daysLeft = (d) =>
         <ul class="doc-list">
           <li v-for="doc in trash" :key="doc.id">
             <RouterLink :to="{ name: 'edit', params: { id: doc.id } }" class="doc-link">
-              <strong>{{ doc.name }}</strong>
+              <strong>{{ displayName(doc.name) }}</strong>
               <small>Deleted {{ fmt(doc.deletedAt) }} · {{ daysLeft(doc) }} days left</small>
             </RouterLink>
             <button @click="restoreDoc(doc.id)">Restore</button>
@@ -110,11 +154,6 @@ const daysLeft = (d) =>
           </li>
         </ul>
       </template>
-    </div>
-
-    <div v-if="toast" class="toast" role="status">
-      <span>Moved “{{ toast.doc.name }}” to Trash.</span>
-      <button @click="undoRemove">Undo</button>
     </div>
   </section>
 </template>

@@ -53,7 +53,13 @@ button.danger { color: var(--danger); background: transparent; border-color: tra
 .hint { color: var(--muted); font-size: 13px; }
 
 .home { width: 100%; max-width: 760px; margin: 0 auto; padding: 24px 16px; }
-.actions { display: flex; gap: 8px; margin-bottom: 20px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.actions .spacer { flex: 1; }
+.filter {
+  width: 100%; margin-bottom: 12px; font: inherit; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg);
+}
+.doc-link strong.untitled { color: var(--muted); font-style: italic; }
 .empty { color: var(--muted); }
 .doc-list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--border); border-radius: 8px; }
 .doc-list li { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
@@ -74,7 +80,11 @@ button.danger { color: var(--danger); background: transparent; border-color: tra
 }
 .name:hover, .name:focus { border-color: var(--border); outline: none; }
 
-.pane { position: relative; flex: 1; min-height: 0; display: flex; font: 14px/1.6 var(--mono); }
+.pane {
+  position: relative; flex: 1; min-height: 0; display: flex;
+  font-family: var(--mono); font-size: 14px; line-height: 1.6;
+}
+.source { flex: 1; min-width: 0; display: flex; }
 .gutter {
   margin: 0; padding: 12px 10px; min-width: 3.5em; text-align: right; overflow: hidden;
   color: var(--muted); background: var(--panel); border-right: 1px solid var(--border);
@@ -85,7 +95,7 @@ button.danger { color: var(--danger); background: transparent; border-color: tra
   font: inherit; color: var(--fg); background: var(--bg); tab-size: 2; white-space: pre;
 }
 .status {
-  display: flex; justify-content: space-between; gap: 12px; padding: 4px 16px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding: 4px 16px;
   font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); background: var(--panel);
 }
 
@@ -152,4 +162,62 @@ button.link:hover { color: var(--fg); }
   .toolbar .name { flex-basis: 100%; }
   .find-row input { flex-basis: 100%; }
   .find-count { min-width: 0; margin-right: auto; text-align: left; }
+}
+
+/* Status bar controls */
+.status-controls { display: flex; align-items: center; gap: 6px; margin-right: auto; }
+.status select {
+  font: inherit; color: var(--muted); background: transparent; border: 1px solid transparent;
+  border-radius: 4px; padding: 1px 2px; cursor: pointer;
+}
+.status select:hover, .status select:focus { border-color: var(--border); color: var(--fg); }
+.font-size { display: inline-flex; align-items: center; gap: 2px; }
+button.mini { font-size: 12px; padding: 0 6px; line-height: 18px; border-color: transparent; background: transparent; color: var(--muted); }
+button.mini:hover { border-color: var(--border); color: var(--fg); }
+
+/* Markdown preview: side by side on wide screens, instead of the text on narrow ones */
+.pane.preview-on .source { flex: 1 1 50%; border-right: 1px solid var(--border); }
+.preview {
+  flex: 1 1 50%; min-width: 0; overflow: auto; padding: 12px 20px;
+  font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: var(--bg);
+}
+@media (max-width: 700px) {
+  .pane.preview-on .source { display: none; }
+}
+.markdown { line-height: 1.6; overflow-wrap: anywhere; }
+.markdown > :first-child { margin-top: 0; }
+.markdown h1, .markdown h2 { border-bottom: 1px solid var(--border); padding-bottom: 0.2em; }
+.markdown code { font-family: var(--mono); font-size: 0.9em; background: var(--panel); padding: 0.1em 0.3em; border-radius: 4px; }
+.markdown pre { background: var(--panel); padding: 10px 12px; border-radius: 6px; overflow: auto; }
+.markdown pre code { background: none; padding: 0; }
+.markdown blockquote { margin: 0; padding: 0 1em; color: var(--muted); border-left: 3px solid var(--border); }
+.markdown table { border-collapse: collapse; }
+.markdown th, .markdown td { border: 1px solid var(--border); padding: 4px 10px; }
+.markdown img { max-width: 100%; }
+
+/* Drag and drop */
+.drop-overlay {
+  position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 3px dashed var(--accent);
+}
+.drop-overlay div {
+  padding: 12px 20px; border-radius: 8px; font-weight: 600;
+  background: var(--bg); color: var(--accent); box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+}
+.toast { z-index: 20; }
+.toast button.icon { min-width: 0; border-color: transparent; }
+
+/* Printing: just the document */
+.print-copy { display: none; }
+@page { margin: 2cm; }
+@media print {
+  html, body, #app { height: auto; background: #fff; color: #000; }
+  .topbar, .toolbar, .banner, .findbar, .pane, .status, .toast, .drop-overlay { display: none !important; }
+  .home .actions, .home .filter, .home button { display: none !important; }
+  .editor { display: block; }
+  .print-copy { display: block; }
+  .print-copy pre { margin: 0; font: 11pt/1.5 var(--mono); white-space: pre; }
+  .print-copy pre.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .print-copy .markdown { font: 11pt/1.5 system-ui, -apple-system, Segoe UI, sans-serif; }
 }

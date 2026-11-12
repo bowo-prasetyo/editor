@@ -11,7 +11,10 @@ import {
   restoreDoc,
 } from '../store'
 import { indentEdit, outdentEdit } from '../indent'
-import { viewSettings } from '../filetype'
+import { extension, viewSettings } from '../filetype'
+import { ENCODINGS, EOLS } from '../textcodec'
+import { prefs, stepFontSize } from '../prefs'
+import { showToast } from '../toast'
 import { applyEdit, rangeRect } from '../textedit'
 import FindBar from '../components/FindBar.vue'
 
@@ -31,12 +34,70 @@ const name = computed({
 })
 
 const view = computed(() => viewSettings(doc.value))
+const isMarkdown = computed(() => ['md', 'markdown', 'mdown'].includes(extension(name.value)))
+const previewOn = computed(() => isMarkdown.value && !!doc.value?.preview)
 const toggle = (key) => setDocOptions(props.id, { [key]: !view.value[key] })
 
 const status = computed(() => state.status[props.id])
 const statusLabel = computed(
   () => ({ saved: 'Saved ✓', pending: 'Saving…', error: 'Not saved' })[status.value] ?? '',
 )
+
+// --- Saving to disk, encoding and line endings ---------------------------------
+
+const encoding = computed({
+  get: () => (doc.value?.encoding ?? 'utf-8') + (doc.value?.bom ? '+bom' : ''),
+  set: (v) => {
+    const [enc, bom] = v.split('+')
+    setDocOptions(props.id, { encoding: enc, bom: bom === 'bom' })
+  },
+})
+const encodingOptions = [
+  ['utf-8', 'UTF-8'],
+  ['utf-8+bom', 'UTF-8 BOM'],
+  ['utf-16le+bom', 'UTF-16 LE BOM'],
+  ['utf-16le', 'UTF-16 LE'],
+  ['utf-16be+bom', 'UTF-16 BE BOM'],
+  ['utf-16be', 'UTF-16 BE'],
+  ['windows-1252', 'Windows-1252'],
+]
+const eol = computed({
+  get: () => doc.value?.eol ?? '\n',
+  set: (v) => setDocOptions(props.id, { eol: v }),
+})
+
+function save() {
+  const { lossy } = downloadDoc(doc.value)
+  if (lossy) {
+    showToast(
+      `Some characters can't be written as ${ENCODINGS[doc.value.encoding]}, so this copy was saved as UTF-8.`,
+      { timeout: 10000 },
+    )
+  }
+}
+
+// --- Markdown preview -------------------------------------------------------
+
+const previewHtml = ref('')
+let render = null
+let renderTimer
+async function updatePreview() {
+  if (!previewOn.value) return
+  render ??= (await import('../markdown')).renderMarkdown
+  previewHtml.value = render(content.value)
+}
+watch(previewOn, updatePreview, { immediate: true })
+watch(content, () => {
+  if (!previewOn.value) return
+  clearTimeout(renderTimer)
+  renderTimer = setTimeout(updatePreview, 150)
+})
+
+async function print() {
+  await updatePreview()
+  await nextTick()
+  window.print()
+}
 
 const lineCount = computed(() => content.value.split('\n').length)
 const wordCount = computed(() => (content.value.match(/\S+/g) || []).length)
@@ -105,7 +166,7 @@ function onWindowKeydown(e) {
   const key = e.key.toLowerCase()
   if (mod && !e.altKey && key === 's') {
     e.preventDefault()
-    downloadDoc(doc.value)
+    save()
   } else if (mod && !e.altKey && key === 'f') {
     e.preventDefault()
     openFind(false)
@@ -151,8 +212,18 @@ function syncScroll(e) {
       >
         Spelling
       </button>
+      <button
+        v-if="isMarkdown"
+        class="toggle"
+        :aria-pressed="previewOn"
+        title="Show the formatted Markdown"
+        @click="setDocOptions(doc.id, { preview: !doc.preview })"
+      >
+        Preview
+      </button>
       <button title="Find and replace (Ctrl/Cmd+F)" @click="openFind(false)">Find</button>
-      <button @click="downloadDoc(doc)" title="Ctrl/Cmd+S">Download</button>
+      <button title="Print (Ctrl/Cmd+P)" @click="print">Print</button>
+      <button @click="save" title="Ctrl/Cmd+S">Download</button>
     </div>
 
     <div v-if="doc.deletedAt" class="banner info" role="status">
@@ -169,7 +240,7 @@ function syncScroll(e) {
         documents and emptying the Trash.
       </span>
       <span class="banner-actions">
-        <button class="primary" @click="downloadDoc(doc)">Download</button>
+        <button class="primary" @click="save">Download</button>
         <button @click="retryFailed">Try again</button>
       </span>
     </div>
@@ -185,7 +256,8 @@ function syncScroll(e) {
       @highlight="(m) => (highlight = m)"
     />
 
-    <div class="pane">
+    <div class="pane" :class="{ 'preview-on': previewOn }" :style="{ fontSize: prefs.fontSize + 'px' }">
+      <div class="source">
       <!-- Line numbers can't line up with wrapped lines, so hide them then;
            the status bar still shows the line and column. -->
       <pre v-if="!view.wrap" ref="gutter" class="gutter" aria-hidden="true"><span v-for="n in lineCount" :key="n">{{ n }}
@@ -206,11 +278,33 @@ function syncScroll(e) {
         @focus="textareaFocused = true"
         @blur="textareaFocused = false"
       />
+      </div>
       <div v-if="markStyle" class="match-mark" :style="markStyle" aria-hidden="true" />
+      <!-- Rendered by marked and sanitised by DOMPurify (see markdown.js). -->
+      <article v-if="previewOn" class="preview markdown" aria-label="Preview" v-html="previewHtml" />
+    </div>
+
+    <!-- What gets printed: the whole text (a textarea only prints what's visible). -->
+    <div class="print-copy" aria-hidden="true">
+      <article v-if="previewOn" class="markdown" v-html="previewHtml" />
+      <pre v-else :class="{ wrap: view.wrap }">{{ content }}</pre>
     </div>
 
     <footer class="status">
       <span>Ln {{ cursor.line }}, Col {{ cursor.col }}</span>
+      <span class="status-controls">
+        <select v-model="encoding" aria-label="Encoding used when downloading" title="Encoding">
+          <option v-for="[v, label] in encodingOptions" :key="v" :value="v">{{ label }}</option>
+        </select>
+        <select v-model="eol" aria-label="Line endings used when downloading" title="Line endings">
+          <option v-for="(label, v) in EOLS" :key="v" :value="v">{{ label }}</option>
+        </select>
+        <span class="font-size" role="group" aria-label="Text size">
+          <button class="mini" aria-label="Smaller text" title="Smaller text" @click="stepFontSize(-1)">A−</button>
+          <span aria-live="polite">{{ prefs.fontSize }}px</span>
+          <button class="mini" aria-label="Larger text" title="Larger text" @click="stepFontSize(1)">A+</button>
+        </span>
+      </span>
       <span>
         {{ lineCount }} lines · {{ wordCount }} words · {{ content.length }} chars ·
         <span :class="['save', status]" aria-live="polite">{{ statusLabel }}</span>

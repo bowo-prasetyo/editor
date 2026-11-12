@@ -1,4 +1,7 @@
 import { reactive } from 'vue'
+import { decodeBytes, encodeText } from './textcodec.js'
+import { DEFAULT_NAME, nameFromContent } from './naming.js'
+import { extension } from './filetype.js'
 
 // All documents live in localStorage — no server involved.
 //
@@ -132,8 +135,10 @@ export function hasUnsaved() {
 
 // --- Public API -----------------------------------------------------------
 
-export function createDoc(name = 'Untitled.txt', content = '') {
-  const doc = { id: crypto.randomUUID(), name, content, updatedAt: Date.now() }
+// extra: { autoName, eol, encoding, bom } and anything else to keep on the doc.
+// A new blank document is named from its first line until the user renames it.
+export function createDoc(name = DEFAULT_NAME, content = '', extra = { autoName: name === DEFAULT_NAME }) {
+  const doc = { id: crypto.randomUUID(), name, content, updatedAt: Date.now(), ...extra }
   state.docs.unshift(doc)
   flush(doc.id)
   return doc
@@ -146,6 +151,10 @@ export function getDoc(id) {
 export function updateDoc(id, patch) {
   const doc = getDoc(id)
   if (!doc) return
+  if ('name' in patch && !('autoName' in patch)) patch = { ...patch, autoName: false }
+  if (doc.autoName && 'content' in patch && !('name' in patch)) {
+    patch = { ...patch, name: nameFromContent(patch.content, extension(doc.name) || 'txt') }
+  }
   Object.assign(doc, patch, { updatedAt: Date.now() })
   schedule(id)
 }
@@ -258,17 +267,76 @@ purgeOldTrash()
 
 // --- Files ----------------------------------------------------------------
 
-// Open a file from the user's disk and store it as a new document.
-export function importFile(file) {
-  return file.text().then((text) => createDoc(file.name, text))
+export class BinaryFileError extends Error {
+  constructor(name) {
+    super(`"${name}" doesn't look like a text file`)
+    this.name = 'BinaryFileError'
+  }
 }
 
-// Save a document to the user's disk as a download.
-export function downloadDoc(doc) {
-  const blob = new Blob([doc.content], { type: 'text/plain;charset=utf-8' })
+// Open a file from the user's disk and store it as a new document, keeping
+// its encoding and line endings so saving writes it back the same way.
+export async function importFile(file) {
+  const decoded = decodeBytes(new Uint8Array(await file.arrayBuffer()))
+  if (decoded.binary) throw new BinaryFileError(file.name)
+  const { text, encoding, bom, eol } = decoded
+  return createDoc(file.name, text, { autoName: false, encoding, bom, eol })
+}
+
+function download(name, blob) {
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = doc.name || 'untitled.txt'
+  a.download = name
   a.click()
   setTimeout(() => URL.revokeObjectURL(a.href), 0)
+}
+
+// Save a document to the user's disk as a download. Returns { lossy: true }
+// if it could not be written in its encoding and was saved as UTF-8 instead.
+export function downloadDoc(doc) {
+  const { bytes, encoding, lossy } = encodeText(doc.content, doc)
+  const charset = encoding === 'windows-1252' ? 'windows-1252' : encoding
+  download(doc.name || 'untitled.txt', new Blob([bytes], { type: `text/plain;charset=${charset}` }))
+  return { lossy }
+}
+
+// --- Backup ---------------------------------------------------------------
+
+export const BACKUP_FORMAT = 'editor-backup'
+
+export function exportBackup() {
+  return { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), docs: state.docs }
+}
+
+export function downloadBackup() {
+  const date = new Date().toISOString().slice(0, 10)
+  const json = JSON.stringify(exportBackup(), null, 1)
+  download(`editor-backup-${date}.json`, new Blob([json], { type: 'application/json' }))
+}
+
+// Add the documents from a backup. Never overwrites: a document that is
+// already here unchanged is skipped; one that differs is added as a copy.
+export function importBackup(data) {
+  if (data?.format !== BACKUP_FORMAT || !Array.isArray(data.docs)) {
+    throw new Error("This file isn't an editor backup.")
+  }
+  let added = 0
+  let skipped = 0
+  for (const d of data.docs) {
+    if (!isDoc(d)) continue
+    const existing = getDoc(d.id)
+    const copyName = `${d.name} (from backup)`
+    const alreadyHere = state.docs.some(
+      (x) => x.content === d.content && (x.name === d.name || x.name === copyName),
+    )
+    if (alreadyHere) {
+      skipped++
+      continue
+    }
+    const doc = existing ? { ...d, id: crypto.randomUUID(), name: copyName } : { ...d }
+    state.docs.push(doc)
+    flush(doc.id)
+    added++
+  }
+  return { added, skipped }
 }
