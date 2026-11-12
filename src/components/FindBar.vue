@@ -4,19 +4,16 @@ const last = { query: '', replacement: '', matchCase: false, wholeWord: false }
 </script>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { findMatches, nextMatchIndex, prevMatchIndex, replaceAllEdit } from '../find'
-import { applyEdit, scrollSelectionIntoView } from '../textedit'
 
-// Find (and optionally replace) in the editor's textarea. The textarea can't
-// highlight matches, so the current match is shown by selecting it.
+// Find (and optionally replace) in the editor. Every match is highlighted;
+// the current one is selected.
 const props = defineProps({
-  target: { type: Object, default: null }, // the <textarea>
+  editor: { type: Object, default: null }, // see createEditor() in cm.js
   text: { type: String, required: true },
 })
-// 'highlight' reports the current match as [start, end] (or null) so the
-// editor can draw it: textareas don't show their selection while unfocused.
-const emit = defineEmits(['close', 'edited', 'highlight'])
+const emit = defineEmits(['close'])
 const showReplace = defineModel('replace', { type: Boolean, default: false })
 
 const query = ref(last.query)
@@ -43,25 +40,30 @@ const count = computed(() => {
   return current.value >= 0 ? `${current.value + 1} of ${matches.value.length}` : `${matches.value.length} found`
 })
 
-// Select match i in the textarea and scroll it into view, keeping focus in
+const selection = () => props.editor?.getSelection() ?? { from: 0, to: 0 }
+
+// Select match i in the editor and scroll it into view, keeping focus in
 // the find bar.
-function select(i, keepFocus = document.activeElement) {
-  const el = props.target
+function select(i) {
   current.value = i
-  if (!el || i < 0) return
+  if (!props.editor || i < 0) return
   const [s, e] = matches.value[i]
-  el.focus({ preventScroll: true })
-  el.setSelectionRange(s, e)
-  scrollSelectionIntoView(el)
-  keepFocus?.focus?.({ preventScroll: true })
-  emit('highlight', [s, e])
+  props.editor.select(s, e)
 }
 
 function isSelected(i) {
-  const el = props.target
   const m = matches.value[i]
-  return el && m && el.selectionStart === m[0] && el.selectionEnd === m[1]
+  const { from, to } = selection()
+  return !!m && from === m[0] && to === m[1]
 }
+
+// Highlight every match in the editor while the bar is open.
+watch(
+  [query, matchCase, wholeWord, () => props.editor],
+  ([q, c, w, ed]) => ed?.highlight(q, { matchCase: c, wholeWord: w }),
+  { immediate: true },
+)
+onBeforeUnmount(() => props.editor?.highlight('', {}))
 
 // Find as you type: jump to the first match after where the search started.
 watch([query, matchCase, wholeWord], () => {
@@ -71,54 +73,45 @@ watch([query, matchCase, wholeWord], () => {
 })
 
 // Keep the counter honest when the text changes under us.
-watch(
-  current,
-  (i) => emit('highlight', i >= 0 && matches.value[i] ? [...matches.value[i]] : null),
-  { flush: 'post' },
-)
-
 watch(matches, (list) => {
   if (current.value >= list.length || !isSelected(current.value)) {
-    const el = props.target
-    current.value = el ? list.findIndex(([s, e]) => s === el.selectionStart && e === el.selectionEnd) : -1
+    const { from, to } = selection()
+    current.value = list.findIndex(([s, e]) => s === from && e === to)
   }
 })
 
 function next() {
   message.value = ''
-  const el = props.target
-  const from = isSelected(current.value) ? matches.value[current.value][0] + 1 : el?.selectionStart ?? 0
+  const from = isSelected(current.value) ? matches.value[current.value][0] + 1 : selection().from
   select(nextMatchIndex(matches.value, from))
 }
 
 function prev() {
   message.value = ''
-  const el = props.target
-  const from = isSelected(current.value) ? matches.value[current.value][0] : el?.selectionStart ?? 0
+  const from = isSelected(current.value) ? matches.value[current.value][0] : selection().from
   select(prevMatchIndex(matches.value, from))
 }
 
+// The text prop only catches up on the next render, so edits read the
+// editor's own text.
+const liveMatches = () =>
+  findMatches(props.editor.getText(), query.value, { matchCase: matchCase.value, wholeWord: wholeWord.value })
+
 async function replaceOne() {
-  const el = props.target
-  if (!el || !matches.value.length) return
+  if (!props.editor || !matches.value.length) return
   if (!isSelected(current.value)) return next()
   const [s, e] = matches.value[current.value]
-  const focus = document.activeElement
-  applyEdit(el, { from: s, to: e, insert: replacement.value })
-  emit('edited')
+  props.editor.replace(s, e, replacement.value)
   await nextTick()
-  select(nextMatchIndex(matches.value, s + replacement.value.length), focus)
+  select(nextMatchIndex(liveMatches(), s + replacement.value.length))
 }
 
 async function replaceAll() {
-  const el = props.target
-  const edit = replaceAllEdit(props.text, matches.value, replacement.value)
-  if (!el || !edit) return
-  const focus = document.activeElement
-  applyEdit(el, edit)
-  emit('edited')
+  if (!props.editor) return
+  const edit = replaceAllEdit(props.editor.getText(), liveMatches(), replacement.value)
+  if (!edit) return
+  props.editor.replace(edit.from, edit.to, edit.insert)
   await nextTick()
-  focus?.focus?.()
   current.value = -1
   message.value = `Replaced ${edit.count}`
 }
@@ -144,11 +137,11 @@ function onReplaceKey(e) {
 // Called by the editor on Ctrl+F / Ctrl+H: seed the query from a one-line
 // selection and focus the right box.
 async function open(withReplace) {
-  const el = props.target
   if (withReplace) showReplace.value = true
-  if (el) {
-    anchor = el.selectionStart
-    const sel = el.value.slice(el.selectionStart, el.selectionEnd)
+  if (props.editor) {
+    const { from, to } = selection()
+    anchor = from
+    const sel = props.editor.getText().slice(from, to)
     if (sel && !sel.includes('\n')) query.value = sel
   }
   await nextTick()

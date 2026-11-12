@@ -9,21 +9,22 @@ import {
   retryFailed,
   restoreDoc,
 } from '../store'
-import { indentEdit, outdentEdit } from '../indent'
 import { extension, viewSettings } from '../filetype'
 import { ENCODINGS, EOLS } from '../textcodec'
 import { prefs, stepFontSize } from '../prefs'
 import { showToast } from '../toast'
-import { applyEdit, rangeRect } from '../textedit'
 import { canSaveInPlace, saveDoc } from '../fileaccess'
-import { countLines, countWords, lineColAt } from '../stats'
+import { countWords } from '../stats'
+import { createEditor } from '../cm'
 import FindBar from '../components/FindBar.vue'
+import GoToBar from '../components/GoToBar.vue'
 
 const props = defineProps({ id: { type: String, required: true } })
 
 const doc = computed(() => getDoc(props.id))
-const textarea = ref(null)
-const cursor = ref({ line: 1, col: 1 })
+const host = ref(null) // where the editor is mounted
+const editor = ref(null) // see createEditor() in cm.js
+const cursor = ref({ line: 1, col: 1, cursors: 1, selected: 0, lines: 1 })
 
 const content = computed({
   get: () => doc.value?.content ?? '',
@@ -127,9 +128,46 @@ async function print() {
   window.print()
 }
 
+
+// --- The editor ---------------------------------------------------------------
+
+// One CodeMirror editor per document; rebuilt when the route moves to
+// another document (so undo history doesn't leak between documents).
+function mountEditor() {
+  editor.value?.destroy()
+  editor.value = null
+  if (!host.value || !doc.value) return
+  editor.value = createEditor({
+    parent: host.value,
+    text: content.value,
+    name: name.value,
+    wrap: view.value.wrap,
+    spellcheck: view.value.spellcheck,
+    onChange: (text) => (content.value = text),
+    onSelection: (info) => (cursor.value = info),
+  })
+  editor.value.focus()
+}
+watch([host, () => props.id], mountEditor, { flush: 'post' })
+
+// Keep the editor in step with the document and its settings.
+watch(content, (text) => editor.value?.setText(text))
+watch(() => view.value.wrap, (on) => editor.value?.setWrap(on))
+watch(() => view.value.spellcheck, (on) => editor.value?.setSpellcheck(on))
+watch(name, (n) => editor.value?.setName(n))
+watch(
+  () => prefs.fontSize,
+  () => nextTick(() => editor.value?.view.requestMeasure()),
+)
+
 // --- Counts -----------------------------------------------------------------
 
-const lineCount = computed(() => countLines(content.value))
+const lineCount = computed(() => cursor.value.lines)
+const selectionInfo = computed(() => {
+  const { cursors, selected } = cursor.value
+  if (cursors > 1) return `${cursors} cursors`
+  return selected ? `${selected} selected` : ''
+})
 
 // Words and characters: immediate for normal documents; for big ones,
 // counted once typing pauses.
@@ -139,118 +177,53 @@ let statsTimer
 function updateStats() {
   stats.value = { words: countWords(content.value), chars: content.value.length }
 }
+let statsFor = null // the document the counts belong to
 watch(
   content,
   (text) => {
     clearTimeout(statsTimer)
-    if (text.length < BIG) updateStats()
+    // Right away for a newly opened document; for big ones, after typing pauses.
+    if (text.length < BIG || statsFor !== props.id) updateStats()
     else statsTimer = setTimeout(updateStats, 500)
+    statsFor = props.id
   },
   { immediate: true },
 )
 
-function updateCursor() {
-  const el = textarea.value
-  if (!el) return
-  cursor.value = lineColAt(el.value, el.selectionStart)
-}
-
-// --- Line numbers -------------------------------------------------------------
-
-// Only the line numbers in view are drawn (a document can have 100,000
-// lines), moved into place to follow the textarea's scrolling.
-const scrollTop = ref(0)
-const viewHeight = ref(0)
-const lineHeight = ref(22.4)
-const padTop = ref(12)
-let measuredAt = 0 // line count when the line pitch was last measured
-function measure() {
-  const el = textarea.value
-  if (!el) return
-  const cs = getComputedStyle(el)
-  const css = parseFloat(cs.lineHeight) || prefs.fontSize * 1.6
-  padTop.value = parseFloat(cs.paddingTop) || 0
-  viewHeight.value = el.clientHeight
-  // Browsers lay lines out on a sub-pixel grid (22.4px becomes 22.390625px in
-  // Chrome), which adds up over thousands of lines. Measure the real pitch
-  // from the text's height when there are enough lines to do so accurately.
-  const lines = lineCount.value
-  const exact = (el.scrollHeight - padTop.value - (parseFloat(cs.paddingBottom) || 0)) / lines
-  lineHeight.value = lines >= 50 && Math.abs(exact - css) < 0.5 ? exact : css
-  measuredAt = lines
-}
-// Measure again as a document grows (cheap: only when the line count doubles).
-watch(lineCount, (n) => {
-  if (n >= 50 && n >= measuredAt * 2) nextTick(measure)
-})
-const firstLine = computed(() =>
-  Math.min(lineCount.value - 1, Math.max(0, Math.floor((scrollTop.value - padTop.value) / lineHeight.value))),
-)
-const gutterLines = computed(() => {
-  const count = Math.ceil(viewHeight.value / lineHeight.value) + 2
-  const end = Math.min(lineCount.value, firstLine.value + count)
-  const out = []
-  for (let n = firstLine.value + 1; n <= end; n++) out.push(n)
-  return out
-})
-const gutterStyle = computed(() => ({
-  transform: `translateY(${padTop.value + firstLine.value * lineHeight.value - scrollTop.value}px)`,
-}))
-const gutterWidth = computed(() => `calc(${Math.max(2, String(lineCount.value).length)}ch + 20px)`)
-let resizeObserver
-watch(() => prefs.fontSize, () => nextTick(measure))
-
-// --- Find / replace ---------------------------------------------------------
+// --- Find / replace and go to line -------------------------------------------
 
 const findOpen = ref(false)
 const replaceOpen = ref(false)
 const findBar = ref(null)
+const goToOpen = ref(false)
 
 async function openFind(withReplace) {
+  goToOpen.value = false
   findOpen.value = true
   await nextTick()
   findBar.value?.open(withReplace)
 }
 
-// Box drawn over the current find match while focus is in the find bar.
-const highlight = ref(null) // [start, end]
-const textareaFocused = ref(false)
-const markStyle = ref(null)
-function placeMark() {
-  const el = textarea.value
-  if (!el || !highlight.value || textareaFocused.value) return (markStyle.value = null)
-  const r = rangeRect(el, ...highlight.value)
-  const visible = r.top + r.height > el.offsetTop && r.top < el.offsetTop + el.clientHeight
-  markStyle.value = visible
-    ? { top: r.top + 'px', left: r.left + 'px', width: r.width + 'px', height: r.height + 'px' }
-    : null
-}
-watch([highlight, textareaFocused, () => view.value.wrap], () => nextTick(placeMark))
-
 function closeFind() {
-  highlight.value = null
   findOpen.value = false
   replaceOpen.value = false
-  textarea.value?.focus()
+  editor.value?.focus()
+}
+
+function openGoTo() {
+  findOpen.value = false
+  goToOpen.value = true
+}
+
+function closeGoTo({ refocus = true } = {}) {
+  goToOpen.value = false
+  if (refocus) editor.value?.focus()
 }
 
 // --- Keyboard ---------------------------------------------------------------
 
-// Tab indents, Shift+Tab outdents (whole lines when text is selected).
-function onTextareaKeydown(e) {
-  if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    e.preventDefault()
-    const el = e.target
-    const fn = e.shiftKey ? outdentEdit : indentEdit
-    const edit = fn(el.value, el.selectionStart, el.selectionEnd)
-    if (edit) {
-      applyEdit(el, edit)
-      updateCursor()
-    }
-  }
-}
-
-// Editor-wide shortcuts, wherever focus is on the page.
+// Editor-wide shortcuts, wherever focus is on the page. Editing keys
+// (Tab, Ctrl/Cmd+/, Alt+arrows…) are handled by the editor itself.
 function onWindowKeydown(e) {
   if (!doc.value) return
   const mod = e.ctrlKey || e.metaKey
@@ -258,12 +231,15 @@ function onWindowKeydown(e) {
   if (mod && !e.altKey && key === 's') {
     e.preventDefault()
     save(e.shiftKey)
-  } else if (mod && !e.altKey && key === 'f') {
+  } else if (mod && !e.altKey && !e.shiftKey && key === 'f') {
     e.preventDefault()
     openFind(false)
-  } else if (mod && !e.altKey && key === 'h') {
+  } else if (mod && !e.altKey && !e.shiftKey && key === 'h') {
     e.preventDefault()
     openFind(true)
+  } else if (mod && !e.altKey && !e.shiftKey && key === 'g') {
+    e.preventDefault()
+    openGoTo()
   } else if (e.altKey && !mod && e.code === 'KeyZ') {
     e.preventDefault()
     toggle('wrap')
@@ -274,25 +250,15 @@ onMounted(() => {
   window.addEventListener('keydown', onWindowKeydown)
   window.addEventListener('beforeprint', beforePrint)
   window.addEventListener('afterprint', afterPrint)
-  measure()
-  if (typeof ResizeObserver !== 'undefined' && textarea.value) {
-    resizeObserver = new ResizeObserver(measure)
-    resizeObserver.observe(textarea.value)
-  }
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onWindowKeydown)
   window.removeEventListener('beforeprint', beforePrint)
   window.removeEventListener('afterprint', afterPrint)
-  resizeObserver?.disconnect()
   clearTimeout(statsTimer)
+  editor.value?.destroy()
   flushAll()
 })
-
-function syncScroll(e) {
-  scrollTop.value = e.target.scrollTop
-  if (highlight.value) placeMark()
-}
 </script>
 
 <template>
@@ -358,52 +324,31 @@ function syncScroll(e) {
       v-if="findOpen"
       ref="findBar"
       v-model:replace="replaceOpen"
-      :target="textarea"
+      :editor="editor"
       :text="content"
       @close="closeFind"
-      @edited="updateCursor"
-      @highlight="(m) => (highlight = m)"
     />
+    <GoToBar v-if="goToOpen" :editor="editor" :lines="lineCount" @close="closeGoTo" />
 
     <div class="pane" :class="{ 'preview-on': previewOn }" :style="{ fontSize: prefs.fontSize + 'px' }">
-      <div class="source">
-      <!-- Line numbers can't line up with wrapped lines, so hide them then;
-           the status bar still shows the line and column. -->
-      <div v-if="!view.wrap" class="gutter" :style="{ width: gutterWidth }" aria-hidden="true">
-        <div class="gutter-lines" :style="gutterStyle">
-          <div v-for="n in gutterLines" :key="n">{{ n }}</div>
-        </div>
-      </div>
-      <textarea
-        ref="textarea"
-        v-model="content"
-        :class="{ wrap: view.wrap }"
-        :spellcheck="view.spellcheck"
-        :wrap="view.wrap ? 'soft' : 'off'"
-        autofocus
-        aria-label="Document text"
-        @keydown="onTextareaKeydown"
-        @keyup="updateCursor"
-        @click="updateCursor"
-        @select="updateCursor"
-        @scroll="syncScroll"
-        @focus="textareaFocused = true"
-        @blur="textareaFocused = false"
-      />
-      </div>
-      <div v-if="markStyle" class="match-mark" :style="markStyle" aria-hidden="true" />
+      <div ref="host" class="source" />
       <!-- Rendered by marked and sanitised by DOMPurify (see markdown.js). -->
       <article v-if="previewOn" class="preview markdown" aria-label="Preview" v-html="previewHtml" />
     </div>
 
-    <!-- What gets printed: the whole text (a textarea only prints what's visible). -->
+    <!-- What gets printed: the whole text (the editor only draws what's visible). -->
     <div v-if="printing" class="print-copy" aria-hidden="true">
       <article v-if="previewOn" class="markdown" v-html="previewHtml" />
       <pre v-else :class="{ wrap: view.wrap }">{{ content }}</pre>
     </div>
 
     <footer class="status">
-      <span>Ln {{ cursor.line }}, Col {{ cursor.col }}</span>
+      <span>
+        <button class="mini position" title="Go to line (Ctrl/Cmd+G)" @click="openGoTo">
+          Ln {{ cursor.line }}, Col {{ cursor.col }}
+        </button>
+        <span v-if="selectionInfo"> ({{ selectionInfo }})</span>
+      </span>
       <span class="status-controls">
         <select v-model="encoding" aria-label="Encoding used when downloading" title="Encoding">
           <option v-for="[v, label] in encodingOptions" :key="v" :value="v">{{ label }}</option>
