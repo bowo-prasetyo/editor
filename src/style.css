@@ -6,6 +6,22 @@
   --panel: #f6f8fa;
   --accent: #0969da;
   --danger: #cf222e;
+  /* Syntax colours (GitHub-like) */
+  --syn-keyword: #cf222e;
+  --syn-string: #0a3069;
+  --syn-number: #0550ae;
+  --syn-comment: #6e7781;
+  --syn-function: #8250df;
+  --syn-type: #953800;
+  --syn-property: #0550ae;
+  --syn-variable: #953800;
+  --syn-punctuation: #57606a;
+  --syn-meta: #6639ba;
+  --syn-escape: #116329;
+  --syn-heading: #0550ae;
+  --syn-link: #0a3069;
+  --syn-inserted: #116329;
+  --syn-deleted: #82071e;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light dark;
 }
@@ -18,6 +34,21 @@
     --panel: #161b22;
     --accent: #4493f8;
     --danger: #f85149;
+    --syn-keyword: #ff7b72;
+    --syn-string: #a5d6ff;
+    --syn-number: #79c0ff;
+    --syn-comment: #8b949e;
+    --syn-function: #d2a8ff;
+    --syn-type: #ffa657;
+    --syn-property: #79c0ff;
+    --syn-variable: #ffa657;
+    --syn-punctuation: #b1bac4;
+    --syn-meta: #d2a8ff;
+    --syn-escape: #7ee787;
+    --syn-heading: #79c0ff;
+    --syn-link: #a5d6ff;
+    --syn-inserted: #7ee787;
+    --syn-deleted: #ffa198;
   }
 }
 
@@ -162,6 +193,7 @@ button.link:hover { color: var(--fg); }
 button.mini { font-size: 12px; padding: 0 6px; line-height: 18px; border-color: transparent; background: transparent; color: var(--muted); }
 button.mini:hover { border-color: var(--border); color: var(--fg); }
 button.mini.position { font-size: inherit; padding: 0 4px; margin-left: -4px; }
+.status select.language { max-width: 14em; }
 .goto-label { font-size: 13px; color: var(--muted); }
 
 /* Markdown preview: side by side on wide screens, instead of the text on narrow ones */
