@@ -168,3 +168,42 @@ test('view options are saved without bumping updatedAt', async () => {
   assert.equal(JSON.parse(localStorage.getItem('editor.doc.' + a.id)).wrap, false)
   assert.equal(s.getDoc(a.id).updatedAt, before)
 })
+
+test('new documents are named from their first line until renamed', async () => {
+  const s = await load()
+  const d = s.createDoc()
+  s.updateDoc(d.id, { content: 'Groceries\nmilk' })
+  assert.equal(s.getDoc(d.id).name, 'Groceries.txt')
+  s.updateDoc(d.id, { name: 'list.md' })
+  s.updateDoc(d.id, { content: 'Something else' })
+  assert.equal(s.getDoc(d.id).name, 'list.md')
+  assert.equal(s.createDoc('opened.txt', 'x').autoName, false)
+})
+
+test('opening a file keeps its encoding and line endings', async () => {
+  const s = await load()
+  const file = new File([new Uint8Array([0x63, 0x61, 0x66, 0xe9, 0x0d, 0x0a])], 'latin.txt')
+  const d = await s.importFile(file)
+  assert.deepEqual([d.content, d.encoding, d.eol, d.autoName], ['café\n', 'windows-1252', '\r\n', false])
+  await assert.rejects(s.importFile(new File([new Uint8Array([0, 1, 2, 0])], 'x.bin')), s.BinaryFileError)
+})
+
+test('backup round trip adds missing docs, skips identical ones, copies changed ones', async () => {
+  const s = await load()
+  const a = s.createDoc('a.txt', 'A')
+  const b = s.createDoc('b.txt', 'B')
+  s.trashDoc(b.id)
+  const backup = JSON.parse(JSON.stringify(s.exportBackup()))
+  assert.equal(backup.docs.length, 2)
+
+  s.deleteDoc(b.id)
+  s.updateDoc(a.id, { content: 'A changed' })
+  const result = s.importBackup(backup)
+  assert.deepEqual(result, { added: 2, skipped: 0 })
+  assert.equal(s.getDoc(b.id).deletedAt, backup.docs.find((d) => d.id === b.id).deletedAt, 'trash state kept')
+  assert.equal(s.getDoc(a.id).content, 'A changed', 'existing doc not overwritten')
+  assert.ok(s.state.docs.find((d) => d.name === 'a.txt (from backup)' && d.content === 'A'))
+
+  assert.deepEqual(s.importBackup(backup), { added: 0, skipped: 2 }, 'importing twice adds nothing')
+  assert.throws(() => s.importBackup({ docs: [] }), /isn't an editor backup\./)
+})

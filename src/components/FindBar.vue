@@ -174,8 +174,8 @@ defineExpose({ open })
         @keydown="onQueryKey"
       />
       <span class="find-count" aria-live="polite">{{ count }}</span>
-      <button class="icon" :aria-pressed="matchCase" title="Match case" @click="matchCase = !matchCase">Aa</button>
-      <button class="icon" :aria-pressed="wholeWord" title="Whole word" @click="wholeWord = !wholeWord">
+      <button class="icon" :aria-pressed="matchCase" title="Match case" aria-label="Match case" @click="matchCase = !matchCase">Aa</button>
+      <button class="icon" :aria-pressed="wholeWord" title="Whole word" aria-label="Whole word" @click="wholeWord = !wholeWord">
         <u>ab</u>
       </button>
       <button class="icon" title="Previous (Shift+Enter)" aria-label="Previous match" @click="prev">↑</button>
@@ -184,6 +184,7 @@ defineExpose({ open })
         class="icon"
         :aria-pressed="showReplace"
         title="Replace (Ctrl/Cmd+H)"
+        aria-label="Show replace"
         @click="showReplace = !showReplace"
       >
         ⇄
