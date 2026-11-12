@@ -1,9 +1,11 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   state,
   createDoc,
+  requestPersistence,
+  storageEstimate,
   deleteDoc,
   downloadBackup,
   emptyTrash,
@@ -14,6 +16,7 @@ import {
 } from '../store'
 import { displayName } from '../naming'
 import { openFiles, TEXT_ACCEPT } from '../openFiles'
+import { canSaveInPlace, pickFiles } from '../fileaccess'
 import { showToast } from '../toast'
 
 const router = useRouter()
@@ -38,7 +41,20 @@ const showTrash = ref(false)
 
 function newDoc() {
   const doc = createDoc()
+  requestPersistence()
   router.push({ name: 'edit', params: { id: doc.id } })
+}
+
+// Where the browser can, open through its file picker so the documents stay
+// linked to their files and Save writes back to them.
+async function openPicker() {
+  if (!canSaveInPlace()) return fileInput.value.click()
+  try {
+    const picked = await pickFiles()
+    if (picked.length) await openFiles(picked, router)
+  } catch (e) {
+    showToast(`Couldn't open the files: ${e.message}`)
+  }
 }
 
 async function onFiles(e) {
@@ -82,6 +98,14 @@ function onEmptyTrash() {
     emptyTrash()
 }
 
+// Storage use, shown under the list so people know how much room is left.
+const usage = ref(null)
+const mb = (b) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.max(0.1, b / 1e6).toFixed(1)} MB`)
+onMounted(async () => {
+  const est = await storageEstimate()
+  if (est?.quota) usage.value = `${mb(est.usage ?? 0)} used of ${mb(est.quota)} available`
+})
+
 const fmt = (t) => new Date(t).toLocaleString()
 const daysLeft = (d) =>
   Math.max(0, Math.ceil(TRASH_DAYS - (Date.now() - d.deletedAt) / (24 * 60 * 60 * 1000)))
@@ -91,7 +115,7 @@ const daysLeft = (d) =>
   <section class="home">
     <div class="actions">
       <button class="primary" @click="newDoc">New document</button>
-      <button @click="fileInput.click()">Open files…</button>
+      <button @click="openPicker">Open files…</button>
       <input ref="fileInput" type="file" multiple :accept="TEXT_ACCEPT" hidden @change="onFiles" />
       <span class="spacer" />
       <button title="Download every document as one backup file" @click="downloadBackup">
@@ -133,6 +157,14 @@ const daysLeft = (d) =>
         </button>
       </li>
     </ul>
+
+    <p v-if="state.backend" class="hint storage-info">
+      <template v-if="state.backend === 'localStorage'">
+        Documents are kept in this browser's small localStorage (about 5 MB) because IndexedDB isn't available.
+      </template>
+      <template v-else>Documents are kept in this browser{{ usage ? ` · ${usage}` : '' }}.</template>
+      <template v-if="!state.persisted"> The browser may clear them if the disk gets full: export a backup now and then.</template>
+    </p>
 
     <div v-if="trash.length" class="trash">
       <div class="trash-head">

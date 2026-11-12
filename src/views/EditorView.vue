@@ -5,7 +5,6 @@ import {
   getDoc,
   updateDoc,
   setDocOptions,
-  downloadDoc,
   flushAll,
   retryFailed,
   restoreDoc,
@@ -16,6 +15,8 @@ import { ENCODINGS, EOLS } from '../textcodec'
 import { prefs, stepFontSize } from '../prefs'
 import { showToast } from '../toast'
 import { applyEdit, rangeRect } from '../textedit'
+import { canSaveInPlace, saveDoc } from '../fileaccess'
+import { countLines, countWords, lineColAt } from '../stats'
 import FindBar from '../components/FindBar.vue'
 
 const props = defineProps({ id: { type: String, required: true } })
@@ -45,11 +46,13 @@ const statusLabel = computed(
 
 // --- Saving to disk, encoding and line endings ---------------------------------
 
+// Changing how the file is written makes it differ from the file on disk.
+const diskChange = () => (doc.value?.linked ? { diskDirty: true } : {})
 const encoding = computed({
   get: () => (doc.value?.encoding ?? 'utf-8') + (doc.value?.bom ? '+bom' : ''),
   set: (v) => {
     const [enc, bom] = v.split('+')
-    setDocOptions(props.id, { encoding: enc, bom: bom === 'bom' })
+    setDocOptions(props.id, { encoding: enc, bom: bom === 'bom', ...diskChange() })
   },
 })
 const encodingOptions = [
@@ -63,16 +66,35 @@ const encodingOptions = [
 ]
 const eol = computed({
   get: () => doc.value?.eol ?? '\n',
-  set: (v) => setDocOptions(props.id, { eol: v }),
+  set: (v) => setDocOptions(props.id, { eol: v, ...diskChange() }),
 })
 
-function save() {
-  const { lossy } = downloadDoc(doc.value)
-  if (lossy) {
-    showToast(
-      `Some characters can't be written as ${ENCODINGS[doc.value.encoding]}, so this copy was saved as UTF-8.`,
-      { timeout: 10000 },
-    )
+// Save writes back to the file the document came from where the browser
+// allows it (Chrome, Edge); elsewhere it downloads a copy.
+const inPlace = canSaveInPlace()
+const fileStatus = computed(() => {
+  if (!doc.value?.linked) return ''
+  return doc.value.diskDirty ? 'Not saved to file' : 'Saved to file'
+})
+let saving = false
+async function save(saveAs = false) {
+  if (saving) return
+  saving = true
+  try {
+    const encodingBefore = ENCODINGS[doc.value.encoding] ?? doc.value.encoding
+    const r = await saveDoc(doc.value, { saveAs })
+    if (r.result === 'saved') showToast(`Saved to “${r.name}”.`, { timeout: 3000 })
+    if (r.lossy) {
+      showToast(
+        `Some characters can't be written as ${encodingBefore}, so this copy was saved as UTF-8.`,
+        { timeout: 10000 },
+      )
+    }
+  } catch (e) {
+    console.error(e)
+    showToast(`Couldn't save the file: ${e.message}`, { timeout: 10000 })
+  } finally {
+    saving = false
   }
 }
 
@@ -93,21 +115,90 @@ watch(content, () => {
   renderTimer = setTimeout(updatePreview, 150)
 })
 
+// The print copy holds the whole text, so it's only rendered while printing
+// (keeping it up to date on every keystroke is slow for big documents).
+const printing = ref(false)
+const beforePrint = () => (printing.value = true)
+const afterPrint = () => (printing.value = false)
 async function print() {
   await updatePreview()
+  printing.value = true
   await nextTick()
   window.print()
 }
 
-const lineCount = computed(() => content.value.split('\n').length)
-const wordCount = computed(() => (content.value.match(/\S+/g) || []).length)
+// --- Counts -----------------------------------------------------------------
+
+const lineCount = computed(() => countLines(content.value))
+
+// Words and characters: immediate for normal documents; for big ones,
+// counted once typing pauses.
+const BIG = 200_000
+const stats = ref({ words: 0, chars: 0 })
+let statsTimer
+function updateStats() {
+  stats.value = { words: countWords(content.value), chars: content.value.length }
+}
+watch(
+  content,
+  (text) => {
+    clearTimeout(statsTimer)
+    if (text.length < BIG) updateStats()
+    else statsTimer = setTimeout(updateStats, 500)
+  },
+  { immediate: true },
+)
 
 function updateCursor() {
   const el = textarea.value
   if (!el) return
-  const before = el.value.slice(0, el.selectionStart).split('\n')
-  cursor.value = { line: before.length, col: before.at(-1).length + 1 }
+  cursor.value = lineColAt(el.value, el.selectionStart)
 }
+
+// --- Line numbers -------------------------------------------------------------
+
+// Only the line numbers in view are drawn (a document can have 100,000
+// lines), moved into place to follow the textarea's scrolling.
+const scrollTop = ref(0)
+const viewHeight = ref(0)
+const lineHeight = ref(22.4)
+const padTop = ref(12)
+let measuredAt = 0 // line count when the line pitch was last measured
+function measure() {
+  const el = textarea.value
+  if (!el) return
+  const cs = getComputedStyle(el)
+  const css = parseFloat(cs.lineHeight) || prefs.fontSize * 1.6
+  padTop.value = parseFloat(cs.paddingTop) || 0
+  viewHeight.value = el.clientHeight
+  // Browsers lay lines out on a sub-pixel grid (22.4px becomes 22.390625px in
+  // Chrome), which adds up over thousands of lines. Measure the real pitch
+  // from the text's height when there are enough lines to do so accurately.
+  const lines = lineCount.value
+  const exact = (el.scrollHeight - padTop.value - (parseFloat(cs.paddingBottom) || 0)) / lines
+  lineHeight.value = lines >= 50 && Math.abs(exact - css) < 0.5 ? exact : css
+  measuredAt = lines
+}
+// Measure again as a document grows (cheap: only when the line count doubles).
+watch(lineCount, (n) => {
+  if (n >= 50 && n >= measuredAt * 2) nextTick(measure)
+})
+const firstLine = computed(() =>
+  Math.min(lineCount.value - 1, Math.max(0, Math.floor((scrollTop.value - padTop.value) / lineHeight.value))),
+)
+const gutterLines = computed(() => {
+  const count = Math.ceil(viewHeight.value / lineHeight.value) + 2
+  const end = Math.min(lineCount.value, firstLine.value + count)
+  const out = []
+  for (let n = firstLine.value + 1; n <= end; n++) out.push(n)
+  return out
+})
+const gutterStyle = computed(() => ({
+  transform: `translateY(${padTop.value + firstLine.value * lineHeight.value - scrollTop.value}px)`,
+}))
+const gutterWidth = computed(() => `calc(${Math.max(2, String(lineCount.value).length)}ch + 20px)`)
+let resizeObserver
+watch(() => prefs.fontSize, () => nextTick(measure))
 
 // --- Find / replace ---------------------------------------------------------
 
@@ -166,7 +257,7 @@ function onWindowKeydown(e) {
   const key = e.key.toLowerCase()
   if (mod && !e.altKey && key === 's') {
     e.preventDefault()
-    save()
+    save(e.shiftKey)
   } else if (mod && !e.altKey && key === 'f') {
     e.preventDefault()
     openFind(false)
@@ -179,15 +270,27 @@ function onWindowKeydown(e) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onWindowKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', onWindowKeydown)
+  window.addEventListener('beforeprint', beforePrint)
+  window.addEventListener('afterprint', afterPrint)
+  measure()
+  if (typeof ResizeObserver !== 'undefined' && textarea.value) {
+    resizeObserver = new ResizeObserver(measure)
+    resizeObserver.observe(textarea.value)
+  }
+})
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onWindowKeydown)
+  window.removeEventListener('beforeprint', beforePrint)
+  window.removeEventListener('afterprint', afterPrint)
+  resizeObserver?.disconnect()
+  clearTimeout(statsTimer)
   flushAll()
 })
 
-const gutter = ref(null)
 function syncScroll(e) {
-  if (gutter.value) gutter.value.scrollTop = e.target.scrollTop
+  scrollTop.value = e.target.scrollTop
   if (highlight.value) placeMark()
 }
 </script>
@@ -223,7 +326,13 @@ function syncScroll(e) {
       </button>
       <button title="Find and replace (Ctrl/Cmd+F)" @click="openFind(false)">Find</button>
       <button title="Print (Ctrl/Cmd+P)" @click="print">Print</button>
-      <button @click="save" title="Ctrl/Cmd+S">Download</button>
+      <template v-if="inPlace">
+        <button :title="doc.linked ? 'Save to the file (Ctrl/Cmd+S)' : 'Save to a file (Ctrl/Cmd+S)'" @click="save(false)">
+          Save
+        </button>
+        <button title="Save to a different file (Ctrl/Cmd+Shift+S)" @click="save(true)">Save as…</button>
+      </template>
+      <button v-else title="Download a copy (Ctrl/Cmd+S)" @click="save(false)">Download</button>
     </div>
 
     <div v-if="doc.deletedAt" class="banner info" role="status">
@@ -240,7 +349,7 @@ function syncScroll(e) {
         documents and emptying the Trash.
       </span>
       <span class="banner-actions">
-        <button class="primary" @click="save">Download</button>
+        <button class="primary" @click="save(false)">{{ inPlace ? 'Save to a file' : 'Download' }}</button>
         <button @click="retryFailed">Try again</button>
       </span>
     </div>
@@ -260,8 +369,11 @@ function syncScroll(e) {
       <div class="source">
       <!-- Line numbers can't line up with wrapped lines, so hide them then;
            the status bar still shows the line and column. -->
-      <pre v-if="!view.wrap" ref="gutter" class="gutter" aria-hidden="true"><span v-for="n in lineCount" :key="n">{{ n }}
-</span></pre>
+      <div v-if="!view.wrap" class="gutter" :style="{ width: gutterWidth }" aria-hidden="true">
+        <div class="gutter-lines" :style="gutterStyle">
+          <div v-for="n in gutterLines" :key="n">{{ n }}</div>
+        </div>
+      </div>
       <textarea
         ref="textarea"
         v-model="content"
@@ -285,7 +397,7 @@ function syncScroll(e) {
     </div>
 
     <!-- What gets printed: the whole text (a textarea only prints what's visible). -->
-    <div class="print-copy" aria-hidden="true">
+    <div v-if="printing" class="print-copy" aria-hidden="true">
       <article v-if="previewOn" class="markdown" v-html="previewHtml" />
       <pre v-else :class="{ wrap: view.wrap }">{{ content }}</pre>
     </div>
@@ -306,8 +418,15 @@ function syncScroll(e) {
         </span>
       </span>
       <span>
-        {{ lineCount }} lines · {{ wordCount }} words · {{ content.length }} chars ·
+        {{ lineCount }} lines · {{ stats.words }} words · {{ stats.chars }} chars ·
         <span :class="['save', status]" aria-live="polite">{{ statusLabel }}</span>
+        <template v-if="fileStatus">
+          ·
+          <span
+            :class="['save', { error: doc.diskDirty }]"
+            :title="doc.diskDirty ? 'Press Ctrl/Cmd+S to write your changes to the file' : 'The file on disk matches'"
+          >{{ fileStatus }}</span>
+        </template>
       </span>
     </footer>
   </section>
