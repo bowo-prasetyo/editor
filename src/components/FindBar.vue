@@ -1,11 +1,20 @@
 <script>
 // Remembered across openings of the find bar, like in most editors.
-const last = { query: '', replacement: '', matchCase: false, wholeWord: false }
+const last = { query: '', replacement: '', matchCase: false, wholeWord: false, regex: false }
 </script>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { findMatches, nextMatchIndex, prevMatchIndex, replaceAllEdit } from '../find'
+import {
+  MAX_MATCHES,
+  escapeRegExp,
+  expandReplacement,
+  findMatches,
+  nextMatchIndex,
+  prevMatchIndex,
+  queryError,
+  replaceAllEdit,
+} from '../find'
 
 // Find (and optionally replace) in the editor. Every match is highlighted;
 // the current one is selected.
@@ -20,24 +29,50 @@ const query = ref(last.query)
 const replacement = ref(last.replacement)
 const matchCase = ref(last.matchCase)
 const wholeWord = ref(last.wholeWord)
-watch([query, replacement, matchCase, wholeWord], ([q, r, c, w]) =>
-  Object.assign(last, { query: q, replacement: r, matchCase: c, wholeWord: w }),
+const regex = ref(last.regex)
+watch([query, replacement, matchCase, wholeWord, regex], ([q, r, c, w, x]) =>
+  Object.assign(last, { query: q, replacement: r, matchCase: c, wholeWord: w, regex: x }),
 )
+const options = computed(() => ({ matchCase: matchCase.value, wholeWord: wholeWord.value, regex: regex.value }))
 const current = ref(-1)
 const message = ref('')
 const queryInput = ref(null)
 const replaceInput = ref(null)
 let anchor = 0 // where the search started, for find-as-you-type
 
-const matches = computed(() =>
-  findMatches(props.text, query.value, { matchCase: matchCase.value, wholeWord: wholeWord.value }),
+const error = computed(() => queryError(query.value, options.value))
+// The text searched. For big documents it follows typing once typing pauses
+// (the highlights move with the edits meanwhile); anything that acts on a
+// match calls refresh() first, so it never uses stale positions.
+const BIG = 200_000
+const searched = ref(props.text)
+let refreshTimer
+watch(
+  () => props.text,
+  (text) => {
+    clearTimeout(refreshTimer)
+    if (text.length < BIG) searched.value = text
+    else refreshTimer = setTimeout(() => (searched.value = text), 250)
+  },
 )
+function refresh() {
+  clearTimeout(refreshTimer)
+  searched.value = props.editor?.getText() ?? props.text
+}
+onBeforeUnmount(() => clearTimeout(refreshTimer))
+
+const matches = computed(() => findMatches(searched.value, query.value, options.value, MAX_MATCHES))
+const total = computed(() => {
+  const n = matches.value.length.toLocaleString()
+  return matches.value.length >= MAX_MATCHES ? `${n}+` : n
+})
 
 const count = computed(() => {
   if (message.value) return message.value
   if (!query.value) return ''
+  if (error.value) return error.value
   if (!matches.value.length) return 'No results'
-  return current.value >= 0 ? `${current.value + 1} of ${matches.value.length}` : `${matches.value.length} found`
+  return current.value >= 0 ? `${(current.value + 1).toLocaleString()} of ${total.value}` : `${total.value} found`
 })
 
 const selection = () => props.editor?.getSelection() ?? { from: 0, to: 0 }
@@ -58,15 +93,11 @@ function isSelected(i) {
 }
 
 // Highlight every match in the editor while the bar is open.
-watch(
-  [query, matchCase, wholeWord, () => props.editor],
-  ([q, c, w, ed]) => ed?.highlight(q, { matchCase: c, wholeWord: w }),
-  { immediate: true },
-)
-onBeforeUnmount(() => props.editor?.highlight('', {}))
+watch([matches, () => props.editor], ([list, ed]) => ed?.highlight(list), { immediate: true })
+onBeforeUnmount(() => props.editor?.highlight([]))
 
 // Find as you type: jump to the first match after where the search started.
-watch([query, matchCase, wholeWord], () => {
+watch([query, matchCase, wholeWord, regex], () => {
   message.value = ''
   if (query.value) select(nextMatchIndex(matches.value, anchor))
   else current.value = -1
@@ -81,12 +112,14 @@ watch(matches, (list) => {
 })
 
 function next() {
+  refresh()
   message.value = ''
   const from = isSelected(current.value) ? matches.value[current.value][0] + 1 : selection().from
   select(nextMatchIndex(matches.value, from))
 }
 
 function prev() {
+  refresh()
   message.value = ''
   const from = isSelected(current.value) ? matches.value[current.value][0] : selection().from
   select(prevMatchIndex(matches.value, from))
@@ -94,26 +127,43 @@ function prev() {
 
 // The text prop only catches up on the next render, so edits read the
 // editor's own text.
-const liveMatches = () =>
-  findMatches(props.editor.getText(), query.value, { matchCase: matchCase.value, wholeWord: wholeWord.value })
+const liveMatches = (limit) => findMatches(props.editor.getText(), query.value, options.value, limit)
 
 async function replaceOne() {
+  refresh()
   if (!props.editor || !matches.value.length) return
   if (!isSelected(current.value)) return next()
+  const text = props.editor.getText()
+  // The selected match, freshly matched so its groups are current.
   const [s, e] = matches.value[current.value]
-  props.editor.replace(s, e, replacement.value)
+  const m = liveMatches().find((x) => x[0] === s && x[1] === e) ?? [s, e]
+  const insert = expandReplacement(replacement.value, m, text, regex.value)
+  props.editor.replace(s, e, insert)
+  refresh()
   await nextTick()
-  select(nextMatchIndex(liveMatches(), s + replacement.value.length))
+  // Continue after the replacement (and past an empty match, so "^" moves on).
+  select(nextMatchIndex(matches.value, s + insert.length + (s === e ? 1 : 0)))
 }
 
 async function replaceAll() {
   if (!props.editor) return
-  const edit = replaceAllEdit(props.editor.getText(), liveMatches(), replacement.value)
+  const text = props.editor.getText()
+  const edit = replaceAllEdit(text, liveMatches(), replacement.value, regex.value)
   if (!edit) return
   props.editor.replace(edit.from, edit.to, edit.insert)
   await nextTick()
   current.value = -1
-  message.value = `Replaced ${edit.count}`
+  message.value = `Replaced ${edit.count.toLocaleString()}`
+}
+
+// Alt+C, Alt+W, Alt+R toggle match case, whole word and regex (by key
+// position, since Alt types other characters on a Mac).
+function onOptionKey(e) {
+  if (!e.altKey || e.ctrlKey || e.metaKey) return
+  const toggle = { KeyC: matchCase, KeyW: wholeWord, KeyR: regex }[e.code]
+  if (!toggle) return
+  e.preventDefault()
+  toggle.value = !toggle.value
 }
 
 function close() {
@@ -142,7 +192,8 @@ async function open(withReplace) {
     const { from, to } = selection()
     anchor = from
     const sel = props.editor.getText().slice(from, to)
-    if (sel && !sel.includes('\n')) query.value = sel
+    // In regex mode, the selected text is searched for literally.
+    if (sel && !sel.includes('\n')) query.value = regex.value ? escapeRegExp(sel) : sel
   }
   await nextTick()
   if (query.value && current.value < 0) select(nextMatchIndex(matches.value, anchor))
@@ -155,21 +206,33 @@ defineExpose({ open })
 </script>
 
 <template>
-  <div class="findbar" role="search" @keydown.esc.prevent="close">
+  <div class="findbar" role="search" @keydown.esc.prevent="close" @keydown="onOptionKey">
     <div class="find-row">
       <input
         ref="queryInput"
         v-model="query"
         type="search"
-        placeholder="Find"
+        :placeholder="regex ? 'Find (regular expression)' : 'Find'"
         aria-label="Find"
         spellcheck="false"
+        autocomplete="off"
+        :class="{ invalid: !!error }"
+        :aria-invalid="!!error"
         @keydown="onQueryKey"
       />
-      <span class="find-count" aria-live="polite">{{ count }}</span>
-      <button class="icon" :aria-pressed="matchCase" title="Match case" aria-label="Match case" @click="matchCase = !matchCase">Aa</button>
-      <button class="icon" :aria-pressed="wholeWord" title="Whole word" aria-label="Whole word" @click="wholeWord = !wholeWord">
+      <span class="find-count" :class="{ error: !!error }" aria-live="polite">{{ count }}</span>
+      <button class="icon" :aria-pressed="matchCase" title="Match case (Alt+C)" aria-label="Match case" @click="matchCase = !matchCase">Aa</button>
+      <button class="icon" :aria-pressed="wholeWord" title="Whole word (Alt+W)" aria-label="Whole word" @click="wholeWord = !wholeWord">
         <u>ab</u>
+      </button>
+      <button
+        class="icon mono"
+        :aria-pressed="regex"
+        title="Regular expression (Alt+R)"
+        aria-label="Regular expression"
+        @click="regex = !regex"
+      >
+        .*
       </button>
       <button class="icon" title="Previous (Shift+Enter)" aria-label="Previous match" @click="prev">↑</button>
       <button class="icon" title="Next (Enter)" aria-label="Next match" @click="next">↓</button>
@@ -188,7 +251,8 @@ defineExpose({ open })
       <input
         ref="replaceInput"
         v-model="replacement"
-        placeholder="Replace with"
+        :placeholder="regex ? 'Replace with ($1, $<name>, \\n…)' : 'Replace with'"
+        :title="regex ? 'Use $1, $2… or $<name> for groups, $& for the whole match, $$ for a $; \\n and \\t for a new line and tab' : ''"
         aria-label="Replace with"
         spellcheck="false"
         @keydown="onReplaceKey"

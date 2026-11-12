@@ -11,7 +11,7 @@ A minimal, client-only text editor that runs entirely in the browser. Built with
 - Markdown preview for `.md` files (side by side on wide screens), adjustable text size, and printing of the whole document.
 - Syntax highlighting for 140+ languages, picked from the file name (`.js`, `.py`, `Dockerfile`, `.yaml`…). Each language is downloaded only when a document needs it. Pick another language, or plain text, in the status bar; the choice is kept per document. Files over 5 million characters start as plain text. Matching brackets are highlighted (mismatched ones in red); Ctrl/Cmd+Shift+\\ jumps to the matching bracket.
 - Built on [CodeMirror 6](https://codemirror.net/): only the visible lines are drawn, so files of several MB stay quick to type in. Line numbers (also with word wrap), cursor position, selection and word count. Word counts for very large documents update when you pause, and spell check is off by default above 200,000 characters.
-- Find and replace (Ctrl/Cmd+F, Ctrl/Cmd+H) with match case and whole word; replacements can be undone.
+- Find and replace (Ctrl/Cmd+F, Ctrl/Cmd+H) with match case, whole word and **regular expressions** (Alt+C, Alt+W, Alt+R). Every match is highlighted; replacements can be undone. In regex mode `^` and `$` match at each line, matches can span lines (`\n`), and the replacement can use `$1`, `$<name>`, `$&`, `$$`, `\n` and `\t`. Up to 100,000 matches are listed; Replace all replaces every one.
 - Word wrap (Alt+Z) and spell check, per document. Both are on by default for prose (`.txt`, `.md`, no extension) and off for code.
 - Deleted documents go to the Trash, with an Undo prompt; restore them or delete them forever. The Trash is emptied after 30 days.
 
@@ -36,6 +36,7 @@ Ctrl means Cmd on a Mac.
 | Ctrl+[ / Ctrl+] | Outdent / indent the lines |
 | Ctrl+Shift+\\ | Jump to the matching bracket |
 | Ctrl+F / Ctrl+H | Find / find and replace (every match is highlighted) |
+| Alt+C / Alt+W / Alt+R | In the find bar: match case / whole word / regular expression |
 | Ctrl+Z / Ctrl+Shift+Z (Ctrl+Y) | Undo / redo |
 | Ctrl+S / Ctrl+Shift+S | Save / save as |
 | Alt+Z | Word wrap on or off |

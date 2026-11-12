@@ -242,3 +242,8 @@ button.mini.position { font-size: inherit; padding: 0 4px; margin-left: -4px; }
   .print-copy pre.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
   .print-copy .markdown { font: 11pt/1.5 system-ui, -apple-system, Segoe UI, sans-serif; }
 }
+
+/* Find: regex toggle and invalid patterns */
+button.icon.mono { font-family: var(--mono); font-weight: 600; }
+.find-row input.invalid { border-color: var(--danger); outline-color: var(--danger); }
+.find-count.error { color: var(--danger); }
