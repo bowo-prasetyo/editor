@@ -12,11 +12,16 @@ export function isProse(name) {
   return PROSE.has(extension(name))
 }
 
+// Above this size, spell checking is off unless turned on: the browser
+// re-checks the whole text as you type, which makes big documents lag.
+export const SPELLCHECK_LIMIT = 200_000
+
 // Effective view settings for a document: its own choice, else the default.
 export function viewSettings(doc) {
   const prose = isProse(doc?.name)
+  const small = (doc?.content?.length ?? 0) <= SPELLCHECK_LIMIT
   return {
     wrap: doc?.wrap ?? prose,
-    spellcheck: doc?.spellcheck ?? prose,
+    spellcheck: doc?.spellcheck ?? (prose && small),
   }
 }

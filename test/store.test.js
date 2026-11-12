@@ -1,5 +1,6 @@
-import { test, beforeEach } from 'node:test'
+import { test, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
+import { IDBFactory } from 'fake-indexeddb'
 
 // Minimal localStorage with a size quota, like browsers have.
 class FakeStorage {
@@ -19,19 +20,31 @@ class FakeStorage {
   }
 }
 
+// Each load is a fresh copy of the store, like reloading the page. Without
+// globalThis.indexedDB it falls back to localStorage.
 let n = 0
-const load = () => import(`../src/store.js?${n++}`)
+const load = async () => {
+  const s = await import(`../src/store.js?${n++}`)
+  await s.ready
+  return s
+}
 
-beforeEach(() => { globalThis.localStorage = new FakeStorage() })
+beforeEach(() => {
+  globalThis.localStorage = new FakeStorage()
+  delete globalThis.indexedDB
+})
+afterEach(() => { delete globalThis.indexedDB })
+
+const stored = (id) => JSON.parse(localStorage.getItem('editor.doc.' + id))
 
 test('each document is saved under its own key', async () => {
   const s = await load()
   const a = s.createDoc('a.txt', 'A')
   s.updateDoc(a.id, { content: 'A2' })
   assert.equal(s.state.status[a.id], 'pending')
-  s.flushAll()
+  await s.flushAll()
   assert.equal(s.state.status[a.id], 'saved')
-  assert.equal(JSON.parse(localStorage.getItem('editor.doc.' + a.id)).content, 'A2')
+  assert.equal(stored(a.id).content, 'A2')
   const s2 = await load()
   assert.deepEqual(s2.state.docs.map((d) => d.content), ['A2'])
 })
@@ -43,13 +56,13 @@ test('a document too big for the quota is flagged and does not block others', as
   const big = s.createDoc('big.txt', '')
   s.updateDoc(big.id, { content: 'x'.repeat(5000) })
   s.updateDoc(small.id, { content: 'hello' })
-  s.flushAll()
+  await s.flushAll()
   assert.equal(s.state.status[big.id], 'error')
   assert.equal(s.state.status[small.id], 'saved')
   assert.equal(s.hasUnsaved(), true)
   // Shrinking it lets it save again.
   s.updateDoc(big.id, { content: 'short' })
-  s.flushAll()
+  await s.flushAll()
   assert.equal(s.state.status[big.id], 'saved')
 })
 
@@ -58,8 +71,9 @@ test('deleting a document retries documents that failed to save', async () => {
   const s = await load()
   const filler = s.createDoc('filler.txt', 'f'.repeat(1500))
   const doc = s.createDoc('doc.txt', 'd'.repeat(1500))
+  await s.flushAll()
   assert.equal(s.state.status[doc.id], 'error')
-  s.deleteDoc(filler.id)
+  await s.deleteDoc(filler.id)
   assert.equal(s.state.status[doc.id], 'saved')
 })
 
@@ -94,25 +108,23 @@ test('documents created in another tab appear, and are not overwritten', async (
   const mine = s.createDoc('mine.txt', 'mine')
   const theirs = { id: 'other', name: 'theirs.txt', content: 'theirs', updatedAt: 5 }
   localStorage.setItem('editor.doc.other', JSON.stringify(theirs))
-  s.handleStorageEvent({ key: 'editor.doc.other', newValue: JSON.stringify(theirs) })
+  s.handleRemoteChange({ type: 'put', doc: theirs })
   s.updateDoc(mine.id, { content: 'mine 2' })
-  s.flushAll()
-  assert.equal(JSON.parse(localStorage.getItem('editor.doc.other')).content, 'theirs')
+  await s.flushAll()
+  assert.equal(stored('other').content, 'theirs')
   assert.deepEqual(s.state.docs.map((d) => d.name).sort(), ['mine.txt', 'theirs.txt'])
 })
 
 test('a clean document takes the other tab\'s edits; a dirty one keeps both', async () => {
   const s = await load()
   const doc = s.createDoc('a.txt', 'v1')
-  const remote = (content) => ({
-    key: 'editor.doc.' + doc.id,
-    newValue: JSON.stringify({ ...doc, content }),
-  })
-  s.handleStorageEvent(remote('v2 from other tab'))
+  await s.flushAll()
+  const remote = (content) => ({ type: 'put', doc: { ...doc, content } })
+  s.handleRemoteChange(remote('v2 from other tab'))
   assert.equal(s.getDoc(doc.id).content, 'v2 from other tab')
 
   s.updateDoc(doc.id, { content: 'my unsaved edit' })
-  s.handleStorageEvent(remote('v3 from other tab'))
+  s.handleRemoteChange(remote('v3 from other tab'))
   assert.equal(s.getDoc(doc.id).content, 'my unsaved edit')
   const copy = s.state.docs.find((d) => d.content === 'v3 from other tab')
   assert.ok(copy, 'other tab\'s version kept as a copy')
@@ -123,12 +135,13 @@ test('a deletion in another tab removes the doc unless it has unsaved edits', as
   const s = await load()
   const a = s.createDoc('a.txt', 'a')
   const b = s.createDoc('b.txt', 'b')
+  await s.flushAll()
   s.updateDoc(b.id, { content: 'b edited' })
-  s.handleStorageEvent({ key: 'editor.doc.' + a.id, newValue: null })
-  s.handleStorageEvent({ key: 'editor.doc.' + b.id, newValue: null })
+  s.handleRemoteChange({ type: 'delete', id: a.id })
+  s.handleRemoteChange({ type: 'delete', id: b.id })
   assert.equal(s.getDoc(a.id), undefined)
   assert.equal(s.getDoc(b.id).content, 'b edited')
-  s.flushAll()
+  await s.flushAll()
   assert.ok(localStorage.getItem('editor.doc.' + b.id))
 })
 
@@ -136,13 +149,13 @@ test('trash: delete is reversible, persists, and "delete forever" frees the key'
   const s = await load()
   const a = s.createDoc('a.txt', 'keep me')
   const before = a.updatedAt
-  s.trashDoc(a.id)
+  await s.trashDoc(a.id)
   assert.ok(JSON.parse(localStorage.getItem('editor.doc.' + a.id)).deletedAt)
   assert.equal(s.getDoc(a.id).updatedAt, before, 'trashing is not an edit')
-  s.restoreDoc(a.id)
+  await s.restoreDoc(a.id)
   assert.equal(JSON.parse(localStorage.getItem('editor.doc.' + a.id)).deletedAt, undefined)
-  s.trashDoc(a.id)
-  s.emptyTrash()
+  await s.trashDoc(a.id)
+  await s.emptyTrash()
   assert.equal(s.getDoc(a.id), undefined)
   assert.equal(localStorage.getItem('editor.doc.' + a.id), null)
 })
@@ -164,7 +177,7 @@ test('view options are saved without bumping updatedAt', async () => {
   const a = s.createDoc('a.txt', 'x')
   const before = a.updatedAt
   s.setDocOptions(a.id, { wrap: false })
-  s.flushAll()
+  await s.flushAll()
   assert.equal(JSON.parse(localStorage.getItem('editor.doc.' + a.id)).wrap, false)
   assert.equal(s.getDoc(a.id).updatedAt, before)
 })
@@ -192,11 +205,11 @@ test('backup round trip adds missing docs, skips identical ones, copies changed 
   const s = await load()
   const a = s.createDoc('a.txt', 'A')
   const b = s.createDoc('b.txt', 'B')
-  s.trashDoc(b.id)
+  await s.trashDoc(b.id)
   const backup = JSON.parse(JSON.stringify(s.exportBackup()))
   assert.equal(backup.docs.length, 2)
 
-  s.deleteDoc(b.id)
+  await s.deleteDoc(b.id)
   s.updateDoc(a.id, { content: 'A changed' })
   const result = s.importBackup(backup)
   assert.deepEqual(result, { added: 2, skipped: 0 })
@@ -206,4 +219,106 @@ test('backup round trip adds missing docs, skips identical ones, copies changed 
 
   assert.deepEqual(s.importBackup(backup), { added: 0, skipped: 2 }, 'importing twice adds nothing')
   assert.throws(() => s.importBackup({ docs: [] }), /isn't an editor backup\./)
+})
+
+// --- IndexedDB ---------------------------------------------------------------
+
+const useIDB = () => { globalThis.indexedDB = new IDBFactory() }
+
+test('indexedDB: documents are kept there, survive a reload, and hold more than localStorage', async () => {
+  useIDB()
+  globalThis.localStorage = new FakeStorage(1000)
+  const s = await load()
+  assert.equal(s.state.backend, 'indexedDB')
+  const big = s.createDoc('big.txt', 'x'.repeat(50_000))
+  s.updateDoc(big.id, { content: 'y'.repeat(60_000) })
+  assert.equal(s.state.status[big.id], 'pending')
+  await s.flushAll()
+  assert.equal(s.state.status[big.id], 'saved')
+  assert.equal(localStorage.length, 0, 'nothing written to localStorage')
+  const s2 = await load()
+  assert.equal(s2.getDoc(big.id).content, 'y'.repeat(60_000))
+})
+
+test('indexedDB: moves documents over from localStorage, then removes them there', async () => {
+  useIDB()
+  localStorage.setItem('editor.doc.1', JSON.stringify({ id: '1', name: 'one.txt', content: 'one', updatedAt: 1 }))
+  localStorage.setItem('editor.documents.v1', JSON.stringify([{ id: '2', name: 'two.txt', content: 'two', updatedAt: 2 }]))
+  localStorage.setItem('editor.prefs.v1', '{"fontSize":16}')
+  const s = await load()
+  assert.deepEqual(s.state.docs.map((d) => d.content).sort(), ['one', 'two'])
+  assert.deepEqual([...localStorage.map.keys()], ['editor.prefs.v1'], 'only preferences are left')
+  const s2 = await load()
+  assert.deepEqual(s2.state.docs.map((d) => d.content).sort(), ['one', 'two'])
+})
+
+test('indexedDB: a write in flight does not resurrect a document deleted after it', async () => {
+  useIDB()
+  const s = await load()
+  const d = s.createDoc('a.txt', 'a')
+  s.updateDoc(d.id, { content: 'b' })
+  s.flushAll() // not awaited: the delete is queued behind the write
+  await s.deleteDoc(d.id)
+  const s2 = await load()
+  assert.equal(s2.getDoc(d.id), undefined)
+})
+
+test('indexedDB: edits made while a save is running keep the document marked unsaved', async () => {
+  useIDB()
+  const s = await load()
+  const d = s.createDoc('a.txt', 'a')
+  const writing = s.flushAll()
+  s.updateDoc(d.id, { content: 'typed during the write' })
+  await writing
+  assert.equal(s.state.status[d.id], 'pending')
+  await s.flushAll()
+  assert.equal(s.state.status[d.id], 'saved')
+})
+
+test('file links: handles are stored with the doc, editing marks the file out of date, backups drop the link', async () => {
+  useIDB()
+  const s = await load()
+  const d = s.createDoc('a.txt', 'a', { autoName: false })
+  const handle = { kind: 'file', name: 'a.txt' } // stands in for a FileSystemFileHandle
+  await s.linkFile(d.id, handle, 123)
+  assert.deepEqual([d.linked, d.diskDirty, d.diskModified], [true, false, 123])
+  s.updateDoc(d.id, { content: 'changed' })
+  assert.equal(s.getDoc(d.id).diskDirty, true)
+  await s.flushAll()
+
+  const s2 = await load()
+  assert.deepEqual(await s2.getFileHandle(d.id), handle)
+  const exported = s2.exportBackup().docs[0]
+  assert.equal('linked' in exported || 'diskModified' in exported, false)
+  await s2.deleteDoc(d.id)
+  assert.equal(await s2.getFileHandle(d.id), null)
+})
+
+test('indexedDB: a write cut off by closing the page is recovered from the rescue copy', async () => {
+  useIDB()
+  const s = await load()
+  const d = s.createDoc('a.txt', 'v1')
+  await s.flushAll()
+  s.updateDoc(d.id, { content: 'typed just before closing' })
+  // The page closes: the write is started but never lands; the rescue copy is synchronous.
+  assert.equal(s.rescueUnsaved(), true)
+  assert.ok(localStorage.getItem('editor.rescue.' + d.id))
+
+  const s2 = await load() // same IndexedDB, which still has v1
+  assert.equal(s2.getDoc(d.id).content, 'typed just before closing')
+  assert.equal(s2.state.status[d.id], 'saved')
+  assert.equal(localStorage.getItem('editor.rescue.' + d.id), null, 'copy dropped once written')
+  const s3 = await load()
+  assert.equal(s3.getDoc(d.id).content, 'typed just before closing')
+})
+
+test('indexedDB: an older rescue copy never replaces a newer saved version', async () => {
+  useIDB()
+  const s = await load()
+  const d = s.createDoc('a.txt', 'new')
+  await s.flushAll()
+  localStorage.setItem('editor.rescue.' + d.id, JSON.stringify({ ...d, content: 'old', updatedAt: 1 }))
+  const s2 = await load()
+  assert.equal(s2.getDoc(d.id).content, 'new')
+  assert.equal(localStorage.getItem('editor.rescue.' + d.id), null)
 })

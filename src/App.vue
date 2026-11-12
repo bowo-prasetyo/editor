@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppToast from './components/AppToast.vue'
 import { openFiles } from './openFiles'
+import { droppedHandles } from './fileaccess'
 
 // Drop files anywhere in the app to open them.
 const router = useRouter()
@@ -28,7 +29,14 @@ function onDrop(e) {
   e.preventDefault()
   depth = 0
   dragging.value = false
-  openFiles([...e.dataTransfer.files], router)
+  const files = [...e.dataTransfer.files]
+  // Handles (where offered) let Save write back to the dropped files. They
+  // must be requested now, before the drop event is over.
+  const handles = droppedHandles(e.dataTransfer)
+  if (!handles) return openFiles(files, router)
+  handles.then((hs) =>
+    openFiles(files.map((file, i) => ({ file, handle: hs[i]?.kind === 'file' ? hs[i] : null })), router),
+  )
 }
 
 const events = { dragenter: onDragEnter, dragleave: onDragLeave, dragover: onDragOver, drop: onDrop }
