@@ -74,7 +74,7 @@ button.danger { color: var(--danger); background: transparent; border-color: tra
 }
 .name:hover, .name:focus { border-color: var(--border); outline: none; }
 
-.pane { flex: 1; min-height: 0; display: flex; font: 14px/1.6 var(--mono); }
+.pane { position: relative; flex: 1; min-height: 0; display: flex; font: 14px/1.6 var(--mono); }
 .gutter {
   margin: 0; padding: 12px 10px; min-width: 3.5em; text-align: right; overflow: hidden;
   color: var(--muted); background: var(--panel); border-right: 1px solid var(--border);
@@ -97,3 +97,59 @@ button.danger { color: var(--danger); background: transparent; border-color: tra
 }
 .banner-actions { display: flex; gap: 8px; }
 .save.error { color: var(--danger); font-weight: 600; }
+
+/* Toggles and wrapping */
+button.toggle[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--accent) 15%, var(--panel));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pane textarea.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+.banner.info {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  border-bottom-color: var(--accent);
+}
+
+/* Find bar */
+.findbar {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 6px 16px; border-bottom: 1px solid var(--border); background: var(--panel);
+}
+.find-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.find-row input {
+  flex: 1 1 160px; min-width: 0; font: inherit; padding: 4px 8px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg);
+}
+.find-row input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.find-count { min-width: 6.5em; font-size: 12px; color: var(--muted); text-align: center; }
+.find-row button { padding: 4px 10px; }
+button.icon { min-width: 32px; padding: 4px 8px; }
+button.icon[aria-pressed='true'] { border-color: var(--accent); color: var(--accent); }
+
+/* Trash and toast */
+.trash { margin-top: 24px; }
+.trash-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.trash .hint { margin: 0 0 8px; }
+.trash li button { margin-right: 6px; white-space: nowrap; }
+button.link { background: none; border: 0; padding: 4px 0; color: var(--muted); }
+button.link:hover { color: var(--fg); }
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 16px; border-radius: 8px;
+  background: var(--fg); color: var(--bg); box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+}
+.toast button { background: transparent; color: inherit; border-color: color-mix(in srgb, var(--bg) 40%, transparent); }
+
+.match-mark {
+  position: absolute; pointer-events: none; border-radius: 2px;
+  background: color-mix(in srgb, #f5c400 45%, transparent);
+  outline: 1px solid color-mix(in srgb, #c99a00 80%, transparent);
+}
+
+@media (max-width: 600px) {
+  .toolbar { flex-wrap: wrap; }
+  .toolbar .name { flex-basis: 100%; }
+  .find-row input { flex-basis: 100%; }
+  .find-count { min-width: 0; margin-right: auto; text-align: left; }
+}

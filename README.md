@@ -7,6 +7,9 @@ A minimal, client-only text editor that runs entirely in the browser. Built with
 - Routes: `#/` lists documents, `#/edit/:id` edits one. Hash routing means no server rewrites are needed.
 - Open local files, download a document (or press Ctrl/Cmd+S), line numbers, cursor position and word count.
 - Tab / Shift+Tab indent and outdent the selected lines; Ctrl/Cmd+Z undoes them.
+- Find and replace (Ctrl/Cmd+F, Ctrl/Cmd+H) with match case and whole word; replacements can be undone.
+- Word wrap (Alt+Z) and spell check, per document. Both are on by default for prose (`.txt`, `.md`, no extension) and off for code. Line numbers are hidden while wrapping.
+- Deleted documents go to the Trash, with an Undo prompt; restore them or delete them forever. The Trash is emptied after 30 days.
 
 ## Develop
 

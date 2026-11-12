@@ -158,6 +158,44 @@ function removeLocal(id) {
   if (i !== -1) state.docs.splice(i, 1)
 }
 
+// Change a document's view settings (wrap, spell check) without marking its
+// content as edited.
+export function setDocOptions(id, patch) {
+  const doc = getDoc(id)
+  if (!doc) return
+  Object.assign(doc, patch)
+  schedule(id)
+}
+
+// --- Trash ----------------------------------------------------------------
+
+// Deleting moves a document to the Trash; it stays there for TRASH_DAYS days
+// unless restored or deleted forever.
+export const TRASH_DAYS = 30
+const DAY = 24 * 60 * 60 * 1000
+
+export function trashDoc(id) {
+  setDocOptions(id, { deletedAt: Date.now() })
+  flush(id)
+}
+
+export function restoreDoc(id) {
+  const doc = getDoc(id)
+  if (!doc) return
+  delete doc.deletedAt
+  schedule(id)
+  flush(id)
+}
+
+export function emptyTrash() {
+  for (const d of [...state.docs]) if (d.deletedAt) deleteDoc(d.id)
+}
+
+function purgeOldTrash(now = Date.now()) {
+  for (const d of [...state.docs]) if (d.deletedAt && now - d.deletedAt > TRASH_DAYS * DAY) deleteDoc(d.id)
+}
+
+// Delete forever.
 export function deleteDoc(id) {
   removeLocal(id)
   try {
@@ -216,6 +254,7 @@ if (typeof window !== 'undefined') {
 }
 
 init()
+purgeOldTrash()
 
 // --- Files ----------------------------------------------------------------
 
