@@ -25,9 +25,12 @@ there.
 2. **Write**, with *New document*, or **open** your own files with
    *Open files…*, *Open folder…*, or by dropping files on the page.
 3. **Save** with Ctrl/Cmd+S. In Chrome and Edge it writes straight back to the
-   file, and asks first if the file changed on disk meanwhile.
+   file, and asks first if the file changed on disk meanwhile. In Firefox and
+   Safari it downloads a copy.
 4. **Find anything** with Ctrl/Cmd+P (documents and files) and
    Ctrl/Cmd+Shift+P (every command). Press F1 for all the shortcuts.
+
+Stuck? See [Troubleshooting](docs/reference.md#troubleshooting).
 
 ## Files and drafts
 
@@ -66,16 +69,23 @@ Everything, with all the details: **[the reference](docs/reference.md)**.
   closing mid-save. Other tabs stay in step.
 - **Nothing is overwritten without asking.** That covers a file changed on disk,
   an unsaved edit, and a file in a folder you close.
+- **Drafts live in this browser only.** They aren't synced, and clearing the
+  browser's data for the site, or closing a private window, deletes them.
+  *Export all* on the start page makes a backup
+  ([more](docs/reference.md#where-your-text-is-kept-and-what-can-remove-it)).
 
 ## More
 
-- [Reference](docs/reference.md): every feature, the shortcuts, and the limits
+- [Reference](docs/reference.md): every feature, the shortcuts, the limits, and
+  troubleshooting
 - [Changelog](CHANGELOG.md): what changed in each version
 - [Vision](VISION.md): what Plumb is for, its principles, and what's next
 - [Testing](TESTING.md): how Plumb is tested
 - [Brand](docs/brand.md): the name, the logo, the colours and what they mean, and how Plumb talks
 
 ## Develop
+
+You need [Node.js](https://nodejs.org/) 22, the version CI uses.
 
 ```bash
 npm install
@@ -104,3 +114,7 @@ with the list of built files, and only runs in production builds (not in
 `npm run dev`). Serve the folder over HTTPS (or `localhost`) for offline support
 and installing. Host it anywhere (GitHub Pages, Netlify, S3), or serve it
 locally with `npm run preview`.
+
+## License
+
+[MIT](LICENSE).
