@@ -4,7 +4,7 @@ import { DEFAULT_NAME, nameFromContent } from './naming.js'
 import { extension } from './filetype.js'
 import { openBackend } from './backends.js'
 import { createHistory } from './history.js'
-import { normalizeFolder, parentFolder, renamedFolder } from './folders.js'
+import { normalizeFolder } from './folders.js'
 
 // Documents live in the browser: IndexedDB normally, localStorage where
 // IndexedDB isn't available (see backends.js). The list is kept in memory
@@ -351,28 +351,13 @@ export async function restoreVersion(id, versionId) {
   return text
 }
 
-// --- Folders (see folders.js) ------------------------------------------------
+// --- Labels and folder paths (see folders.js) ----------------------------------
 
 // Moving isn't an edit: it doesn't change when the document was last edited.
 export function moveToFolder(id, folder) {
   setDocOptions(id, { folder: normalizeFolder(folder) || undefined })
 }
 
-// Rename folder `from` to `to` (or move it inside another folder), taking its
-// documents and subfolders along. Returns how many documents moved.
-export function renameFolder(from, to) {
-  let n = 0
-  for (const d of state.docs) {
-    const next = renamedFolder(d.folder, from, normalizeFolder(to))
-    if (next === undefined) continue
-    moveToFolder(d.id, next)
-    n++
-  }
-  return n
-}
-
-// Remove a folder: its documents (and subfolders) move up to its parent.
-export const removeFolder = (path) => renameFolder(path, parentFolder(path))
 
 // --- Files on disk (see fileaccess.js) -------------------------------------
 

@@ -59,6 +59,10 @@ export class FakeDir {
     this.children.set(name, d)
     return d
   }
+  async removeEntry(name) {
+    if (!this.children.has(name)) throw notFound()
+    this.children.delete(name)
+  }
   async queryPermission() { return this.permission }
   async requestPermission() { return (this.permission = 'granted') }
   async isSameEntry(other) { return other === this }

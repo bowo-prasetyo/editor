@@ -108,6 +108,9 @@ The scenarios follow the principles in [VISION.md](VISION.md#principles).
 | Closing with unsaved files asks: *Save all to disk* (writes, then closes; stays open and says which file if one can't be saved), *Keep as drafts*, *Cancel*; with nothing unsaved it just closes | `closing.spec.js`, `test/closing.test.js` |
 | Opening the folder again offers to *Put the edits back*: unchanged files become files again with their unsaved edits; files changed meanwhile get the *changed on disk* banner and Save asks; files gone stay drafts; *Not now* leaves them; another folder with the same name isn't mistaken for it | `closing.spec.js`, `test/closing.test.js` |
 | Backups hold drafts and unsaved file edits, not copies; rescue copies and other tabs never blank a file | `test/filesdrafts.test.js` |
+| Pinned drafts stay at the top, and stay pinned | `drafts.spec.js`, `test/folders.test.js`, `test/drafts.test.js` |
+| Labels: filter by one, remove one with Undo; no folder controls remain; the quick switcher makes plain drafts | `drafts.spec.js`, `test/folders.test.js` |
+| *Save to folder…* writes the draft's text (its encoding and line endings) as a new file, creating subfolders; never replaces a file or a folder; refuses bad names; the draft becomes that file, with its history; Undo makes it a draft again and removes the file only if unchanged | `drafts.spec.js`, `test/drafts.test.js` |
 | Migration: each kind of old document becomes a draft or a file as planned, runs once, never deletes text; copies from closed folders are offered to the Trash (with Undo) or kept | `migration.spec.js`, `test/filesdrafts.test.js` |
 
 ### The editor screen

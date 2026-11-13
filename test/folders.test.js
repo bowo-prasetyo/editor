@@ -1,42 +1,22 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { NONE, folderTree, inFolder, normalizeFolder, parentFolder, renamedFolder, sortDocs } from '../src/folders.js'
+import { labelsOf, normalizeFolder, sortDocs } from '../src/folders.js'
 
-test('folder paths are tidied', () => {
+test('folder paths are normalized', () => {
   assert.equal(normalizeFolder('  /Work//Clients/ '), 'Work/Clients')
   assert.equal(normalizeFolder(' My   notes '), 'My notes')
   assert.equal(normalizeFolder('/'), '')
-  assert.equal(parentFolder('a/b/c'), 'a/b')
-  assert.equal(parentFolder('a'), '')
 })
 
-test('a folder includes its subfolders; NONE means no folder', () => {
-  const d = (folder) => ({ folder })
-  assert.equal(inFolder(d('Work'), 'Work'), true)
-  assert.equal(inFolder(d('Work/Clients'), 'Work'), true)
-  assert.equal(inFolder(d('Workshop'), 'Work'), false, 'not a prefix match')
-  assert.equal(inFolder(d(undefined), NONE), true)
-  assert.equal(inFolder(d('Work'), NONE), false)
-  assert.equal(inFolder(d('Work'), ''), true)
-})
-
-test('the tree lists parents before children, with counts that include subfolders', () => {
-  const docs = [{ folder: 'Work/Clients' }, { folder: 'Work' }, { folder: 'home' }, {}, { folder: 'Work/Clients' }]
-  assert.deepEqual(folderTree(docs, ['Ideas', 'Work/Archive']), [
-    { path: 'home', name: 'home', depth: 0, count: 1 },
-    { path: 'Ideas', name: 'Ideas', depth: 0, count: 0 },
-    { path: 'Work', name: 'Work', depth: 0, count: 3 },
-    { path: 'Work/Archive', name: 'Archive', depth: 1, count: 0 },
-    { path: 'Work/Clients', name: 'Clients', depth: 1, count: 2 },
+test('labels in use, with counts, in natural order', () => {
+  const docs = [{ folder: 'Work/Clients' }, { folder: 'ideas' }, {}, { folder: 'Work/Clients' }, { folder: 'Item 10' }, { folder: 'Item 9' }]
+  assert.deepEqual(labelsOf(docs), [
+    { label: 'ideas', count: 1 },
+    { label: 'Item 9', count: 1 },
+    { label: 'Item 10', count: 1 },
+    { label: 'Work/Clients', count: 2 },
   ])
-})
-
-test('renaming or removing a folder moves its documents and subfolders along', () => {
-  assert.equal(renamedFolder('Work', 'Work', 'Job'), 'Job')
-  assert.equal(renamedFolder('Work/Clients', 'Work', 'Job'), 'Job/Clients')
-  assert.equal(renamedFolder('Workshop', 'Work', 'Job'), undefined)
-  assert.equal(renamedFolder('Work/Clients', 'Work/Clients', ''), '', 'removed: back to no folder')
-  assert.equal(renamedFolder('Work/Clients/2024', 'Work/Clients', 'Work'), 'Work/2024')
+  assert.deepEqual(labelsOf([{}, {}]), [])
 })
 
 test('sorting by edit time, name (natural), creation and size', () => {
@@ -50,4 +30,15 @@ test('sorting by edit time, name (natural), creation and size', () => {
   assert.deepEqual(names('name'), ['apple.md', 'Note 9.txt', 'note 10.txt'])
   assert.deepEqual(names('created'), ['Note 9.txt', 'apple.md', 'note 10.txt'])
   assert.deepEqual(names('size'), ['note 10.txt', 'apple.md', 'Note 9.txt'])
+})
+
+test('pinned drafts come first, in the chosen order among themselves', () => {
+  const docs = [
+    { name: 'a', updatedAt: 4, content: '' },
+    { name: 'b', updatedAt: 3, content: '', pinned: true },
+    { name: 'c', updatedAt: 2, content: '' },
+    { name: 'd', updatedAt: 1, content: '', pinned: true },
+  ]
+  assert.deepEqual(sortDocs(docs, 'updated').map((d) => d.name), ['b', 'd', 'a', 'c'])
+  assert.deepEqual(sortDocs(docs, 'name').map((d) => d.name), ['b', 'd', 'a', 'c'])
 })

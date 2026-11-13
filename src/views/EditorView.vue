@@ -5,7 +5,6 @@ import {
   getDoc,
   updateDoc,
   setDocOptions,
-  moveToFolder,
   recordVersion,
   flushAll,
   retryFailed,
@@ -27,12 +26,12 @@ import { AUTO, PLAIN, findLanguage, languageNames, loadLanguage } from '../langu
 import FindBar from '../components/FindBar.vue'
 import GoToBar from '../components/GoToBar.vue'
 import TabBar from '../components/TabBar.vue'
-import FolderDialog from '../components/FolderDialog.vue'
+import SaveToFolderDialog from '../components/SaveToFolderDialog.vue'
+import { saveDraftToFolder, saveTargets, togglePin, undoSaveToFolder } from '../drafts'
 import IndentMenu from '../components/IndentMenu.vue'
 import HistoryPanel from '../components/HistoryPanel.vue'
 import UnreadFile from '../components/UnreadFile.vue'
 import { convertIndentation, detectIndent, effectiveIndent } from '../indentation'
-import { folderTree } from '../folders'
 import { closeTab, liveTabs, opened, saveSnapshot, takeSnapshot } from '../session'
 import { registerCommands, ui } from '../commands'
 import { cycleTab } from '../tabs'
@@ -382,20 +381,33 @@ watch(
   () => nextTick(() => editor.value?.view.requestMeasure()),
 )
 
-// --- Folder -----------------------------------------------------------------
+// --- Save to folder (drafts; see drafts.js) -----------------------------------
 
-const moving = ref(false)
-const folderPaths = computed(() =>
-  folderTree(
-    state.docs.filter((d) => !d.deletedAt),
-    prefs.folders,
-  ).map((f) => f.path),
-)
-function onMove(path) {
-  moving.value = false
-  moveToFolder(props.id, path)
-  if (path && !folderPaths.value.includes(path)) prefs.folders = [...prefs.folders, path]
-  current()?.focus()
+// A draft can become a file in an open folder.
+const isDraft = computed(() => doc.value && doc.value.kind !== 'file' && !doc.value.deletedAt)
+const folderTargets = computed(() => (isDraft.value ? saveTargets() : []))
+const savingTo = ref(null) // { error, busy } while the dialog is open
+const openSaveToFolder = () => folderTargets.value.length && (savingTo.value = { error: '', busy: false })
+async function onSaveToFolder({ rootId, path }) {
+  savingTo.value = { error: '', busy: true }
+  try {
+    const saved = await saveDraftToFolder(props.id, rootId, path)
+    savingTo.value = null
+    const folder = folderTargets.value.find((f) => f.id === rootId)?.name ?? saveTargets().find((f) => f.id === rootId)?.name
+    showToast(`Saved as “${saved.path}” in “${folder}”. It’s a file now, not a draft.`, {
+      action: {
+        label: 'Undo',
+        run: async () => {
+          const removed = await undoSaveToFolder(saved)
+          showToast(removed ? 'It’s a draft again, and the file was removed.' : 'It’s a draft again. The file changed since, so it was kept.')
+        },
+      },
+      timeout: 10000,
+    })
+    current()?.focus()
+  } catch (e) {
+    savingTo.value = { error: e.message, busy: false }
+  }
 }
 
 // --- Counts -----------------------------------------------------------------
@@ -517,7 +529,9 @@ const editorCommands = [
   { id: 'saveAs', title: 'Save as…', group: G, shortcut: 'saveAs', run: () => save(true), when: () => inPlace },
   { id: 'print', title: 'Print', group: G, run: () => print() },
   { id: 'rename', title: 'Rename document', group: G, run: () => nameInput.value?.select() },
-  { id: 'move', title: 'Move to folder…', group: G, run: () => (moving.value = true) },
+  { id: 'saveToFolder', title: 'Save to folder…', group: G, when: () => folderTargets.value.length > 0, run: openSaveToFolder },
+  { id: 'pin', title: 'Pin this draft to the top of the list', group: G, when: () => isDraft.value && !doc.value.pinned, run: () => togglePin(props.id) },
+  { id: 'unpin', title: 'Unpin this draft', group: G, when: () => isDraft.value && !!doc.value.pinned, run: () => togglePin(props.id) },
   { id: 'wrap', title: 'Toggle word wrap', group: G, shortcut: 'wrap', run: () => toggle('wrap') },
   { id: 'spelling', title: 'Toggle spell check', group: G, run: () => toggle('spellcheck') },
   { id: 'preview', title: 'Toggle Markdown preview', group: G, when: () => isMarkdown.value, run: () => setDocOptions(props.id, { preview: !doc.value.preview }) },
@@ -619,14 +633,7 @@ onBeforeUnmount(() => {
   <section v-if="doc" class="editor">
     <TabBar :active="id" />
     <div class="toolbar">
-      <button
-        class="folder-button"
-        :class="{ empty: !doc.folder }"
-        :title="doc.folder ? `In ${doc.folder} — move to another folder` : 'Move to a folder'"
-        @click="moving = true"
-      >
-        📁<span v-if="doc.folder" class="folder-path">{{ doc.folder }}</span>
-      </button>
+      <span v-if="doc.kind === 'file' && doc.folder" class="folder-path" :title="`In ${doc.folder}`">{{ doc.folder }}</span>
       <input ref="nameInput" v-model="name" class="name" spellcheck="false" aria-label="File name" />
       <button
         class="toggle"
@@ -668,6 +675,9 @@ onBeforeUnmount(() => {
           Save
         </button>
         <button title="Save to a different file (Ctrl/Cmd+Shift+S)" @click="save(true)">Save as…</button>
+        <button v-if="folderTargets.length" title="Save this draft as a file in an open folder" @click="openSaveToFolder">
+          Save to folder…
+        </button>
       </template>
       <button v-else title="Download a copy (Ctrl/Cmd+S)" @click="save(false)">Download</button>
     </div>
@@ -737,15 +747,14 @@ onBeforeUnmount(() => {
       <pre v-else :class="{ wrap: view.wrap }">{{ content }}</pre>
     </div>
 
-    <FolderDialog
-      v-if="moving"
-      :title="`Move “${name || 'this document'}” to folder`"
-      :initial="doc.folder ?? ''"
-      confirm="Move"
-      :folders="folderPaths"
-      allow-empty
-      @submit="onMove"
-      @cancel="moving = false"
+    <SaveToFolderDialog
+      v-if="savingTo"
+      :name="name || 'untitled.txt'"
+      :folders="folderTargets"
+      :error="savingTo.error"
+      :busy="savingTo.busy"
+      @submit="onSaveToFolder"
+      @cancel="savingTo = null"
     />
 
     <footer class="status">

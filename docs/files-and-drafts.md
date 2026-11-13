@@ -1,9 +1,9 @@
 # Plan: Files and Drafts
 
-> **Status: accepted; phases 1 and 2 done.** This plans step 3 of
+> **Status: accepted; phases 1–3 done.** This plans step 3 of
 > [VISION.md](../VISION.md#next-steps), the split between **Files** and
 > **Drafts**. The [decisions](#decisions) are recorded at the end.
-> [Phases 1 and 2](#phases) are built; phases 3 and 4 are next.
+> [Phases 1–3](#phases) are built; phase 4 is next.
 
 ## Why
 
@@ -212,6 +212,22 @@ Some details settled while building it:
 - **Unknown file dates.** A draft with no known date for its file (from the
   migration) is reattached so that Save still asks before replacing the file.
 - **Text that now matches the file** is reattached with nothing unsaved.
+
+**Phase 3 is done** as planned (`src/drafts.js`, `SaveToFolderDialog.vue`,
+labels in `src/folders.js`). Details settled while building it:
+
+- **Labels** are listed flat by their full name ("Work/Clients"), not as a
+  tree. Removing one offers Undo. Files keep using `folder` for their place
+  in the folder, shown read-only in the editor's toolbar.
+- **Save to folder…** is in the editor's toolbar and the command palette,
+  for drafts while a folder is open. It writes the draft's encoding and line
+  endings, and adds a "Saved to file" version.
+  - **Undo** turns the file back into the draft it was (label, pin and file
+    link included). It removes the file only if it's still exactly what was
+    written; if anything changed it since, the file stays.
+- **Removed:** `FolderDialog`, `renameFolder` / `removeFolder`, `prefs.folders`
+  and dragging onto folders. Opened and dropped files no longer go into "the
+  folder shown".
 
 1. **Records and migration.**
    - Code: the `kind` field; file records stored without text when they have

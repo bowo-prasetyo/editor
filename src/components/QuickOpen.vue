@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { createDoc, moveToFolder, requestPersistence, state } from '../store'
+import { createDoc, requestPersistence, state } from '../store'
 import { displayName } from '../naming'
 import { prefs } from '../prefs'
 import { fuzzyMatch, highlightRuns } from '../fuzzy'
@@ -147,12 +147,12 @@ function choose(i) {
         showToast(e instanceof BinaryFileError ? `Couldn't open “${r.name}”: it doesn't look like a text file.` : `Couldn't open “${r.name}”: ${e.message}`),
       )
   } else if (createLabel.value) {
+    // A new draft, named after what was typed ("Work/todo.md" -> "todo.md":
+    // drafts have no folders; see docs/files-and-drafts.md).
     const path = normalizeFolder(createLabel.value)
-    const slash = path.lastIndexOf('/')
-    let name = path.slice(slash + 1)
+    let name = path.slice(path.lastIndexOf('/') + 1)
     if (!/\.[^.]+$/.test(name)) name += '.txt'
     const doc = createDoc(name, '', { autoName: false })
-    if (slash > 0) moveToFolder(doc.id, path.slice(0, slash))
     requestPersistence()
     hide(false)
     router.push({ name: 'edit', params: { id: doc.id } })
