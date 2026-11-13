@@ -1,9 +1,9 @@
 # Plan: Files and Drafts
 
-> **Status: accepted; phase 1 done.** This plans step 3 of
+> **Status: accepted; phases 1 and 2 done.** This plans step 3 of
 > [VISION.md](../VISION.md#next-steps), the split between **Files** and
 > **Drafts**. The [decisions](#decisions) are recorded at the end.
-> [Phase 1](#phases) is built; phases 2–4 are next.
+> [Phases 1 and 2](#phases) are built; phases 3 and 4 are next.
 
 ## Why
 
@@ -197,6 +197,21 @@ working.
 - **Files opened on their own stay as they are until phase 4.** Without the
   Recent files list, turning them into file records would hide them, so the
   migration keeps them as drafts for now.
+
+**Phase 2 is done** as planned (`src/closing.js`, `CloseFolderDialog.vue`).
+Some details settled while building it:
+
+- **Recognising the folder.** `origin` records the closed folder's id
+  (`root`), and its handle is kept in memory and in IndexedDB under
+  `origin:<id>`. Reopening compares handles with `isSameEntry`. A draft from
+  the migration, with no remembered handle, matches by folder name; the
+  person still chooses *Put the edits back*. A remembered handle is
+  forgotten once no draft points to it.
+- **The offer** sits in the sidebar, under the reopened folder:
+  *Put the edits back* / *Not now*. *Not now* leaves the drafts as drafts.
+- **Unknown file dates.** A draft with no known date for its file (from the
+  migration) is reattached so that Save still asks before replacing the file.
+- **Text that now matches the file** is reattached with nothing unsaved.
 
 1. **Records and migration.**
    - Code: the `kind` field; file records stored without text when they have

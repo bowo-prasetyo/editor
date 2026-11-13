@@ -106,21 +106,55 @@ export async function openFolder() {
   addRoot(w.id, handle, 'granted')
   prefs.workspaces = [...prefs.workspaces, w]
   requestPersistence()
+  for (const fn of openedListeners) await fn(w, handle)
   return w
 }
 
+// Called with ({ id, name }, handle) when a folder is newly opened (see closing.js).
+const openedListeners = new Set()
+export function onFolderOpened(fn) {
+  openedListeners.add(fn)
+  return () => openedListeners.delete(fn)
+}
+
+// --- Where kept drafts came from ------------------------------------------------------
+//
+// Closing a folder with "Keep as drafts" remembers the folder's handle, so
+// that opening the same folder again can recognise it and offer to put the
+// edits back (see closing.js). Kept in memory, and in IndexedDB for later visits.
+const originKey = (rootId) => `origin:${rootId}`
+const originHandles = new Map()
+
+export async function originHandle(rootId) {
+  if (originHandles.has(rootId)) return originHandles.get(rootId)
+  const h = (await storedHandle(originKey(rootId)).catch(() => null)) ?? null
+  if (h) originHandles.set(rootId, markRaw(h))
+  return h
+}
+
+export async function forgetOrigin(rootId) {
+  originHandles.delete(rootId)
+  await storeHandle(originKey(rootId), null).catch(() => {})
+}
+
 // Take a folder out of the sidebar. Its files' records go: a file with
-// unsaved changes becomes a draft (remembering where it came from), so
-// nothing is lost; the others, and their history, are removed, since their
-// text is on disk. Returns how many files were kept as drafts.
+// unsaved changes becomes a draft that remembers where it came from (its
+// `origin`), so nothing is lost; the others, and their history, are removed,
+// since their text is on disk. Returns how many files were kept as drafts.
+// (The close dialog, offering to save them first, is in FileTree.vue.)
 export async function closeFolder(id) {
   const name = workspaceFor(id)?.name ?? ''
   let kept = 0
   for (const doc of state.docs.filter((d) => d.kind === 'file' && d.source?.root === id && !d.deletedAt)) {
     if (doc.diskDirty) {
-      setDocOptions(doc.id, { kind: 'draft', origin: { folder: name, path: doc.source.path }, source: undefined })
+      setDocOptions(doc.id, { kind: 'draft', origin: { folder: name, path: doc.source.path, root: id }, source: undefined })
       kept++
     } else await deleteDoc(doc.id)
+  }
+  const handle = roots.get(id)?.handle
+  if (kept && handle) {
+    originHandles.set(id, handle)
+    await storeHandle(originKey(id), handle).catch(() => {})
   }
   prefs.workspaces = prefs.workspaces.filter((w) => w.id !== id)
   delete prefs.expanded[id]

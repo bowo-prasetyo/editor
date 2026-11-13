@@ -244,7 +244,7 @@ test('closing a folder keeps files with unsaved changes as drafts and lets the o
   const kept = store.getDoc(edited.id)
   assert.equal(kept.kind, 'draft')
   assert.equal(kept.content, '# My app, edited\n')
-  assert.deepEqual(kept.origin, { folder: 'my-app', path: 'README.md' })
+  assert.deepEqual(kept.origin, { folder: 'my-app', path: 'README.md', root: w.id })
   assert.equal(kept.source, undefined)
   store.deleteDoc(edited.id)
 })

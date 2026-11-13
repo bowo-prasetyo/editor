@@ -128,6 +128,7 @@ test('closing a folder keeps unsaved files as drafts; the others go', async ({ p
   await expect.poll(() => editorText(page)).toBe('const answer = 41\n')
 
   await page.getByRole('button', { name: 'Close project' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Keep as drafts' }).click()
   await expect(page.locator('.toast')).toContainText('1 file with unsaved changes was kept as a draft')
   await goHome(page)
   const list = page.locator('.list-pane')
