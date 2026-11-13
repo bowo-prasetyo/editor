@@ -266,7 +266,7 @@ In order:
    - ~~a one-time cleanup of documents that are copies of folder files~~ (phase 1, done);
    - ~~closing a folder with unsaved edits, as decided~~ (phase 2, done);
    - ~~virtual folders become read-only labels; pinning and **Save to folder…** for drafts~~ (phase 3, done).
-4. **Markdown first-class**: `.md` drafts, the preview toggle, the writing
+4. **Markdown first-class** *(plan: [docs/markdown.md](docs/markdown.md))*: `.md` drafts, the preview toggle, the writing
    conveniences, and moving the sidebar off Ctrl/Cmd+B.
 5. **Explain the platform differences**, as described in
    [How Plumb says it](#how-plumb-says-it): greyed-out folder actions with a

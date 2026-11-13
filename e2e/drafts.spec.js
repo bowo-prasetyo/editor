@@ -36,9 +36,9 @@ test('a pinned draft stays at the top, and stays pinned', async ({ page }) => {
   await draft(page, 'beta')
   await home(page)
   await expect(list(page).locator('li').first()).toContainText('beta')
-  await row(page, 'alpha').getByRole('button', { name: 'Pin alpha.txt' }).click()
+  await row(page, 'alpha').getByRole('button', { name: 'Pin alpha.md' }).click()
   await expect(list(page).locator('li').first()).toContainText('alpha')
-  await expect(row(page, 'alpha').getByRole('button', { name: 'Unpin alpha.txt' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(row(page, 'alpha').getByRole('button', { name: 'Unpin alpha.md' })).toHaveAttribute('aria-pressed', 'true')
   await page.reload()
   await expect(list(page).locator('li').first()).toContainText('alpha')
 })
@@ -107,7 +107,7 @@ test.describe('Save to folder', () => {
     expect(exists).toBe(false)
     expect(await editorText(page)).toBe('Plan\nstep one')
     await home(page)
-    await expect(list(page)).toContainText('Plan.txt')
+    await expect(list(page)).toContainText('Plan.md')
   })
 
   test('a file that exists is never replaced: the dialog says so', async ({ page }) => {

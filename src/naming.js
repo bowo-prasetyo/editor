@@ -1,9 +1,10 @@
 // Names for documents.
 
-export const DEFAULT_NAME = 'Untitled.txt'
+// New drafts are Markdown (see docs/markdown.md); plain text is valid Markdown.
+export const DEFAULT_NAME = 'Untitled.md'
 
-// "Shopping list for Saturday" -> "Shopping list for Saturday.txt"
-export function nameFromContent(content, ext = 'txt') {
+// "Shopping list for Saturday" -> "Shopping list for Saturday.md"
+export function nameFromContent(content, ext = 'md') {
   // Only the first non-blank line matters; don't split the whole (maybe huge) text.
   let line = ''
   for (let start = 0; start <= content.length; ) {

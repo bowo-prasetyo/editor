@@ -2,6 +2,7 @@
 // syntax highlighting for the document's language (see languages.js). It
 // handles very large documents (only the visible lines are drawn), several
 // cursors, and the usual editing commands.
+import { toggleBold, toggleItalic } from './mdedit.js'
 import { Compartment, EditorSelection, EditorState, Facet, Prec, RangeSetBuilder, StateEffect, StateField, Transaction } from '@codemirror/state'
 import { diagnosticCount, lintGutter, lintKeymap, linter, nextDiagnostic, openLintPanel } from '@codemirror/lint'
 import {
@@ -138,6 +139,16 @@ export const indentSettings = (indent) => [
 // rules (an extra level after "{", "(" or ":"). Otherwise Enter copies the
 // current line's indentation.
 export const smartEnter = Facet.define({ combine: (values) => values.some(Boolean) })
+
+// Writing helpers in Markdown documents (see docs/markdown.md). Above the
+// default keymap, where Mod-i selects the enclosing syntax. Ctrl/Cmd+B here
+// means bold; elsewhere it shows or hides the folder sidebar (App.vue).
+export const markdownKeys = Prec.high(
+  keymap.of([
+    { key: 'Mod-b', run: toggleBold, preventDefault: true },
+    { key: 'Mod-i', run: toggleItalic, preventDefault: true },
+  ]),
+)
 
 export function enter(target) {
   return target.state.facet(smartEnter) ? insertNewlineAndIndent(target) : newlineKeepIndent(target)
@@ -569,8 +580,10 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, hel
     // Highlight as `support` (a loaded LanguageSupport, or null for plain
     // text); `name` picks the fallback comment syntax.
     // `smart`: indent new lines by the language's rules.
+    // Markdown documents also get their writing helpers (see mdedit.js).
     setLanguage(n, support, { smart = false } = {}) {
-      view.dispatch({ effects: language.reconfigure([commentData(n), support ?? [], smart ? smartEnter.of(true) : []]) })
+      const markdown = support?.language?.name === 'markdown' ? markdownKeys : []
+      view.dispatch({ effects: language.reconfigure([commentData(n), support ?? [], smart ? smartEnter.of(true) : [], markdown]) })
     },
     // Turn helpers on or off: the options for helpers().
     setHelpers(options) {

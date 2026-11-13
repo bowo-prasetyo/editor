@@ -151,7 +151,7 @@ function choose(i) {
     // drafts have no folders; see docs/files-and-drafts.md).
     const path = normalizeFolder(createLabel.value)
     let name = path.slice(path.lastIndexOf('/') + 1)
-    if (!/\.[^.]+$/.test(name)) name += '.txt'
+    if (!/\.[^.]+$/.test(name)) name += '.md'
     const doc = createDoc(name, '', { autoName: false })
     requestPersistence()
     hide(false)
