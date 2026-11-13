@@ -353,6 +353,11 @@ export async function linkFile(id, handle, lastModified) {
   setDocOptions(id, { linked: true, diskDirty: false, diskModified: lastModified })
 }
 
+// Other handles kept with the documents, by key (folders opened from disk:
+// see workspace.js). Kept in IndexedDB; in memory only with localStorage.
+export const storedHandle = (key) => backend?.getHandle(key) ?? Promise.resolve(null)
+export const storeHandle = (key, handle) => backend.putHandle(key, handle)
+
 export async function unlinkFile(id) {
   handleCache.delete(id)
   await backend.putHandle(id, null)
@@ -506,7 +511,7 @@ export function downloadDoc(doc) {
 export const BACKUP_FORMAT = 'editor-backup'
 
 // Links to files on disk only make sense in this browser, so they're left out.
-const FILE_FIELDS = ['linked', 'diskDirty', 'diskModified']
+const FILE_FIELDS = ['linked', 'diskDirty', 'diskModified', 'source']
 function withoutFileLink(doc) {
   const d = plain(doc)
   for (const f of FILE_FIELDS) delete d[f]

@@ -6,15 +6,36 @@ export const FONT_SIZES = [11, 12, 13, 14, 16, 18, 20, 24, 28]
 // tabs: open document ids; recent: recently opened, newest first; sort: how
 // the list is ordered; folders: folders created while still empty.
 // folderView: the folder shown in the document list ('' = all).
-const defaults = { fontSize: 14, tabs: [], recent: [], sort: 'updated', folders: [], folderView: '' }
+// Editing helpers (for code): closeBrackets, autocomplete, indentGuides.
+// When saving to a file: trimOnSave (trailing spaces; never in Markdown,
+// where they mean a line break) and finalNewline.
+// workspaces: folders opened from disk ({ id, name }), with sidebar
+// (shown or hidden) and expanded (folder paths open in the tree, by id).
+const defaults = {
+  fontSize: 14,
+  tabs: [],
+  recent: [],
+  sort: 'updated',
+  folders: [],
+  folderView: '',
+  closeBrackets: true,
+  autocomplete: true,
+  indentGuides: true,
+  trimOnSave: false,
+  finalNewline: false,
+  workspaces: [],
+  sidebar: true,
+  expanded: {},
+}
 
 function load() {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY)) ?? {}
     const lists = Object.fromEntries(
-      ['tabs', 'recent', 'folders'].map((k) => [k, Array.isArray(saved[k]) ? saved[k] : []]),
+      ['tabs', 'recent', 'folders', 'workspaces'].map((k) => [k, Array.isArray(saved[k]) ? saved[k] : []]),
     )
-    return { ...defaults, ...saved, ...lists }
+    const expanded = saved.expanded && typeof saved.expanded === 'object' ? saved.expanded : {}
+    return { ...defaults, ...saved, ...lists, expanded }
   } catch {
     return structuredClone(defaults)
   }

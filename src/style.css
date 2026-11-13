@@ -60,7 +60,8 @@ body {
   font: 15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif;
 }
 #app { display: flex; flex-direction: column; }
-main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+main { flex: 1; min-height: 0; display: flex; }
+.view { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
 a { color: var(--accent); }
 
 button {
@@ -393,3 +394,35 @@ button.icon-button:hover { opacity: 1; border-color: var(--border); }
 .shortcuts-body dd { margin: 0; text-align: right; white-space: nowrap; }
 .shortcuts-body kbd { font: 12px var(--mono); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--panel); }
 .shortcuts-body > .hint { column-span: all; margin-top: 14px; }
+
+/* Folder sidebar (see FileTree.vue) */
+.file-tree {
+  flex: none; width: 260px; min-height: 0; overflow: auto; border-right: 1px solid var(--border);
+  background: var(--panel); font-size: 13px; padding: 4px 0 12px;
+}
+.file-tree ul { list-style: none; margin: 0; padding: 0; }
+.tree-root { position: relative; margin-top: 4px; }
+.tree-row {
+  display: flex; align-items: center; gap: 4px; padding: 2px 8px; cursor: pointer; white-space: nowrap;
+  border: 1px solid transparent; line-height: 20px; user-select: none;
+}
+.tree-row:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.tree-row:focus { outline: none; border-color: var(--accent); }
+.tree-row.selected { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.tree-row.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.tree-row.hidden .tree-name { opacity: 0.6; }
+.root-row { font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; padding-right: 150px; }
+.root-actions { position: absolute; right: 4px; top: 1px; display: flex; gap: 0; }
+.root-actions button.mini { padding: 0 5px; font-size: 11px; }
+.tree-chevron { flex: none; width: 1em; color: var(--muted); text-align: center; }
+.tree-name { overflow: hidden; text-overflow: ellipsis; }
+.tree-dirty { margin-left: auto; color: var(--accent); font-size: 10px; }
+.tree-note { margin: 0; padding: 2px 8px; color: var(--muted); font-size: 12px; line-height: 18px; }
+p.tree-note { padding: 4px 10px 6px; white-space: normal; }
+button.primary-mini { color: var(--accent); border-color: var(--accent); margin-left: 4px; }
+@media (max-width: 700px) {
+  .file-tree { width: 200px; }
+}
+@media print {
+  .file-tree { display: none !important; }
+}

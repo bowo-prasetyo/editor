@@ -13,6 +13,7 @@ export const SHORTCUTS = [
   { id: 'prevTab', group: 'Documents', label: 'Previous tab', keys: ['Alt+PageUp'] },
   { id: 'nextTab', group: 'Documents', label: 'Next tab', keys: ['Alt+PageDown'] },
   { id: 'shortcuts', group: 'Documents', label: 'Show keyboard shortcuts', keys: ['F1', '?'] },
+  { id: 'sidebar', group: 'Documents', label: 'Show / hide the folder sidebar', keys: ['Mod+B'] },
   // Find
   { id: 'find', group: 'Find', label: 'Find', keys: ['Mod+F'] },
   { id: 'replace', group: 'Find', label: 'Find and replace', keys: ['Mod+H'] },
@@ -30,6 +31,10 @@ export const SHORTCUTS = [
   { id: 'matchingBracket', group: 'Editing', label: 'Jump to the matching bracket', keys: ['Mod+Shift+\\'] },
   { id: 'undo', group: 'Editing', label: 'Undo / redo', keys: ['Mod+Z', isMac ? 'Mod+Shift+Z' : 'Mod+Y'] },
   { id: 'wrap', group: 'Editing', label: 'Word wrap on / off', keys: ['Alt+Z'] },
+  { id: 'complete', group: 'Editing', label: 'Show suggestions (Enter accepts, Escape closes)', keys: ['Ctrl+Space'] },
+  // Folding
+  { id: 'fold', group: 'Folding', label: 'Fold / unfold at the cursor', keys: isMac ? ['Mod+Alt+[', 'Mod+Alt+]'] : ['Ctrl+Shift+[', 'Ctrl+Shift+]'] },
+  { id: 'foldAll', group: 'Folding', label: 'Fold all / unfold all', keys: ['Ctrl+Alt+[', 'Ctrl+Alt+]'] },
   // Cursors
   { id: 'selectNext', group: 'Cursors and selection', label: 'Add the next occurrence to the selection', keys: ['Mod+D'] },
   { id: 'selectAll', group: 'Cursors and selection', label: 'Select every occurrence', keys: ['Mod+Shift+L'] },

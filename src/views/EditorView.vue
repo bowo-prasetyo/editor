@@ -18,6 +18,7 @@ import { showToast } from '../toast'
 import { canSaveInPlace, saveDoc } from '../fileaccess'
 import { countWords } from '../stats'
 import { createEditor } from '../cm'
+import { whitespaceFix } from '../textops'
 import { AUTO, PLAIN, findLanguage, languageNames, loadLanguage } from '../languages'
 import FindBar from '../components/FindBar.vue'
 import GoToBar from '../components/GoToBar.vue'
@@ -99,6 +100,7 @@ async function save(saveAs = false) {
   if (saving) return
   saving = true
   try {
+    fixWhitespace()
     const encodingBefore = ENCODINGS[doc.value.encoding] ?? doc.value.encoding
     const r = await saveDoc(doc.value, { saveAs })
     if (r.result === 'saved') showToast(`Saved to “${r.name}”.`, { timeout: 3000 })
@@ -114,6 +116,15 @@ async function save(saveAs = false) {
   } finally {
     saving = false
   }
+}
+
+// Before writing a file: trailing spaces and the final line break, if
+// turned on. In Markdown, two spaces at the end of a line are a line break,
+// so they stay. Undoable like any edit.
+function fixWhitespace() {
+  const trim = prefs.trimOnSave && !isMarkdown.value
+  if (!trim && !prefs.finalNewline) return
+  current()?.apply(whitespaceFix({ trim, finalNewline: prefs.finalNewline }))
 }
 
 // --- Markdown preview -------------------------------------------------------
@@ -211,6 +222,7 @@ function mountEditor([, id] = [], [, oldId] = []) {
     name: name.value,
     wrap: view.value.wrap,
     spellcheck: view.value.spellcheck,
+    help: help.value,
     onChange: (text) => (content.value = text),
     onSelection: (info) => (cursor.value = info),
   })
@@ -249,10 +261,39 @@ watch(
     const load = ++languageLoads
     const support = await loadLanguage(desc)
     // Ignore a slow load that a newer choice (or another document) replaced.
-    if (load === languageLoads && editor.value === ed) ed.setLanguage(name.value, support, { smart: isCode(desc, support) })
+    if (load === languageLoads && editor.value === ed) {
+      ed.setLanguage(name.value, support, { smart: isCode(desc, support) })
+      codeLoaded.value = isCode(desc, support)
+    }
   },
   { immediate: true },
 )
+
+// Completion, closing brackets and indentation guides: for code, unless
+// turned off (see helpers() in cm.js). Suggestions are always available with
+// Ctrl+Space.
+const codeLoaded = ref(false)
+const help = computed(() => ({
+  code: codeLoaded.value,
+  closeBrackets: prefs.closeBrackets,
+  autocomplete: prefs.autocomplete,
+  guides: prefs.indentGuides,
+}))
+watch(help, (h) => current()?.setHelpers(h))
+const onOff = (on) => (on ? 'on' : 'off')
+const flip = (key, label) => () => {
+  prefs[key] = !prefs[key]
+  showToast(`${label}: ${onOff(prefs[key])}.`, { timeout: 2500 })
+}
+// A command whose title says what it will do.
+const setting = (id, key, label) => ({
+  id,
+  group: 'Settings',
+  get title() {
+    return `${label}: turn ${onOff(!prefs[key])}`
+  },
+  run: flip(key, label),
+})
 // Renaming can change the fallback comment syntax even if the language doesn't.
 watch(name, async (n) => {
   const ed = current()
@@ -432,6 +473,24 @@ const editorCommands = [
   { id: 'selectLine', title: 'Select line', group: E, shortcut: 'selectLine', run: edit('selectLine') },
   { id: 'indentLines', title: 'Indent lines', group: E, run: edit('indentMore') },
   { id: 'outdentLines', title: 'Outdent lines', group: E, run: edit('indentLess') },
+  { id: 'sortAsc', title: 'Sort lines (A to Z)', group: E, run: edit('sortLinesAscending') },
+  { id: 'sortDesc', title: 'Sort lines (Z to A)', group: E, run: edit('sortLinesDescending') },
+  { id: 'sortCaseless', title: 'Sort lines, ignoring case', group: E, run: edit('sortLinesIgnoreCase') },
+  { id: 'uniqueLines', title: 'Remove duplicate lines', group: E, run: edit('removeDuplicateLines') },
+  { id: 'reverseLines', title: 'Reverse lines', group: E, run: edit('reverseLines') },
+  { id: 'joinLines', title: 'Join lines', group: E, run: edit('joinLines') },
+  { id: 'upperCase', title: 'Change case: UPPERCASE', group: E, run: edit('upperCase') },
+  { id: 'lowerCase', title: 'Change case: lowercase', group: E, run: edit('lowerCase') },
+  { id: 'titleCase', title: 'Change case: Title Case', group: E, run: edit('titleCase') },
+  { id: 'trimWhitespace', title: 'Trim trailing whitespace', group: E, run: edit('trimTrailingWhitespace') },
+  { id: 'foldAll', title: 'Fold all', group: E, shortcut: 'foldAll', run: edit('foldAll') },
+  { id: 'unfoldAll', title: 'Unfold all', group: E, shortcut: 'foldAll', run: edit('unfoldAll') },
+  { id: 'complete', title: 'Show suggestions', group: E, shortcut: 'complete', run: edit('startCompletion') },
+  setting('prefCloseBrackets', 'closeBrackets', 'Auto-close brackets and quotes'),
+  setting('prefAutocomplete', 'autocomplete', 'Suggestions while typing'),
+  setting('prefIndentGuides', 'indentGuides', 'Indentation guides'),
+  setting('prefTrimOnSave', 'trimOnSave', 'Trim trailing whitespace when saving to a file'),
+  setting('prefFinalNewline', 'finalNewline', 'Add a final newline when saving to a file'),
   { id: 'undo', title: 'Undo', group: E, shortcut: 'undo', run: edit('undo') },
   { id: 'redo', title: 'Redo', group: E, run: edit('redo') },
 ]
