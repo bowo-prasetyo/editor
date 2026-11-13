@@ -1,0 +1,225 @@
+// Search (and replace) across every document and the files in open folders.
+//
+// Documents are searched as they are in the browser. Files in open folders
+// that have no document yet are read from disk (text files up to
+// MAX_FILE_BYTES). Replacing never writes to disk: each changed file
+// becomes a document with changes not yet saved to its file, and a version
+// from before the replace is kept. "Save all" then writes them.
+import { reactive } from 'vue'
+import { findMatches, replaceAllEdit, searchRegExp } from './find.js'
+import { decodeBytes } from './textcodec.js'
+import { displayName } from './naming.js'
+import { prefs } from './prefs.js'
+import { getDoc, recordVersion, state, updateDoc } from './store.js'
+import { ensureAllIndexes, fileIndex, findWorkspaceDoc, openWorkspaceFile } from './workspace.js'
+
+// Results stop after this many matches (a file's matches are all counted).
+export const MAX_RESULTS = 10_000
+// Bigger files in folders are skipped (open them to search them).
+export const MAX_FILE_BYTES = 2_000_000
+const PREVIEW = 120 // characters of context around a match
+
+// --- Which files: "*.js, src/, !test/" ----------------------------------------------
+
+// A glob as a RegExp source: * is any characters but "/", ** any at all,
+// ? one character.
+function globSource(glob) {
+  let out = ''
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i]
+    if (c === '*') {
+      if (glob[i + 1] === '*') {
+        out += '.*'
+        i++
+        if (glob[i + 1] === '/') i++ // "**/" also matches no folder at all
+      } else out += '[^/]*'
+    } else if (c === '?') out += '[^/]'
+    else out += c.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+  }
+  return out
+}
+
+// A test for paths ("folder/sub/name.ext") from a comma-separated list of
+// patterns. A pattern without "/" matches file names ("*.md", "README*");
+// one with "/" matches part of the path ("src/", "docs/**/*.md"). Patterns
+// starting with "!" exclude. With no include patterns, everything is in.
+export function pathFilter(spec = '') {
+  const parts = spec.split(',').map((s) => s.trim()).filter(Boolean)
+  const include = []
+  const exclude = []
+  for (let p of parts) {
+    const list = p.startsWith('!') ? exclude : include
+    p = p.replace(/^!/, '').trim()
+    if (!p) continue
+    const re = p.includes('/')
+      ? new RegExp(`(^|/)${globSource(p.replace(/^\//, ''))}`, 'i')
+      : new RegExp(`(^|/)${globSource(p)}$`, 'i')
+    list.push(re)
+  }
+  return (path) => (!include.length || include.some((re) => re.test(path))) && !exclude.some((re) => re.test(path))
+}
+
+// --- Matches in one text ------------------------------------------------------------------
+
+// Matches with their line, column and a preview of the line:
+// [{ from, to, line, col, before, text, after }]. `limit` caps how many.
+export function searchText(text, query, options = {}, limit = Infinity) {
+  const matches = findMatches(text, query, options, limit)
+  const out = []
+  let line = 1
+  let lineStart = 0
+  let scanned = 0
+  for (const [from, to] of matches) {
+    // Count line breaks up to this match (matches are in order).
+    for (let i = text.indexOf('\n', scanned); i !== -1 && i < from; i = text.indexOf('\n', i + 1)) {
+      line++
+      lineStart = i + 1
+    }
+    scanned = from
+    let lineEnd = text.indexOf('\n', from)
+    if (lineEnd === -1) lineEnd = text.length
+    const shownEnd = Math.min(to, lineEnd) // a match across lines shows its first line
+    const start = Math.max(lineStart, from - PREVIEW / 2)
+    const before = text.slice(start, from).replace(/^\s+/, '')
+    out.push({
+      from,
+      to,
+      line,
+      col: from - lineStart + 1,
+      before: (start > lineStart ? '…' : '') + before,
+      text: text.slice(from, shownEnd),
+      after: text.slice(shownEnd, Math.min(lineEnd, shownEnd + PREVIEW)) + (lineEnd > shownEnd + PREVIEW ? '…' : ''),
+    })
+  }
+  return out
+}
+
+// --- Searching everything ----------------------------------------------------------------
+
+// Where to look: 'all', 'documents' (in the browser) or 'folders' (files
+// in open folders, including those opened as documents).
+export const SCOPES = { all: 'Everything', documents: 'Documents', folders: 'Open folders' }
+
+const rootName = (id) => prefs.workspaces.find((w) => w.id === id)?.name ?? ''
+const docPath = (doc) => (doc.folder ? `${doc.folder}/` : '') + displayName(doc.name)
+
+// What could be searched: documents, and folder files with no document.
+// Each target: { key, kind: 'doc' | 'file', name, folder, path, doc?, rootId?, filePath?, handle? }
+export async function searchTargets(scope = 'all') {
+  const targets = []
+  for (const doc of state.docs) {
+    if (doc.deletedAt) continue
+    if (scope === 'folders' && !doc.source) continue
+    targets.push({ key: doc.id, kind: 'doc', name: displayName(doc.name), folder: doc.folder ?? '', path: docPath(doc), doc })
+  }
+  if (scope === 'documents') return targets
+  await ensureAllIndexes()
+  for (const w of prefs.workspaces) {
+    const index = fileIndex.get(w.id)
+    if (!index?.ready) continue
+    for (const { path, handle } of index.files) {
+      if (findWorkspaceDoc(w.id, path)) continue // searched as a document
+      const slash = path.lastIndexOf('/')
+      const folder = [w.name, ...(slash === -1 ? [] : [path.slice(0, slash)])].join('/')
+      targets.push({
+        key: `${w.id}:${path}`,
+        kind: 'file',
+        name: path.slice(slash + 1),
+        folder,
+        path: `${w.name}/${path}`,
+        rootId: w.id,
+        filePath: path,
+        handle,
+      })
+    }
+  }
+  return targets
+}
+
+// The text of a target, or null if it can't be searched (binary, too big,
+// gone).
+export async function targetText(target) {
+  if (target.kind === 'doc') return getDoc(target.doc.id)?.content ?? null
+  try {
+    const file = await target.handle.getFile()
+    if (file.size > MAX_FILE_BYTES) return null
+    const decoded = decodeBytes(new Uint8Array(await file.arrayBuffer()))
+    return decoded.binary ? null : decoded.text
+  } catch {
+    return null
+  }
+}
+
+// Search everything in `scope`, calling onResult({ target, matches }) for
+// each file with matches as it's found, and onProgress(done, total).
+// Resolves to { files, matches, skipped, truncated, aborted }.
+export async function searchAll(query, options = {}, { scope = 'all', files = '', signal, onResult, onProgress } = {}) {
+  const summary = { files: 0, matches: 0, skipped: 0, truncated: false, aborted: false }
+  if (!searchRegExp(query, options)) return summary // throws for an invalid pattern
+  const keep = pathFilter(files)
+  const targets = (await searchTargets(scope)).filter((t) => keep(t.path))
+  const BATCH = 16
+  for (let i = 0; i < targets.length; i += BATCH) {
+    if (signal?.aborted) return { ...summary, aborted: true }
+    const batch = targets.slice(i, i + BATCH)
+    const texts = await Promise.all(batch.map(targetText))
+    if (signal?.aborted) return { ...summary, aborted: true }
+    batch.forEach((target, k) => {
+      const text = texts[k]
+      if (text == null) return void (target.kind === 'file' && summary.skipped++)
+      if (summary.truncated) return
+      const matches = searchText(text, query, options, MAX_RESULTS - summary.matches)
+      if (!matches.length) return
+      summary.files++
+      summary.matches += matches.length
+      if (summary.matches >= MAX_RESULTS) summary.truncated = true
+      onResult?.({ target, matches })
+    })
+    onProgress?.(Math.min(i + BATCH, targets.length), targets.length)
+    // Let the page breathe between batches.
+    await new Promise((r) => setTimeout(r, 0))
+  }
+  return summary
+}
+
+// --- Replacing ----------------------------------------------------------------------------
+
+// Replace every match in one target (opening a folder file as a document
+// first). Matches are found again in the current text, so edits made since
+// the search are respected. Returns { doc, count }.
+export async function replaceInTarget(target, query, options, replacement) {
+  let doc = target.kind === 'doc' ? getDoc(target.doc.id) : findWorkspaceDoc(target.rootId, target.filePath)
+  if (!doc) doc = (await openWorkspaceFile(target.rootId, target.filePath, target.handle)).doc
+  const text = doc.content
+  const edit = replaceAllEdit(text, findMatches(text, query, options), replacement, options.regex)
+  if (!edit) return { doc, count: 0 }
+  await recordVersion(doc.id, 'manual', 'Before replacing in files')
+  updateDoc(doc.id, { content: text.slice(0, edit.from) + edit.insert + text.slice(edit.to) })
+  return { doc: getDoc(doc.id), count: edit.count }
+}
+
+// Replace in every target. Returns { files, count, docs }.
+export async function replaceAll(targets, query, options, replacement) {
+  const out = { files: 0, count: 0, docs: [] }
+  for (const t of targets) {
+    const r = await replaceInTarget(t, query, options, replacement)
+    if (!r.count) continue
+    out.files++
+    out.count += r.count
+    out.docs.push(r.doc)
+  }
+  return out
+}
+
+// --- The search page's state, kept while moving around the app -------------------------
+
+export const search = reactive({
+  query: '',
+  replace: '',
+  showReplace: false,
+  files: '',
+  scope: 'all',
+  matchCase: false,
+  wholeWord: false,
+  regex: false,
+})

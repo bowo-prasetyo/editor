@@ -2,7 +2,7 @@
 // API (Chrome, Edge and other Chromium browsers). Elsewhere, saving falls
 // back to a download.
 import { ENCODINGS } from './textcodec.js'
-import { docBlob, downloadDoc, getFileHandle, linkFile, recordVersion, setDocOptions } from './store.js'
+import { docBlob, downloadDoc, getDoc, getFileHandle, linkFile, recordVersion, setDocOptions, state } from './store.js'
 
 // (globalThis is window in a page.)
 export const canSaveInPlace = () =>
@@ -106,4 +106,26 @@ export async function saveDoc(doc, { saveAs = false, confirm: confirmFn = (m) =>
   recordVersion(doc.id, 'saved')
   if (handle.name && handle.name !== doc.name) setDocOptions(doc.id, { name: handle.name, autoName: false })
   return { result: 'saved', name: handle.name }
+}
+
+// Documents linked to files that have changes not saved to them.
+export const unsavedToDisk = () => state.docs.filter((d) => d.linked && d.diskDirty && !d.deletedAt)
+
+// Save every document with changes not saved to its file, one after the
+// other (each may ask about a file changed on disk). `prepare(doc)` runs
+// first for each one (whitespace fixes). Returns { saved, cancelled, failed: [names] }.
+export async function saveAllToFiles({ prepare, confirm } = {}) {
+  const out = { saved: 0, cancelled: 0, failed: [] }
+  for (const { id } of unsavedToDisk()) {
+    try {
+      prepare?.(getDoc(id))
+      const r = await saveDoc(getDoc(id), confirm ? { confirm } : {})
+      if (r.result === 'saved') out.saved++
+      else out.cancelled++
+    } catch (e) {
+      console.error(e)
+      out.failed.push(getDoc(id)?.name ?? id)
+    }
+  }
+  return out
 }

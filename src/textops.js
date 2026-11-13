@@ -2,7 +2,7 @@
 // change case, and the whitespace fixes applied when saving to a file.
 // They are plain CodeMirror state commands ({ state, dispatch } => boolean),
 // so they're easy to test, and each one is a single undoable edit.
-import { EditorSelection } from '@codemirror/state'
+import { EditorSelection, EditorState } from '@codemirror/state'
 
 // --- Which lines a command works on ------------------------------------------
 
@@ -184,3 +184,10 @@ export function whitespaceFix({ trim = false, finalNewline = false } = {}) {
 }
 
 export const trimTrailingWhitespace = whitespaceFix({ trim: true })
+
+// The same, for text not open in an editor.
+export function fixWhitespaceText(text, options) {
+  let state = EditorState.create({ doc: text })
+  whitespaceFix(options)({ state, dispatch: (tr) => (state = tr.state) })
+  return state.doc.toString()
+}

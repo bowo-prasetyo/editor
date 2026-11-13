@@ -8,6 +8,9 @@ import { fuzzyMatch, highlightRuns } from '../fuzzy'
 import { normalizeFolder } from '../folders'
 import { availableCommands } from '../commands'
 import { isMac, keyLabel, shortcut } from '../keys'
+import { BinaryFileError } from '../store'
+import { showToast } from '../toast'
+import { ensureAllIndexes, fileIndex, openWorkspaceFile } from '../workspace'
 
 // Ctrl/Cmd+P: jump to any document by typing part of its name or folder.
 // With nothing typed, recently opened documents come first.
@@ -38,6 +41,37 @@ const keysFor = (c) => shortcut(c.shortcut).map((k) => keyLabel(k)).join(' / ')
 
 const docs = computed(() => state.docs.filter((d) => !d.deletedAt))
 
+// Files in open folders that have no document yet, as { rootId, path,
+// handle, name, folder } (folder: the folder's name and path, as documents
+// opened from it are filed).
+const openedFiles = computed(() => new Set(docs.value.filter((d) => d.source).map((d) => `${d.source.root}:${d.source.path}`)))
+const folderFiles = computed(() => {
+  const out = []
+  for (const w of prefs.workspaces) {
+    const index = fileIndex.get(w.id)
+    if (!index) continue
+    for (const { path, handle } of index.files) {
+      if (openedFiles.value.has(`${w.id}:${path}`)) continue
+      const slash = path.lastIndexOf('/')
+      out.push({ rootId: w.id, path, handle, name: path.slice(slash + 1), folder: w.name + (slash === -1 ? '' : '/' + path.slice(0, slash)) })
+    }
+  }
+  return out
+})
+const indexing = computed(() => prefs.workspaces.some((w) => fileIndex.get(w.id) && !fileIndex.get(w.id).ready))
+
+// Results: { key, name, folder, positions, folderPositions, doc? | file? }
+function scored(q, name, folderPath) {
+  const folder = folderPath ? folderPath + '/' : ''
+  const m = fuzzyMatch(q, folder + name, folder.length)
+  if (!m) return null
+  return {
+    score: m.score,
+    positions: m.positions.filter((p) => p >= folder.length).map((p) => p - folder.length),
+    folderPositions: m.positions.filter((p) => p < folder.length),
+  }
+}
+
 const results = computed(() => {
   if (commandMode.value) return []
   const q = query.value.trim()
@@ -46,30 +80,26 @@ const results = computed(() => {
     return [...docs.value]
       .sort((a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity) || b.updatedAt - a.updatedAt)
       .slice(0, MAX_SHOWN)
-      .map((doc) => ({ doc, name: displayName(doc.name), positions: [], folderPositions: [] }))
+      .map((doc) => ({ key: doc.id, doc, name: displayName(doc.name), folder: doc.folder ?? '', positions: [], folderPositions: [] }))
   }
   const out = []
   for (const doc of docs.value) {
     const name = displayName(doc.name)
-    const folder = doc.folder ? doc.folder + '/' : ''
-    const m = fuzzyMatch(q, folder + name, folder.length)
-    if (!m) continue
-    out.push({
-      doc,
-      name,
-      score: m.score,
-      positions: m.positions.filter((p) => p >= folder.length).map((p) => p - folder.length),
-      folderPositions: m.positions.filter((p) => p < folder.length),
-    })
+    const m = scored(q, name, doc.folder)
+    if (m) out.push({ key: doc.id, doc, name, folder: doc.folder ?? '', updated: doc.updatedAt, ...m })
   }
-  return out.sort((a, b) => b.score - a.score || b.doc.updatedAt - a.doc.updatedAt).slice(0, MAX_SHOWN)
+  for (const file of folderFiles.value) {
+    const m = scored(q, file.name, file.folder)
+    if (m) out.push({ key: `${file.rootId}:${file.path}`, file, name: file.name, folder: file.folder, updated: 0, ...m })
+  }
+  return out.sort((a, b) => b.score - a.score || b.updated - a.updated).slice(0, MAX_SHOWN)
 })
 
 // "Work/todo.md" creates todo.md in the Work folder.
 const createLabel = computed(() => {
   const q = query.value.trim()
   if (commandMode.value) return ''
-  if (!q || results.value.some((r) => r.doc.name.toLowerCase() === q.toLowerCase())) return ''
+  if (!q || results.value.some((r) => r.name.toLowerCase() === q.toLowerCase())) return ''
   return q
 })
 const count = computed(() =>
@@ -87,6 +117,8 @@ async function show(prefix = '') {
   query.value = prefix
   active.value = 0
   open.value = true
+  // List the files in open folders (once; kept until a folder is refreshed).
+  ensureAllIndexes()
   await nextTick()
   input.value?.focus()
 }
@@ -106,8 +138,14 @@ function choose(i) {
     return
   }
   if (i < results.value.length) {
+    const r = results.value[i]
     hide(false)
-    router.push({ name: 'edit', params: { id: results.value[i].doc.id } })
+    if (r.doc) return router.push({ name: 'edit', params: { id: r.doc.id } })
+    openWorkspaceFile(r.file.rootId, r.file.path, r.file.handle)
+      .then(({ doc }) => router.push({ name: 'edit', params: { id: doc.id } }))
+      .catch((e) =>
+        showToast(e instanceof BinaryFileError ? `Couldn't open “${r.name}”: it doesn't look like a text file.` : `Couldn't open “${r.name}”: ${e.message}`),
+      )
   } else if (createLabel.value) {
     const path = normalizeFolder(createLabel.value)
     const slash = path.lastIndexOf('/')
@@ -147,7 +185,7 @@ onMounted(() => window.addEventListener('keydown', onWindowKey, true))
 onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKey, true))
 
 defineExpose({ show })
-const folderRuns = (r) => highlightRuns(r.doc.folder ?? '', r.folderPositions)
+const folderRuns = (r) => highlightRuns(r.folder, r.folderPositions)
 const id = (i) => `quick-open-${i}`
 </script>
 
@@ -158,7 +196,7 @@ const id = (i) => `quick-open-${i}`
         ref="input"
         v-model="query"
         class="quick-input"
-        :placeholder="commandMode ? 'Run a command…' : 'Go to document… (type > for commands)'"
+        :placeholder="commandMode ? 'Run a command…' : prefs.workspaces.length ? 'Go to a document or file… (type > for commands)' : 'Go to document… (type > for commands)'"
         role="combobox"
         aria-expanded="true"
         aria-controls="quick-open-list"
@@ -194,11 +232,12 @@ const id = (i) => `quick-open-${i}`
         <li
           v-for="(r, i) in results"
           :id="id(i)"
-          :key="r.doc.id"
+          :key="r.key"
           :data-index="i"
           role="option"
           :aria-selected="i === active"
-          :class="{ active: i === active }"
+          :class="{ active: i === active, 'on-disk': !!r.file }"
+          :title="r.file ? 'In an open folder, not opened yet' : undefined"
           @mousemove="active = i"
           @click="choose(i)"
         >
@@ -207,7 +246,7 @@ const id = (i) => `quick-open-${i}`
               <mark v-if="run.hit">{{ run.text }}</mark><template v-else>{{ run.text }}</template>
             </template>
           </span>
-          <span v-if="r.doc.folder" class="quick-folder">
+          <span v-if="r.folder" class="quick-folder">
             <template v-for="(run, k) in folderRuns(r)" :key="k">
               <mark v-if="run.hit">{{ run.text }}</mark><template v-else>{{ run.text }}</template>
             </template>
@@ -226,7 +265,8 @@ const id = (i) => `quick-open-${i}`
         >
           + Create “{{ createLabel }}”
         </li>
-        <li v-if="!count" class="quick-empty">No documents yet</li>
+        <li v-if="!count" class="quick-empty">{{ indexing ? 'Listing the files in your folders…' : 'No documents yet' }}</li>
+        <li v-else-if="indexing && query.trim()" class="quick-empty">Still listing the files in your folders…</li>
         </template>
       </ul>
     </div>
