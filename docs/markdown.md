@@ -1,10 +1,10 @@
 # Plan: Markdown as a first-class kind of document
 
-> **Status: accepted; phase 1 done.** This plans step 4 of
+> **Status: done.** This planned step 4 of
 > [VISION.md](../VISION.md#next-steps), following the decision in the vision
 > ([Markdown is first-class, within limits](../VISION.md#markdown-is-first-class-within-limits)).
-> The [decisions](#decisions) are recorded at the end. [Phase 1](#phases) is
-> built; phase 2 (writing helpers) is next.
+> The [decisions](#decisions) are recorded at the end, and both
+> [phases](#phases) are built.
 
 ## Why
 
@@ -22,10 +22,10 @@ and adding a few small helpers for writing.
 | New drafts | Named `Untitled.txt`, then after their first line: `Meeting notes.txt` (`src/naming.js`). The quick switcher adds `.txt` to a name with no extension |
 | Highlighting | Markdown is highlighted for `.md`, `.markdown` and `.mdown` names (CodeMirror's Markdown language) |
 | Preview | A *Preview* button and a palette command for Markdown documents. Off by default, remembered per document (`doc.preview`). Side by side on wide screens. Rendered by `marked` and sanitised by DOMPurify (`src/markdown.js`); links open in a new tab |
-| Enter | Keeps the current line's indentation in prose (`newlineKeepIndent` in `src/cm.js`). Lists **don't** continue, because Plumb's Enter takes priority over CodeMirror's Markdown keymap |
+| Enter | Keeps the current line's indentation in prose (`newlineKeepIndent` in `src/cm.js`). *Correction, found while building phase 2:* in Markdown documents, CodeMirror's own Markdown keymap (high priority) **already took Enter**: lists continued, but **renumbered the items after the cursor**. Since phase 1 made new drafts Markdown, every new draft did this |
 | Ctrl/Cmd+B | Shows or hides the folder sidebar, from anywhere (`App.vue`). Doesn't mean bold |
 | Ctrl/Cmd+I | Nothing |
-| Pasting a URL | Pastes the URL as is |
+| Pasting a URL | *Correction, found while building phase 2:* CodeMirror's Markdown support **already** made a link when a URL (`http(s)`, `mailto:`, `www.`) was pasted over selected plain text |
 | Headings | No outline |
 
 ## Principles for this work
@@ -191,6 +191,23 @@ Details settled while building it:
 | Ctrl/Cmd+B changes meaning for people used to the sidebar | The sidebar gets a visible button, and the shortcuts panel says what changed. With option A of question 1, nothing changes outside Markdown |
 | A helper changes text the person didn't mean to | Each helper acts only on the cursor's line or the selection, in response to a key, and is one undo step. Tests check that other lines are untouched |
 | The preview renders something unsafe from an opened file | Unchanged: everything is sanitised by DOMPurify, and links open in a new tab |
+
+**Phase 2 is done** (`continueList` and `headings` in `src/mdedit.js`, the
+quick switcher's `#`). Details settled while building it:
+
+- **Plumb's Enter wins in Markdown.** Its keys are placed before
+  CodeMirror's Markdown support (same precedence: earlier wins), so
+  CodeMirror's renumbering Enter never runs. When Plumb's continuation
+  declines (outside lists, in a code block, with the cursor inside a marker,
+  or with a selection), Enter goes to Plumb's usual Enter.
+- **Pasting links** turned out to be CodeMirror's existing `pasteURLAsLink`,
+  which matches the plan's rule (selected plain text plus a single URL) and
+  also takes `mailto:` and `www.` links. It's kept, with tests.
+- **Go to heading** is `#` in the quick switcher, and *Go to heading…* in the
+  palette for Markdown documents with headings. The list is indented by
+  level and filtered by fuzzy match. Headings come from the fully parsed
+  syntax tree, so underlined (setext) headings count and `#` in code blocks
+  doesn't.
 
 ## Decisions
 

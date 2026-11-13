@@ -124,6 +124,9 @@ The scenarios follow the principles in [VISION.md](VISION.md#principles).
 | New drafts (and the quick switcher's) are named `.md`; the preview is off until turned on | `markdown.spec.js`, `test/naming.test.js` |
 | Ctrl/Cmd+B and Ctrl/Cmd+I wrap and unwrap the selection, insert a pair with nothing selected, toggle every selection, and don't take each other's stars | `markdown.spec.js`, `test/mdedit.test.js` |
 | Outside Markdown, Ctrl/Cmd+B shows and hides the sidebar and adds no stars; the Folders button does too | `markdown.spec.js` |
+| Lists, tasks and quotes continue on Enter, copying indentation and spacing; an ordered list is never renumbered; Enter on an empty item ends the list; nothing happens outside lists, inside a marker or in code blocks | `markdown.spec.js`, `test/mdedit.test.js` |
+| Pasting a URL over selected text makes a link; elsewhere it pastes as is | `markdown.spec.js` |
+| Go to heading: `#` in the quick switcher lists headings (not in code blocks; underlined ones too) and jumps to one; also from the palette | `markdown.spec.js`, `test/mdedit.test.js` |
 
 ### The editor screen
 

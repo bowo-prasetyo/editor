@@ -30,4 +30,6 @@ export function availableCommands() {
 
 // selectedText(): the editor's selection, when a document is open (for
 // starting a search with it).
-export const ui = reactive({ shortcutsOpen: false, selectedText: null })
+// headings / goTo: the open Markdown document's headings, and jumping to one
+// (set by the editor; see the quick switcher's "#").
+export const ui = reactive({ shortcutsOpen: false, selectedText: null, headings: null, goTo: null })
