@@ -29,6 +29,7 @@ import { decodeBytes, fileFormat } from './textcodec.js'
 import { editorSettings, parseEditorConfig, propertiesFor } from './editorconfig.js'
 import { dropPrefix, markChanged } from './filecache.js'
 import { compareNatural } from './locale.js'
+import { t } from './i18n.js'
 
 export const canOpenFolder = () => typeof globalThis.showDirectoryPicker === 'function'
 
@@ -568,8 +569,8 @@ export async function requestFileAccess(id) {
 
 export function checkEntryName(name) {
   const n = String(name ?? '').trim()
-  if (!n) return 'Type a name.'
-  if (n === '.' || n === '..' || /[/\\]/.test(n)) return 'A name can’t be “.” or “..”, or contain / or \\.'
+  if (!n) return t('errors.typeName')
+  if (n === '.' || n === '..' || /[/\\]/.test(n)) return t('errors.badName')
   return ''
 }
 
@@ -591,7 +592,7 @@ export async function createEntry(rootId, dir, dirPath, name, kind) {
   const problem = checkEntryName(name)
   if (problem) throw new Error(problem)
   name = name.trim()
-  if (await exists(dir, name)) throw new Error(`“${name}” already exists here.`)
+  if (await exists(dir, name)) throw new Error(t('errors.existsHere', { name }))
   const handle =
     kind === 'directory' ? await dir.getDirectoryHandle(name, { create: true }) : await dir.getFileHandle(name, { create: true })
   await loadListing(rootId, dirPath, dir)

@@ -1,6 +1,7 @@
 // Version history: copies of a document kept over time, so earlier text can
 // be looked at and brought back. Stored by the backend (see backends.js);
 // this module decides when to keep a version and which old ones to let go.
+import { translated } from './i18n.js'
 
 const MINUTE = 60 * 1000
 const HOUR = 60 * MINUTE
@@ -9,18 +10,21 @@ const DAY = 24 * HOUR
 // While editing, a version is kept at most this often.
 export const AUTO_INTERVAL = 5 * MINUTE
 
-// Kinds of version and how they're described.
-export const KINDS = {
-  auto: 'Autosaved',
-  opened: 'Opened from file',
-  saved: 'Saved to file',
-  manual: 'Saved version',
-  restore: 'Before restoring an older version',
-}
+// Kinds of version and how they're described. The kind is stored, never the
+// words, so a version reads in whatever language Plumb is in.
+export const KINDS = translated({
+  auto: 'history.kinds.auto',
+  opened: 'history.kinds.opened',
+  saved: 'history.kinds.saved',
+  manual: 'history.kinds.manual',
+  restore: 'history.kinds.restore',
+  reload: 'history.kinds.reload',
+  replace: 'history.kinds.replace',
+})
 
 // Versions the user made or that mark an event are kept longer than
 // automatic ones.
-const MARKED = new Set(['manual', 'saved', 'opened', 'restore'])
+const MARKED = new Set(['manual', 'saved', 'opened', 'restore', 'reload', 'replace'])
 export const MAX_MARKED = 50
 export const MAX_VERSIONS = 100
 // Text kept per document, in characters: big documents keep fewer versions.

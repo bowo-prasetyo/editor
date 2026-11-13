@@ -5,6 +5,7 @@ import { createDoc, getDoc, requestPersistence } from '../store'
 import { displayName } from '../naming'
 import { liveTabs } from '../session'
 import { closeDocTab } from '../closetab'
+import { t } from '../i18n'
 
 // Tabs for the open documents. Middle-click or × closes one; closing the
 // active tab shows its neighbour (or the document list).
@@ -42,7 +43,7 @@ watch(
 </script>
 
 <template>
-  <nav class="tabbar" aria-label="Open documents">
+  <nav class="tabbar" :aria-label="t('tabs.openDocuments')">
     <!-- A list of links (the current one is aria-current), each with its own
          close button: not ARIA tabs, which can't hold a second control. -->
     <ul ref="strip" class="tabs">
@@ -57,13 +58,13 @@ watch(
       >
         <RouterLink :to="{ name: 'edit', params: { id: d.id } }" class="tab-link">
           <span class="tab-name">{{ displayName(d.name) }}</span>
-          <span v-if="d.linked && d.diskDirty" class="tab-dirty" title="Not saved to file">●</span>
+          <span v-if="d.linked && d.diskDirty" class="tab-dirty" :title="t('file.notSaved')">●</span>
         </RouterLink>
-        <button class="tab-close" :aria-label="`Close ${displayName(d.name)}`" title="Close tab (middle-click)" @click="close(d.id)">
+        <button class="tab-close" :aria-label="t('tabs.close', { name: displayName(d.name) })" :title="t('tabs.closeTitle')" @click="close(d.id)">
           ×
         </button>
       </li>
     </ul>
-    <button class="tab-new" title="New document" aria-label="New document" @click="newTab">+</button>
+    <button class="tab-new" :title="t('common.newDocument')" :aria-label="t('common.newDocument')" @click="newTab">+</button>
   </nav>
 </template>

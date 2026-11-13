@@ -2,12 +2,15 @@
 // encoding, byte-order mark and line endings on open, and write them back the
 // same way on save. The editor itself always works with "\n" line endings.
 import { applyLineEnds, recordLineEnds } from './lineends.js'
+import { t } from './i18n.js'
 
 export const ENCODINGS = {
   'utf-8': 'UTF-8',
   'utf-16le': 'UTF-16 LE',
   'utf-16be': 'UTF-16 BE',
-  'windows-1252': 'Western (Windows-1252)',
+  get 'windows-1252'() {
+    return t('encodings.windows1252')
+  },
 }
 
 export const EOLS = { '\n': 'LF', '\r\n': 'CRLF', '\r': 'CR' }

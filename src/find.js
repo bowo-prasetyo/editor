@@ -3,6 +3,7 @@
 // A match is [start, end], plus, for regular expressions, a third element
 // with what the expression captured (used by replacement patterns):
 //   [start, end, { groups: [...], named: {...} | undefined }]
+import { t } from './i18n.js'
 
 export const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -32,7 +33,7 @@ export function queryError(query, options) {
     searchRegExp(query, options)
     return ''
   } catch (e) {
-    return e instanceof SyntaxError ? 'Invalid pattern' : e.message
+    return e instanceof SyntaxError ? t('find.invalidPattern') : e.message
   }
 }
 

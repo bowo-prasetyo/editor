@@ -10,6 +10,7 @@ import { showToast } from '../toast'
 import { unsavedToDisk } from '../fileaccess'
 import { saveAll } from '../saveall'
 import { compareNatural, formatNumber } from '../locale'
+import { t } from '../i18n'
 
 // Search every document and the files in open folders; replace across them.
 const route = useRoute()
@@ -73,20 +74,19 @@ const status = computed(() => {
   if (error.value) return error.value
   if (progress.value) {
     const { done, total } = progress.value
-    return total ? `Searching… ${formatNumber(done)} of ${formatNumber(total)} files` : 'Searching…'
+    return total ? t('search.progress', { done, count: total }) : t('search.searching')
   }
   if (!summary.value) return ''
   const n = totalMatches.value
-  if (!n) return 'No results'
-  const files = results.value.length
-  return `${formatNumber(n)} result${n === 1 ? '' : 's'} in ${formatNumber(files)} file${files === 1 ? '' : 's'}`
+  if (!n) return t('find.noResults')
+  return t('search.results', { count: n, files: t('search.files', { count: results.value.length }) })
 })
 const notes = computed(() => {
   const s = summary.value
   if (!s) return []
   const out = []
-  if (s.truncated) out.push('Showing the first 10,000 results: narrow the search to see the rest.')
-  if (s.skipped) out.push(`${formatNumber(s.skipped)} file${s.skipped === 1 ? ' was' : 's were'} skipped: not text, or over 2 MB.`)
+  if (s.truncated) out.push(t('search.truncated', { max: 10_000 }))
+  if (s.skipped) out.push(t('search.skipped', { count: s.skipped }))
   return out
 })
 const hasFolders = computed(() => prefs.workspaces.length > 0)
@@ -104,7 +104,7 @@ async function openMatch(r, m) {
     const id = await idFor(r.target)
     router.push({ name: 'edit', params: { id }, query: { at: `${m.from}-${m.to}` } })
   } catch (e) {
-    showToast(e instanceof BinaryFileError ? `Couldn't open “${r.target.name}”.` : `Couldn't open “${r.target.name}”: ${e.message}`)
+    showToast(e instanceof BinaryFileError ? t('open.notTextOne', { name: r.target.name }) : t('open.failed', { name: r.target.name, error: e.message }))
   }
 }
 
@@ -128,26 +128,28 @@ const replacing = ref(false)
 const toSave = computed(() => unsavedToDisk().length)
 
 function afterReplace({ files, count }) {
-  if (!count) return showToast('Nothing to replace: the text changed since the search.')
-  const what = `Replaced ${formatNumber(count)} match${count === 1 ? '' : 'es'} in ${formatNumber(files)} file${files === 1 ? '' : 's'}.`
+  if (!count) return showToast(t('search.nothingToReplace'))
+  const what = t('search.replaced', { count, files: t('search.files', { count: files }) })
   const save = toSave.value
   showToast(
-    save ? `${what} Undo from each file's History. Changes aren't saved to the files on disk yet.` : `${what} Undo from each document's History.`,
-    { timeout: 10000, ...(save ? { action: { label: 'Save all', run: saveAll } } : {}) },
+    `${what} ${t(save ? 'search.undoNotSaved' : 'search.undo')}`,
+    { timeout: 10000, ...(save ? { action: { label: t('search.saveAll'), run: saveAll } } : {}) },
   )
 }
 
 async function onReplaceAll() {
   if (!results.value.length || replacing.value) return
   const n = totalMatches.value
-  const files = results.value.length
-  const shown = search.replace ? `“${search.replace}”` : 'nothing (delete them)'
-  if (!confirm(`Replace ${formatNumber(n)} match${n === 1 ? '' : 'es'} in ${formatNumber(files)} file${files === 1 ? '' : 's'} with ${shown}?`)) return
+  const files = t('search.files', { count: results.value.length })
+  const question = search.replace
+    ? t('search.confirmReplace', { count: n, files, text: search.replace })
+    : t('search.confirmDelete', { count: n, files })
+  if (!confirm(question)) return
   replacing.value = true
   try {
     afterReplace(await replaceAll(results.value.map((r) => r.target), search.query, options.value, search.replace))
   } catch (e) {
-    showToast(`Couldn't replace everywhere: ${e.message}`)
+    showToast(t('search.replaceFailed', { error: e.message }))
   } finally {
     replacing.value = false
     run()
@@ -161,7 +163,7 @@ async function onReplaceIn(r) {
     const { doc, count } = await replaceInTarget(r.target, search.query, options.value, search.replace)
     afterReplace({ files: count ? 1 : 0, count, docs: [doc] })
   } catch (e) {
-    showToast(`Couldn't replace in “${r.target.name}”: ${e.message}`)
+    showToast(t('search.replaceInFailed', { name: r.target.name, error: e.message }))
   } finally {
     replacing.value = false
     run()
@@ -211,14 +213,14 @@ const lineLabel = (m) => `${m.line}`
 
 <template>
   <section class="search-page" @keydown="onOptionKey">
-    <h1 class="search-title">Search</h1>
+    <h1 class="search-title">{{ t('app.search') }}</h1>
     <div class="findbar search-form" role="search">
       <div class="find-row">
         <button
           class="icon"
           :aria-pressed="search.showReplace"
-          :aria-label="search.showReplace ? 'Hide replace' : 'Show replace'"
-          title="Replace"
+          :aria-label="t(search.showReplace ? 'search.hideReplace' : 'find.showReplace')"
+          :title="t('find.replace')"
           @click="search.showReplace = !search.showReplace"
         >
           {{ search.showReplace ? '▾' : '▸' }}
@@ -227,39 +229,39 @@ const lineLabel = (m) => `${m.line}`
           ref="queryInput"
           v-model="search.query"
           type="search"
-          :placeholder="search.regex ? 'Search (regular expression)' : 'Search in all documents and folders'"
-          aria-label="Search"
+          :placeholder="t(search.regex ? 'search.placeholderRegex' : 'search.placeholder')"
+          :aria-label="t('app.search')"
           spellcheck="false"
           autocomplete="off"
           :class="{ invalid: !!error }"
           :aria-invalid="!!error"
           @keydown="onQueryKey"
         />
-        <button class="icon" :aria-pressed="search.matchCase" title="Match case (Alt+C)" aria-label="Match case" @click="search.matchCase = !search.matchCase">Aa</button>
-        <button class="icon" :aria-pressed="search.wholeWord" title="Whole word (Alt+W)" aria-label="Whole word" @click="search.wholeWord = !search.wholeWord"><u>ab</u></button>
-        <button class="icon mono" :aria-pressed="search.regex" title="Regular expression (Alt+R)" aria-label="Regular expression" @click="search.regex = !search.regex">.*</button>
+        <button class="icon" :aria-pressed="search.matchCase" :title="t('find.matchCaseTitle')" :aria-label="t('find.matchCase')" @click="search.matchCase = !search.matchCase">Aa</button>
+        <button class="icon" :aria-pressed="search.wholeWord" :title="t('find.wholeWordTitle')" :aria-label="t('find.wholeWord')" @click="search.wholeWord = !search.wholeWord"><u>ab</u></button>
+        <button class="icon mono" :aria-pressed="search.regex" :title="t('find.regexTitle')" :aria-label="t('find.regex')" @click="search.regex = !search.regex">.*</button>
       </div>
       <div v-if="search.showReplace" class="find-row">
         <span class="icon-spacer" />
         <input
           v-model="search.replace"
-          :placeholder="search.regex ? 'Replace with ($1, $<name>, \\n…)' : 'Replace with'"
-          aria-label="Replace with"
+          :placeholder="t(search.regex ? 'find.replaceWithRegex' : 'find.replaceWith')"
+          :aria-label="t('find.replaceWith')"
           spellcheck="false"
         />
-        <button :disabled="!results.length || replacing" title="Replace every result shown below" @click="onReplaceAll">Replace all</button>
+        <button :disabled="!results.length || replacing" :title="t('search.replaceAllTitle')" @click="onReplaceAll">{{ t('search.replaceAll') }}</button>
       </div>
       <div class="find-row">
         <span class="icon-spacer" />
         <input
           v-model="search.files"
           class="files-filter"
-          placeholder="Files to include, e.g. *.js, src/  (! to exclude: !*.min.js)"
-          aria-label="Files to include or exclude"
+          :placeholder="t('search.filesPlaceholder')"
+          :aria-label="t('search.filesLabel')"
           spellcheck="false"
           autocomplete="off"
         />
-        <select v-if="hasFolders" v-model="search.scope" aria-label="Where to search" class="scope">
+        <select v-if="hasFolders" v-model="search.scope" :aria-label="t('search.scopeLabel')" class="scope">
           <option v-for="(label, key) in SCOPES" :key="key" :value="key">{{ label }}</option>
         </select>
       </div>
@@ -268,15 +270,14 @@ const lineLabel = (m) => `${m.line}`
     <div class="search-status">
       <span :class="{ error: !!error }" aria-live="polite">{{ status }}</span>
       <span class="spacer" />
-      <button v-if="toSave" class="primary" title="Write every changed file back to disk" @click="saveAll">
-        Save all ({{ toSave }})
+      <button v-if="toSave" class="primary" :title="t('search.saveAllTitle')" @click="saveAll">
+        {{ t('search.saveAllCount', { count: toSave }) }}
       </button>
-      <button v-if="results.length" class="link" @click="collapseAll">{{ allCollapsed ? 'Expand all' : 'Collapse all' }}</button>
+      <button v-if="results.length" class="link" @click="collapseAll">{{ t(allCollapsed ? 'search.expandAll' : 'search.collapseAll') }}</button>
     </div>
     <p v-for="n in notes" :key="n" class="hint search-note">{{ n }}</p>
     <p v-if="!search.query" class="empty search-empty">
-      Type to search every document<template v-if="hasFolders"> and every file in your open folders</template>.
-      Click a result to open it there.
+      {{ t(hasFolders ? 'search.emptyFolders' : 'search.empty') }}
     </p>
 
     <ul class="search-results">
@@ -286,13 +287,13 @@ const lineLabel = (m) => `${m.line}`
             {{ r.collapsed ? '▸' : '▾' }} <strong>{{ r.target.name }}</strong>
             <span class="search-folder">{{ r.target.folder }}</span>
           </button>
-          <span class="search-count">{{ r.matches.length }}</span>
-          <button v-if="search.showReplace" class="mini" :disabled="replacing" :title="`Replace in ${r.target.name}`" @click="onReplaceIn(r)">Replace</button>
-          <button class="mini" :title="`Hide ${r.target.name} from the results`" :aria-label="`Hide ${r.target.name} from the results`" @click="dismiss(r)">×</button>
+          <span class="search-count">{{ formatNumber(r.matches.length) }}</span>
+          <button v-if="search.showReplace" class="mini" :disabled="replacing" :title="t('search.replaceIn', { name: r.target.name })" @click="onReplaceIn(r)">{{ t('find.replace') }}</button>
+          <button class="mini" :title="t('search.hide', { name: r.target.name })" :aria-label="t('search.hide', { name: r.target.name })" @click="dismiss(r)">×</button>
         </div>
         <ul v-if="!r.collapsed" class="search-lines">
           <li v-for="m in r.matches" :key="m.from">
-            <button class="search-line" :title="`Line ${m.line}, column ${m.col}`" @click="openMatch(r, m)">
+            <button class="search-line" :title="t('search.lineColumn', { line: m.line, col: m.col })" @click="openMatch(r, m)">
               <span class="search-ln">{{ lineLabel(m) }}</span>
               <span class="search-preview">{{ m.before }}<mark :class="{ replaced: search.showReplace }">{{ m.text }}</mark><ins v-if="search.showReplace && !search.regex">{{ search.replace }}</ins>{{ m.after }}</span>
             </button>

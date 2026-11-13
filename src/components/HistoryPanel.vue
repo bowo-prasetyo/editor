@@ -17,6 +17,7 @@ import { theme } from '../cm'
 import { displayName } from '../naming'
 import { showToast } from '../toast'
 import { formatDate, formatDateTime, formatNumber, formatRelative } from '../locale'
+import { t } from '../i18n'
 
 // Earlier versions of a document: what changed since each one, and bringing
 // one back. The diff view (CodeMirror's merge package) loads on first use.
@@ -44,7 +45,7 @@ async function refresh() {
 const ago = (t) => formatRelative(t)
 const when = (t) => formatDateTime(t)
 const describe = (v) => v.label || KINDS[v.kind] || v.kind
-const chars = (n) => `${formatNumber(n)} chars`
+const chars = (n) => t('common.chars', { count: n })
 
 // --- The diff -------------------------------------------------------------------
 
@@ -119,18 +120,18 @@ async function restore() {
   const v = selected.value
   if (!v) return
   const text = await restoreVersion(props.doc.id, v.id)
-  if (text == null) return showToast("Couldn't read that version.")
-  showToast(`Restored the version from ${when(v.at)}. The text it replaced was kept as a version.`, { timeout: 6000 })
+  if (text == null) return showToast(t('history.cantRead'))
+  showToast(t('history.restored', { when: when(v.at) }), { timeout: 6000 })
   await refresh()
   select(null)
 }
 
 async function saveVersion() {
-  const label = prompt('Name this version (optional):', '')
+  const label = prompt(t('history.namePrompt'), '')
   if (label === null) return
   await recordVersion(props.doc.id, 'manual', label.trim())
   await refresh()
-  showToast('Version saved.')
+  showToast(t('history.saved'))
 }
 
 function openCopy() {
@@ -156,22 +157,21 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <aside class="history" aria-label="Version history">
+  <aside class="history" :aria-label="t('history.label')">
     <header class="history-head">
-      <strong>History</strong>
+      <strong>{{ t('history.title') }}</strong>
       <span class="spacer" />
-      <button title="Keep the current text as a version, with a name if you like" @click="saveVersion">Save version…</button>
-      <button class="icon" aria-label="Close history" title="Close" @click="emit('close')">✕</button>
+      <button :title="t('history.saveVersionTitle')" @click="saveVersion">{{ t('history.saveVersion') }}</button>
+      <button class="icon" :aria-label="t('history.close')" :title="t('common.close')" @click="emit('close')">✕</button>
     </header>
 
     <p v-if="memoryOnly" class="hint history-note">
-      This browser can't use IndexedDB, so versions are kept only until this page is closed.
+      {{ t('history.memoryOnly') }}
     </p>
 
     <ol class="history-list">
       <li v-if="!versions.length" class="hint">
-        No versions yet. One is kept when you open a file, every few minutes while you edit, and when you save to a file
-        or press Save version.
+        {{ t('history.empty') }}
       </li>
       <li v-for="v in versions" :key="v.id">
         <button class="history-item" :aria-pressed="selected?.id === v.id" @click="select(selected?.id === v.id ? null : v)">
@@ -185,16 +185,17 @@ onBeforeUnmount(() => {
     <section v-if="selected" class="history-diff">
       <div class="history-diff-head">
         <span>
-          Changes since {{ when(selected.at) }}:
-          <template v-if="!stats">comparing…</template>
-          <template v-else-if="stats.same">none</template>
+          {{ t('history.changesSince', { when: when(selected.at) }) }}
+          <template v-if="!stats">{{ t('history.comparing') }}</template>
+          <template v-else-if="stats.same">{{ t('history.none') }}</template>
           <template v-else>
-            <span class="added">+{{ stats.added }}</span> <span class="removed">−{{ stats.removed }}</span> lines
+            <span class="added">+{{ formatNumber(stats.added) }}</span> <span class="removed">−{{ formatNumber(stats.removed) }}</span>
+            {{ t('history.linesWord', { count: stats.added + stats.removed }) }}
           </template>
         </span>
         <span class="spacer" />
-        <button @click="openCopy">Open as copy</button>
-        <button class="primary" :disabled="stats?.same" @click="restore">Restore</button>
+        <button @click="openCopy">{{ t('history.openCopy') }}</button>
+        <button class="primary" :disabled="stats?.same" @click="restore">{{ t('common.restore') }}</button>
       </div>
       <div ref="host" class="history-view" />
     </section>

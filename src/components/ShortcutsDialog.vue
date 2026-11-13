@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { SHORTCUTS, SHORTCUT_GROUPS, keyLabel } from '../keys'
 import { useModal } from '../modal'
+import { t } from '../i18n'
 
 // Every keyboard shortcut, grouped, with a filter.
 const emit = defineEmits(['close'])
@@ -27,14 +28,14 @@ onMounted(() => input.value?.focus())
 
 <template>
   <div class="quick-backdrop" @mousedown.self="emit('close')">
-    <div ref="root" class="quick shortcuts" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+    <div ref="root" class="quick shortcuts" role="dialog" aria-modal="true" :aria-label="t('shortcuts.title')">
       <div class="shortcuts-head">
-        <h2>Keyboard shortcuts</h2>
-        <button class="icon" aria-label="Close" title="Close (Esc)" @click="emit('close')">✕</button>
+        <h2>{{ t('shortcuts.title') }}</h2>
+        <button class="icon" :aria-label="t('common.close')" :title="t('common.closeEsc')" @click="emit('close')">✕</button>
       </div>
-      <input ref="input" v-model="query" class="quick-input" placeholder="Filter shortcuts" aria-label="Filter shortcuts" />
+      <input ref="input" v-model="query" class="quick-input" :placeholder="t('shortcuts.filter')" :aria-label="t('shortcuts.filter')" />
       <div class="shortcuts-body">
-        <p v-if="!groups.length" class="hint">No shortcuts match “{{ query }}”.</p>
+        <p v-if="!groups.length" class="hint">{{ t('shortcuts.noMatch', { query }) }}</p>
         <section v-for="[group, items] in groups" :key="group">
           <h3>{{ group }}</h3>
           <dl>
@@ -48,7 +49,7 @@ onMounted(() => input.value?.focus())
             </template>
           </dl>
         </section>
-        <p class="hint">Run any action by name with the command palette.</p>
+        <p class="hint">{{ t('shortcuts.paletteHint') }}</p>
       </div>
     </div>
   </div>

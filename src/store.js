@@ -5,6 +5,7 @@ import { extension } from './filetype.js'
 import { openBackend } from './backends.js'
 import { createHistory } from './history.js'
 import { normalizeFolder } from './folders.js'
+import { SOURCE, t } from './i18n.js'
 
 // Documents live in the browser: IndexedDB normally, localStorage where
 // IndexedDB isn't available (see backends.js). The list is kept in memory
@@ -328,7 +329,9 @@ export function setDocOptions(id, patch) {
 // --- Version history (see history.js) ----------------------------------------
 
 // Keep the document's current text as a version: kind 'manual' (with an
-// optional label), 'saved' (written to a file), 'opened', or 'auto' (skipped
+// optional label the user typed), 'reload' (before reloading from disk),
+// 'replace' (before Replace in files), 'saved' (written to a file),
+// 'opened', 'restore', or 'auto' (skipped
 // if nothing changed since the newest version).
 export async function recordVersion(id, kind = 'manual', label = '') {
   const doc = getDoc(id)
@@ -472,7 +475,7 @@ export function handleRemoteChange(msg) {
     Object.assign(local, incoming, keep)
     if (keep.content !== undefined) delete local.unread
   } else if (incoming.content !== local.content) {
-    createDoc(`${incoming.name} (changed in another tab)`, incoming.content)
+    createDoc(t('store.otherTabCopy', { name: incoming.name }), incoming.content)
   }
 }
 
@@ -586,9 +589,11 @@ export function importBackup(data) {
   for (const d of data.docs) {
     if (!isDoc(d) || d.textOnDisk) continue
     const existing = getDoc(d.id)
-    const copyName = `${d.name} (from backup)`
+    const copyName = t('store.backupCopy', { name: d.name })
+    // A copy made earlier, perhaps with Plumb in English.
+    const englishCopy = t('store.backupCopy', { name: d.name }, SOURCE)
     const alreadyHere = state.docs.some(
-      (x) => x.content === d.content && (x.name === d.name || x.name === copyName),
+      (x) => x.content === d.content && (x.name === d.name || x.name === copyName || x.name === englishCopy),
     )
     if (alreadyHere) {
       skipped++

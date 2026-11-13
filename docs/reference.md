@@ -418,6 +418,8 @@ anything that matters to a file.
 Open them with ⚙ in the header, or Ctrl+,. They're kept in this browser and
 applied at once.
 
+- **Language:** the browser's, or one you choose. Numbers and dates follow it.
+  Only English so far; [translations are welcome](translating.md).
 - **Theme:** same as the system, light or dark.
 - **Font:** the system's monospace font, a common coding font (JetBrains Mono,
   Fira Code, Cascadia Code, SF Mono, Consolas…), or any installed font by name,
@@ -612,6 +614,8 @@ installed.
 - **Hash routing.** `#/` is the start page and `#/edit/:id` edits a draft or a
   file, so no server rewrites are needed. The build runs from any static host
   or subpath.
+- **Every word on screen** comes from `src/locales/en.json`, so Plumb can be
+  translated; see [Translating Plumb](translating.md).
 - **Built with** Vue 3, Vue Router, Vite and CodeMirror 6. The Markdown preview
   uses `marked`, sanitised with DOMPurify.
 - **The service worker** (`sw.js`) is generated at build time by `build/pwa.js`,

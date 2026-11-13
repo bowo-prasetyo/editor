@@ -92,7 +92,7 @@ test('unsaved changes are never replaced: a notice offers to reload or keep them
   assert.equal(current().diskDirty, false)
   assert.equal(live.diskNotices[doc.id], undefined)
   const versions = await store.listVersions(doc.id)
-  const kept = versions.find((v) => v.label === 'Before reloading from disk')
+  const kept = versions.find((v) => v.kind === 'reload')
   assert.equal(await store.versionText(kept.id), 'mine')
 })
 

@@ -6,6 +6,7 @@
 // are made (see docs/files-and-drafts.md, "Drafts"). For a file from an open
 // folder, `folder` is its place in that folder ("my-app/src").
 import { compareNatural } from './locale.js'
+import { t } from './i18n.js'
 
 // "  /Work//Clients/ " -> "Work/Clients"; "" for none.
 export function normalizeFolder(path = '') {
@@ -29,16 +30,20 @@ export function labelsOf(docs) {
 // --- Sorting --------------------------------------------------------------
 
 export const SORTS = {
-  updated: { label: 'Last edited', compare: (a, b) => b.updatedAt - a.updatedAt },
+  updated: { get label() { return t('home.sorts.updated') }, compare: (a, b) => b.updatedAt - a.updatedAt },
   name: {
-    label: 'Name',
+    get label() {
+      return t('home.sorts.name')
+    },
     compare: (a, b) => compareNatural(a.name, b.name),
   },
   created: {
-    label: 'Date created',
+    get label() {
+      return t('home.sorts.created')
+    },
     compare: (a, b) => (b.createdAt ?? b.updatedAt) - (a.createdAt ?? a.updatedAt),
   },
-  size: { label: 'Size', compare: (a, b) => b.content.length - a.content.length },
+  size: { get label() { return t('home.sorts.size') }, compare: (a, b) => b.content.length - a.content.length },
 }
 
 // Pinned drafts first, then by the chosen order. Ties fall back to most

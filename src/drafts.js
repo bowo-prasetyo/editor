@@ -1,6 +1,7 @@
 // Drafts: pinning, and "Save to folder…", which turns a draft into a file in
 // an open folder. See docs/files-and-drafts.md, "Drafts".
 import { prefs } from './prefs.js'
+import { t } from './i18n.js'
 import {
   docBlob,
   getDoc,
@@ -22,7 +23,7 @@ export const saveTargets = () =>
 // "notes/todo.md" -> ['notes', 'todo.md'], or throws with what's wrong.
 export function splitPath(path) {
   const parts = String(path ?? '').replace(/\\/g, '/').split('/').map((p) => p.trim()).filter(Boolean)
-  if (!parts.length) throw new Error('Type a file name.')
+  if (!parts.length) throw new Error(t('errors.typeFileName'))
   for (const p of parts) {
     const problem = checkEntryName(p)
     if (problem) throw new Error(problem)
@@ -38,10 +39,10 @@ const isNotFound = (e) => e?.name === 'NotFoundError'
 // endings. Returns what undoSaveToFolder() needs.
 export async function saveDraftToFolder(id, rootId, path) {
   const draft = getDoc(id)
-  if (!draft || draft.kind === 'file') throw new Error('Only a draft can be saved to a folder.')
+  if (!draft || draft.kind === 'file') throw new Error(t('errors.onlyDraft'))
   const root = roots.get(rootId)
   const folder = prefs.workspaces.find((w) => w.id === rootId)
-  if (!root || !folder) throw new Error('That folder isn’t open.')
+  if (!root || !folder) throw new Error(t('errors.folderNotOpen'))
   const parts = splitPath(path)
   const name = parts.at(-1)
   const filePath = parts.join('/')
@@ -50,9 +51,9 @@ export async function saveDraftToFolder(id, rootId, path) {
   for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p, { create: true })
   try {
     await dir.getFileHandle(name)
-    throw new Error(`“${filePath}” already exists in “${folder.name}”.`)
+    throw new Error(t('errors.existsIn', { path: filePath, folder: folder.name }))
   } catch (e) {
-    if (e?.name === 'TypeMismatchError') throw new Error(`“${filePath}” is a folder in “${folder.name}”.`)
+    if (e?.name === 'TypeMismatchError') throw new Error(t('errors.folderIn', { path: filePath, folder: folder.name }))
     if (!isNotFound(e)) throw e
   }
   const handle = await dir.getFileHandle(name, { create: true })

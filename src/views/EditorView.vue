@@ -16,7 +16,6 @@ import { prefs, stepFontSize } from '../prefs'
 import { showToast } from '../toast'
 import { canSaveInPlace, saveDoc } from '../fileaccess'
 import { countWords, slowToCount } from '../stats'
-import { formatNumber } from '../locale'
 import { createEditor } from '../cm'
 import { EditorView } from '@codemirror/view'
 import { whitespaceFix } from '../textops'
@@ -42,6 +41,8 @@ import { closeDocTab } from '../closetab'
 import { registerCommands, ui } from '../commands'
 import { cycleTab } from '../tabs'
 import { keyLabel } from '../keys'
+import { t } from '../i18n'
+import T from '../components/T'
 import { useRoute, useRouter } from 'vue-router'
 
 const props = defineProps({ id: { type: String, required: true } })
@@ -78,17 +79,17 @@ const toggle = (key) => setDocOptions(props.id, { [key]: !view.value[key] })
 const status = computed(() => state.status[props.id])
 const saveKey = keyLabel('Mod+S')
 const browserLabel = computed(() => {
-  if (status.value === 'error') return 'Not saved'
-  if (!doc.value?.linked) return { saved: 'Saved ✓', pending: 'Saving…' }[status.value] ?? ''
+  if (status.value === 'error') return t('editor.status.notSaved')
+  if (!doc.value?.linked) return { saved: t('editor.status.saved'), pending: t('common.saving') }[status.value] ?? ''
   if (!doc.value.diskDirty) return ''
-  return { saved: 'Edits kept in browser ✓', pending: 'Keeping edits in browser…' }[status.value] ?? ''
+  return { saved: t('editor.status.kept'), pending: t('editor.status.keeping') }[status.value] ?? ''
 })
 const browserTitle = computed(() =>
   status.value === 'error'
-    ? "Your browser's storage is full or unavailable"
+    ? t('editor.status.errorTitle')
     : doc.value?.linked
-      ? 'Changes not yet saved to the file are kept in this browser, so a reload or crash loses nothing'
-      : 'Kept in this browser',
+      ? t('editor.status.keptTitle')
+      : t('editor.status.savedTitle'),
 )
 
 // --- Saving to disk, encoding and line endings ---------------------------------
@@ -130,9 +131,9 @@ const fileState = computed(() => {
   return doc.value.diskDirty ? 'dirty' : 'saved'
 })
 const FILE_STATUS = {
-  deleted: { text: 'File not on disk', title: () => 'The file was deleted or moved: Save asks where to save' },
-  dirty: { text: 'Not saved to file', title: () => `Press ${saveKey} to write your changes to the file` },
-  saved: { text: 'Saved to file', title: () => 'The file on disk matches' },
+  deleted: { text: () => t('editor.file.deleted'), title: () => t('editor.file.deletedTitle') },
+  dirty: { text: () => t('file.notSaved'), title: () => t('editor.file.dirtyTitle', { key: saveKey }) },
+  saved: { text: () => t('editor.file.saved'), title: () => t('editor.file.savedTitle') },
 }
 let saving = false
 async function save(saveAs = false) {
@@ -142,18 +143,18 @@ async function save(saveAs = false) {
     fixWhitespace()
     const encodingBefore = ENCODINGS[doc.value.encoding] ?? doc.value.encoding
     const r = await saveDoc(doc.value, { saveAs })
-    if (r.result === 'saved') showToast(`Saved to “${r.name}”.`, { timeout: 3000 })
+    if (r.result === 'saved') showToast(t('save.saved', { name: r.name }), { timeout: 3000 })
     // Firefox, Safari: say where the copy went, so nobody wonders whether their file changed.
     if (r.result === 'downloaded' && !r.lossy) showToast(downloadedMessage(r.name), { timeout: 6000 })
     if (r.lossy) {
       showToast(
-        `Some characters can't be written as ${encodingBefore}, so this copy was saved as UTF-8.`,
+        t('save.lossy', { encoding: encodingBefore }),
         { timeout: 10000 },
       )
     }
   } catch (e) {
     console.error(e)
-    showToast(`Couldn't save the file: ${e.message}`, { timeout: 10000 })
+    showToast(t('save.failed', { error: e.message }), { timeout: 10000 })
   } finally {
     saving = false
   }
@@ -175,9 +176,9 @@ watch(() => props.id, (id) => checkDoc(id).catch(() => {}), { immediate: true })
 const diskNotice = computed(() => diskNotices[props.id] ?? null)
 async function onReloadFromDisk() {
   try {
-    if (await reloadFromDisk(props.id)) showToast('Reloaded from disk. Your text was kept as a version (see History).', { timeout: 5000 })
+    if (await reloadFromDisk(props.id)) showToast(t('editor.reloaded'), { timeout: 5000 })
   } catch (e) {
-    showToast(`Couldn't read the file: ${e.message}`)
+    showToast(t('editor.cantRead', { error: e.message }))
   }
 }
 
@@ -263,7 +264,7 @@ function convertTo(type) {
   const text = convertIndentation(content.value, from, to)
   if (text !== content.value) current()?.replace(0, content.value.length, text, { select: false })
   setDocOptions(props.id, { indent: { type, size: to.size } })
-  showToast(text === content.value ? 'The indentation already matches.' : `Converted the indentation to ${type}.`)
+  showToast(t(text === content.value ? 'indent.alreadyMatches' : type === 'tabs' ? 'indent.convertedTabs' : 'indent.convertedSpaces'))
 }
 
 // The editor, if it shows the current document. When the route moves to
@@ -338,7 +339,7 @@ const languageChoice = computed({
 const HIGHLIGHT_LIMIT = 5_000_000
 const tooBig = computed(() => content.value.length > HIGHLIGHT_LIMIT)
 const detected = computed(() =>
-  tooBig.value ? 'Plain text (large file)' : (findLanguage(name.value)?.name ?? 'Plain text'),
+  tooBig.value ? t('editor.plainTextLarge') : (findLanguage(name.value)?.name ?? t('editor.plainText')),
 )
 const language = computed(() =>
   languageChoice.value === AUTO && tooBig.value ? null : findLanguage(name.value, languageChoice.value),
@@ -395,11 +396,11 @@ function toggleSplit() {
 // its controls behind a ⋯ button. On touch screens, Markdown documents get
 // Bold and Italic buttons (there's no Ctrl+B without a keyboard).
 const moreItems = computed(() => [
-  { id: 'wrap', label: 'Wrap long lines', checked: !!view.value.wrap, run: () => toggle('wrap') },
-  { id: 'spelling', label: 'Underline spelling mistakes', checked: !!view.value.spellcheck, run: () => toggle('spellcheck') },
-  { id: 'history', label: 'History', checked: historyOpen.value, run: () => (historyOpen.value = !historyOpen.value) },
-  { id: 'print', label: 'Print', run: () => print() },
-  ...(inPlace ? [{ id: 'saveAs', label: 'Save as…', run: () => save(true) }] : []),
+  { id: 'wrap', label: t('editor.wrap'), checked: !!view.value.wrap, run: () => toggle('wrap') },
+  { id: 'spelling', label: t('editor.spelling'), checked: !!view.value.spellcheck, run: () => toggle('spellcheck') },
+  { id: 'history', label: t('history.title'), checked: historyOpen.value, run: () => (historyOpen.value = !historyOpen.value) },
+  { id: 'print', label: t('editor.print'), run: () => print() },
+  ...(inPlace ? [{ id: 'saveAs', label: t('commands.titles.saveAs'), run: () => save(true) }] : []),
 ])
 const statusMore = ref(false)
 
@@ -424,19 +425,19 @@ const format = (cmd) => {
   current()?.apply(cmd)
   current()?.focus()
 }
-const onOff = (on) => (on ? 'on' : 'off')
-const flip = (key, label) => () => {
+// A setting turned on or off from the palette: its title says what it will do.
+const settingName = (id) => t(`commands.settings.${id}`)
+const flip = (id, key) => () => {
   prefs[key] = !prefs[key]
-  showToast(`${label}: ${onOff(prefs[key])}.`, { timeout: 2500 })
+  showToast(t(prefs[key] ? 'commands.isOn' : 'commands.isOff', { setting: settingName(id) }), { timeout: 2500 })
 }
-// A command whose title says what it will do.
-const setting = (id, key, label) => ({
+const setting = (id, key) => ({
   id,
   group: 'settings',
   get title() {
-    return `${label}: turn ${onOff(!prefs[key])}`
+    return t(prefs[key] ? 'commands.turnOff' : 'commands.turnOn', { setting: settingName(id) })
   },
-  run: flip(key, label),
+  run: flip(id, key),
 })
 // Renaming can change the fallback comment syntax even if the language doesn't.
 watch(name, async (n) => {
@@ -463,12 +464,12 @@ async function onSaveToFolder({ rootId, path }) {
     const saved = await saveDraftToFolder(props.id, rootId, path)
     savingTo.value = null
     const folder = folderTargets.value.find((f) => f.id === rootId)?.name ?? saveTargets().find((f) => f.id === rootId)?.name
-    showToast(`Saved as “${saved.path}” in “${folder}”. It’s a file now, not a draft.`, {
+    showToast(t('saveToFolder.saved', { path: saved.path, folder }), {
       action: {
-        label: 'Undo',
+        label: t('common.undo'),
         run: async () => {
           const removed = await undoSaveToFolder(saved)
-          showToast(removed ? 'It’s a draft again, and the file was removed.' : 'It’s a draft again. The file changed since, so it was kept.')
+          showToast(t(removed ? 'saveToFolder.undoneRemoved' : 'saveToFolder.undoneKept'))
         },
       },
       timeout: 10000,
@@ -484,8 +485,8 @@ async function onSaveToFolder({ rootId, path }) {
 const lineCount = computed(() => cursor.value.lines)
 const selectionInfo = computed(() => {
   const { cursors, selected } = cursor.value
-  if (cursors > 1) return `${formatNumber(cursors)} cursors`
-  return selected ? `${formatNumber(selected)} selected` : ''
+  if (cursors > 1) return t('editor.cursors', { count: cursors })
+  return selected ? t('editor.selected', { count: selected }) : ''
 })
 
 // Words and characters: immediate for normal documents; for big ones,
@@ -581,97 +582,97 @@ function goToTab(step) {
   if (next && next !== props.id) router.push({ name: 'edit', params: { id: next } })
 }
 async function saveNamedVersion() {
-  const label = prompt('Name this version (optional):', '')
+  const label = prompt(t('history.namePrompt'), '')
   if (label === null) return
   await recordVersion(props.id, 'manual', label.trim())
-  showToast('Version saved.')
+  showToast(t('history.saved'))
 }
 const G = 'editor'
 const E = 'editing'
 let unregister = () => {}
 const editorCommands = [
-  { id: 'find', title: 'Find', group: G, shortcut: 'find', run: () => openFind(false) },
-  { id: 'replace', title: 'Find and replace', group: G, shortcut: 'replace', run: () => openFind(true) },
-  { id: 'goToLine', title: 'Go to line…', group: G, shortcut: 'goToLine', run: () => openGoTo() },
-  { id: 'save', title: inPlace ? 'Save' : 'Download', group: G, shortcut: 'save', run: () => save(false) },
-  { id: 'saveAs', title: 'Save as…', group: G, shortcut: 'saveAs', run: () => save(true), when: () => inPlace },
-  { id: 'print', title: 'Print', group: G, run: () => print() },
-  { id: 'rename', title: 'Rename document', group: G, run: () => nameInput.value?.select() },
-  { id: 'saveToFolder', title: 'Save to folder…', group: G, when: () => folderTargets.value.length > 0, run: openSaveToFolder },
-  { id: 'pin', title: 'Pin this draft to the top of the list', group: G, when: () => isDraft.value && !doc.value.pinned, run: () => togglePin(props.id) },
-  { id: 'unpin', title: 'Unpin this draft', group: G, when: () => isDraft.value && !!doc.value.pinned, run: () => togglePin(props.id) },
-  { id: 'wrap', title: 'Toggle word wrap', group: G, shortcut: 'wrap', run: () => toggle('wrap') },
-  { id: 'spelling', title: 'Toggle spell check', group: G, run: () => toggle('spellcheck') },
-  { id: 'preview', title: 'Toggle Markdown preview', group: G, when: () => isMarkdown.value, run: () => setDocOptions(props.id, { preview: !doc.value.preview }) },
-  { id: 'history', title: 'Show version history', group: G, run: () => (historyOpen.value = true) },
-  { id: 'saveVersion', title: 'Save a version now…', group: G, run: saveNamedVersion },
-  { id: 'detectIndent', title: 'Indentation: detect from the file', group: G, run: () => setIndent(null) },
-  { id: 'indentSpaces2', title: 'Indentation: 2 spaces', group: G, run: () => setIndent({ type: 'spaces', size: 2 }) },
-  { id: 'indentSpaces4', title: 'Indentation: 4 spaces', group: G, run: () => setIndent({ type: 'spaces', size: 4 }) },
-  { id: 'indentTabs', title: 'Indentation: tabs', group: G, run: () => setIndent({ type: 'tabs', size: indent.value.size }) },
-  { id: 'convertSpaces', title: 'Convert indentation to spaces', group: G, run: () => convertTo('spaces') },
-  { id: 'convertTabs', title: 'Convert indentation to tabs', group: G, run: () => convertTo('tabs') },
-  { id: 'biggerText', title: 'Larger text', group: G, run: () => stepFontSize(1) },
-  { id: 'smallerText', title: 'Smaller text', group: G, run: () => stepFontSize(-1) },
-  { id: 'nextTab', title: 'Next tab', group: G, shortcut: 'nextTab', run: () => goToTab(1) },
-  { id: 'prevTab', title: 'Previous tab', group: G, shortcut: 'prevTab', run: () => goToTab(-1) },
+  { id: 'find', get title() { return t('commands.titles.find') }, group: G, shortcut: 'find', run: () => openFind(false) },
+  { id: 'replace', get title() { return t('commands.titles.replace') }, group: G, shortcut: 'replace', run: () => openFind(true) },
+  { id: 'goToLine', get title() { return t('commands.titles.goToLine') }, group: G, shortcut: 'goToLine', run: () => openGoTo() },
+  { id: 'save', get title() { return t(inPlace ? 'commands.titles.save' : 'commands.titles.download') }, group: G, shortcut: 'save', run: () => save(false) },
+  { id: 'saveAs', get title() { return t('commands.titles.saveAs') }, group: G, shortcut: 'saveAs', run: () => save(true), when: () => inPlace },
+  { id: 'print', get title() { return t('commands.titles.print') }, group: G, run: () => print() },
+  { id: 'rename', get title() { return t('commands.titles.rename') }, group: G, run: () => nameInput.value?.select() },
+  { id: 'saveToFolder', get title() { return t('commands.titles.saveToFolder') }, group: G, when: () => folderTargets.value.length > 0, run: openSaveToFolder },
+  { id: 'pin', get title() { return t('commands.titles.pin') }, group: G, when: () => isDraft.value && !doc.value.pinned, run: () => togglePin(props.id) },
+  { id: 'unpin', get title() { return t('commands.titles.unpin') }, group: G, when: () => isDraft.value && !!doc.value.pinned, run: () => togglePin(props.id) },
+  { id: 'wrap', get title() { return t('commands.titles.wrap') }, group: G, shortcut: 'wrap', run: () => toggle('wrap') },
+  { id: 'spelling', get title() { return t('commands.titles.spelling') }, group: G, run: () => toggle('spellcheck') },
+  { id: 'preview', get title() { return t('commands.titles.preview') }, group: G, when: () => isMarkdown.value, run: () => setDocOptions(props.id, { preview: !doc.value.preview }) },
+  { id: 'history', get title() { return t('commands.titles.history') }, group: G, run: () => (historyOpen.value = true) },
+  { id: 'saveVersion', get title() { return t('commands.titles.saveVersion') }, group: G, run: saveNamedVersion },
+  { id: 'detectIndent', get title() { return t('commands.titles.detectIndent') }, group: G, run: () => setIndent(null) },
+  { id: 'indentSpaces2', get title() { return t('commands.titles.indentSpaces2') }, group: G, run: () => setIndent({ type: 'spaces', size: 2 }) },
+  { id: 'indentSpaces4', get title() { return t('commands.titles.indentSpaces4') }, group: G, run: () => setIndent({ type: 'spaces', size: 4 }) },
+  { id: 'indentTabs', get title() { return t('commands.titles.indentTabs') }, group: G, run: () => setIndent({ type: 'tabs', size: indent.value.size }) },
+  { id: 'convertSpaces', get title() { return t('commands.titles.convertSpaces') }, group: G, run: () => convertTo('spaces') },
+  { id: 'convertTabs', get title() { return t('commands.titles.convertTabs') }, group: G, run: () => convertTo('tabs') },
+  { id: 'biggerText', get title() { return t('commands.titles.biggerText') }, group: G, run: () => stepFontSize(1) },
+  { id: 'smallerText', get title() { return t('commands.titles.smallerText') }, group: G, run: () => stepFontSize(-1) },
+  { id: 'nextTab', get title() { return t('commands.titles.nextTab') }, group: G, shortcut: 'nextTab', run: () => goToTab(1) },
+  { id: 'prevTab', get title() { return t('commands.titles.prevTab') }, group: G, shortcut: 'prevTab', run: () => goToTab(-1) },
   {
-    id: 'closeTab', title: 'Close tab', group: G,
+    id: 'closeTab', get title() { return t('commands.titles.closeTab') }, group: G,
     run: () => closeDocTab(router, props.id, props.id),
   },
-  { id: 'toggleComment', title: 'Comment or uncomment lines', group: E, shortcut: 'toggleComment', run: edit('toggleComment') },
-  { id: 'moveLineUp', title: 'Move lines up', group: E, shortcut: 'moveLineUp', run: edit('moveLineUp') },
-  { id: 'moveLineDown', title: 'Move lines down', group: E, run: edit('moveLineDown') },
-  { id: 'copyLineDown', title: 'Duplicate lines', group: E, shortcut: 'copyLineDown', run: edit('copyLineDown') },
-  { id: 'deleteLine', title: 'Delete lines', group: E, shortcut: 'deleteLine', run: edit('deleteLine') },
-  { id: 'selectNext', title: 'Add next occurrence to selection', group: E, shortcut: 'selectNext', run: edit('selectNextOccurrence') },
-  { id: 'selectAll', title: 'Select all occurrences', group: E, shortcut: 'selectAll', run: edit('selectSelectionMatches') },
-  { id: 'addCursorAbove', title: 'Add cursor above', group: E, run: edit('addCursorAbove') },
-  { id: 'addCursorBelow', title: 'Add cursor below', group: E, run: edit('addCursorBelow') },
-  { id: 'matchingBracket', title: 'Go to matching bracket', group: E, shortcut: 'matchingBracket', run: edit('cursorMatchingBracket') },
-  { id: 'selectLine', title: 'Select line', group: E, shortcut: 'selectLine', run: edit('selectLine') },
-  { id: 'indentLines', title: 'Indent lines', group: E, run: edit('indentMore') },
-  { id: 'outdentLines', title: 'Outdent lines', group: E, run: edit('indentLess') },
-  { id: 'sortAsc', title: 'Sort lines (A to Z)', group: E, run: edit('sortLinesAscending') },
-  { id: 'sortDesc', title: 'Sort lines (Z to A)', group: E, run: edit('sortLinesDescending') },
-  { id: 'sortCaseless', title: 'Sort lines, ignoring case', group: E, run: edit('sortLinesIgnoreCase') },
-  { id: 'uniqueLines', title: 'Remove duplicate lines', group: E, run: edit('removeDuplicateLines') },
-  { id: 'reverseLines', title: 'Reverse lines', group: E, run: edit('reverseLines') },
-  { id: 'joinLines', title: 'Join lines', group: E, run: edit('joinLines') },
-  { id: 'upperCase', title: 'Change case: UPPERCASE', group: E, run: edit('upperCase') },
-  { id: 'lowerCase', title: 'Change case: lowercase', group: E, run: edit('lowerCase') },
-  { id: 'titleCase', title: 'Change case: Title Case', group: E, run: edit('titleCase') },
-  { id: 'trimWhitespace', title: 'Trim trailing whitespace', group: E, run: edit('trimTrailingWhitespace') },
-  { id: 'foldAll', title: 'Fold all', group: E, shortcut: 'foldAll', run: edit('foldAll') },
-  { id: 'unfoldAll', title: 'Unfold all', group: E, shortcut: 'foldAll', run: edit('unfoldAll') },
-  { id: 'complete', title: 'Show suggestions', group: E, shortcut: 'complete', run: edit('startCompletion') },
-  setting('prefCloseBrackets', 'closeBrackets', 'Auto-close brackets and quotes'),
-  setting('prefAutocomplete', 'autocomplete', 'Suggestions while typing'),
-  setting('prefIndentGuides', 'indentGuides', 'Indentation guides'),
-  setting('prefTrimOnSave', 'trimOnSave', 'Trim trailing whitespace when saving to a file'),
-  setting('prefFinalNewline', 'finalNewline', 'Add a final newline when saving to a file'),
-  setting('prefLint', 'lint', 'Check JSON and YAML'),
+  { id: 'toggleComment', get title() { return t('commands.titles.toggleComment') }, group: E, shortcut: 'toggleComment', run: edit('toggleComment') },
+  { id: 'moveLineUp', get title() { return t('commands.titles.moveLineUp') }, group: E, shortcut: 'moveLineUp', run: edit('moveLineUp') },
+  { id: 'moveLineDown', get title() { return t('commands.titles.moveLineDown') }, group: E, run: edit('moveLineDown') },
+  { id: 'copyLineDown', get title() { return t('commands.titles.copyLineDown') }, group: E, shortcut: 'copyLineDown', run: edit('copyLineDown') },
+  { id: 'deleteLine', get title() { return t('commands.titles.deleteLine') }, group: E, shortcut: 'deleteLine', run: edit('deleteLine') },
+  { id: 'selectNext', get title() { return t('commands.titles.selectNext') }, group: E, shortcut: 'selectNext', run: edit('selectNextOccurrence') },
+  { id: 'selectAll', get title() { return t('commands.titles.selectAll') }, group: E, shortcut: 'selectAll', run: edit('selectSelectionMatches') },
+  { id: 'addCursorAbove', get title() { return t('commands.titles.addCursorAbove') }, group: E, run: edit('addCursorAbove') },
+  { id: 'addCursorBelow', get title() { return t('commands.titles.addCursorBelow') }, group: E, run: edit('addCursorBelow') },
+  { id: 'matchingBracket', get title() { return t('commands.titles.matchingBracket') }, group: E, shortcut: 'matchingBracket', run: edit('cursorMatchingBracket') },
+  { id: 'selectLine', get title() { return t('commands.titles.selectLine') }, group: E, shortcut: 'selectLine', run: edit('selectLine') },
+  { id: 'indentLines', get title() { return t('commands.titles.indentLines') }, group: E, run: edit('indentMore') },
+  { id: 'outdentLines', get title() { return t('commands.titles.outdentLines') }, group: E, run: edit('indentLess') },
+  { id: 'sortAsc', get title() { return t('commands.titles.sortAsc') }, group: E, run: edit('sortLinesAscending') },
+  { id: 'sortDesc', get title() { return t('commands.titles.sortDesc') }, group: E, run: edit('sortLinesDescending') },
+  { id: 'sortCaseless', get title() { return t('commands.titles.sortCaseless') }, group: E, run: edit('sortLinesIgnoreCase') },
+  { id: 'uniqueLines', get title() { return t('commands.titles.uniqueLines') }, group: E, run: edit('removeDuplicateLines') },
+  { id: 'reverseLines', get title() { return t('commands.titles.reverseLines') }, group: E, run: edit('reverseLines') },
+  { id: 'joinLines', get title() { return t('commands.titles.joinLines') }, group: E, run: edit('joinLines') },
+  { id: 'upperCase', get title() { return t('commands.titles.upperCase') }, group: E, run: edit('upperCase') },
+  { id: 'lowerCase', get title() { return t('commands.titles.lowerCase') }, group: E, run: edit('lowerCase') },
+  { id: 'titleCase', get title() { return t('commands.titles.titleCase') }, group: E, run: edit('titleCase') },
+  { id: 'trimWhitespace', get title() { return t('commands.titles.trimWhitespace') }, group: E, run: edit('trimTrailingWhitespace') },
+  { id: 'foldAll', get title() { return t('commands.titles.foldAll') }, group: E, shortcut: 'foldAll', run: edit('foldAll') },
+  { id: 'unfoldAll', get title() { return t('commands.titles.unfoldAll') }, group: E, shortcut: 'foldAll', run: edit('unfoldAll') },
+  { id: 'complete', get title() { return t('commands.titles.complete') }, group: E, shortcut: 'complete', run: edit('startCompletion') },
+  setting('prefCloseBrackets', 'closeBrackets'),
+  setting('prefAutocomplete', 'autocomplete'),
+  setting('prefIndentGuides', 'indentGuides'),
+  setting('prefTrimOnSave', 'trimOnSave'),
+  setting('prefFinalNewline', 'finalNewline'),
+  setting('prefLint', 'lint'),
   {
     id: 'prefVim', group: 'settings',
     get title() {
-      return prefs.keymap === 'vim' ? 'Vim keys: turn off' : 'Vim keys: turn on'
+      return t(prefs.keymap === 'vim' ? 'commands.turnOff' : 'commands.turnOn', { setting: settingName('prefVim') })
     },
     run: () => {
       prefs.keymap = prefs.keymap === 'vim' ? 'standard' : 'vim'
-      showToast(`Vim keys: ${prefs.keymap === 'vim' ? 'on' : 'off'}.`, { timeout: 2500 })
+      showToast(t(prefs.keymap === 'vim' ? 'commands.isOn' : 'commands.isOff', { setting: settingName('prefVim') }), { timeout: 2500 })
     },
   },
   {
     id: 'split', group: G, shortcut: 'split',
     get title() {
-      return splitOpen.value ? 'Close the split' : 'Split the editor (side by side)'
+      return t(splitOpen.value ? 'split.close' : 'commands.titles.split')
     },
     run: toggleSplit,
   },
-  { id: 'problems', title: 'Show problems (JSON, YAML)', group: E, shortcut: 'problems', run: edit('openLintPanel') },
-  { id: 'nextProblem', title: 'Go to the next problem', group: E, shortcut: 'nextProblem', run: edit('nextDiagnostic') },
-  { id: 'undo', title: 'Undo', group: E, shortcut: 'undo', run: edit('undo') },
-  { id: 'redo', title: 'Redo', group: E, run: edit('redo') },
+  { id: 'problems', get title() { return t('commands.titles.problems') }, group: E, shortcut: 'problems', run: edit('openLintPanel') },
+  { id: 'nextProblem', get title() { return t('commands.titles.nextProblem') }, group: E, shortcut: 'nextProblem', run: edit('nextDiagnostic') },
+  { id: 'undo', get title() { return t('commands.titles.undo') }, group: E, shortcut: 'undo', run: edit('undo') },
+  { id: 'redo', get title() { return t('commands.titles.redo') }, group: E, run: edit('redo') },
 ]
 
 onMounted(() => {
@@ -709,104 +710,95 @@ onBeforeUnmount(() => {
     <TabBar :active="id" />
     <h1 class="sr-only">{{ displayName(name) }}</h1>
     <div class="toolbar">
-      <span v-if="doc.kind === 'file' && doc.folder" class="folder-path" :title="`In ${doc.folder}`">{{ doc.folder }}</span>
-      <input ref="nameInput" v-model="name" class="name" spellcheck="false" aria-label="File name" title="Rename" />
+      <span v-if="doc.kind === 'file' && doc.folder" class="folder-path" :title="t('editor.inFolder', { folder: doc.folder })">{{ doc.folder }}</span>
+      <input ref="nameInput" v-model="name" class="name" spellcheck="false" :aria-label="t('saveToFolder.fileName')" :title="t('editor.rename')" />
       <template v-if="isMarkdown">
-        <button class="touch-only format" title="Bold (Ctrl/Cmd+B)" aria-label="Bold" @pointerdown.prevent @click="format(toggleBold)"><b>B</b></button>
-        <button class="touch-only format" title="Italic (Ctrl/Cmd+I)" aria-label="Italic" @pointerdown.prevent @click="format(toggleItalic)"><i>I</i></button>
+        <button class="touch-only format" :title="t('editor.boldTitle')" :aria-label="t('editor.bold')" @pointerdown.prevent @click="format(toggleBold)"><b>B</b></button>
+        <button class="touch-only format" :title="t('editor.italicTitle')" :aria-label="t('editor.italic')" @pointerdown.prevent @click="format(toggleItalic)"><i>I</i></button>
       </template>
       <button
         class="toggle wide-only"
         :aria-pressed="view.wrap"
-        title="Wrap long lines (Alt+Z)"
+        :title="t('editor.wrapTitle')"
         @click="toggle('wrap')"
       >
-        Wrap
+        {{ t('editor.wrapButton') }}
       </button>
       <button
         class="toggle wide-only"
         :aria-pressed="view.spellcheck"
-        title="Underline spelling mistakes"
+        :title="t('editor.spelling')"
         @click="toggle('spellcheck')"
       >
-        Spelling
+        {{ t('editor.spellingButton') }}
       </button>
       <button
         v-if="isMarkdown"
         class="toggle"
         :aria-pressed="previewOn"
-        title="Show the formatted Markdown"
+        :title="t('editor.previewTitle')"
         @click="setDocOptions(doc.id, { preview: !doc.preview })"
       >
-        Preview
+        {{ t('editor.preview') }}
       </button>
-      <button title="Find and replace (Ctrl/Cmd+F)" @click="openFind(false)">Find</button>
+      <button :title="t('editor.findTitle')" @click="openFind(false)">{{ t('find.placeholder') }}</button>
       <button
         class="toggle wide-only"
         :aria-pressed="historyOpen"
-        title="Earlier versions of this document"
+        :title="t('editor.historyTitle')"
         @click="historyOpen = !historyOpen"
       >
-        History
+        {{ t('history.title') }}
       </button>
       <button
         class="toggle wide-only"
         :aria-pressed="splitOpen"
-        title="Show a second document (or this one) side by side (Ctrl/Cmd+\)"
+        :title="t('editor.splitTitle')"
         @click="toggleSplit"
       >
-        Split
+        {{ t('editor.split') }}
       </button>
-      <button class="wide-only" title="Print the whole document" @click="print">Print</button>
+      <button class="wide-only" :title="t('editor.printTitle')" @click="print">{{ t('editor.print') }}</button>
       <template v-if="inPlace">
-        <button :title="doc.linked ? 'Save to the file (Ctrl/Cmd+S)' : 'Save to a file (Ctrl/Cmd+S)'" @click="save(false)">
-          Save
+        <button :title="t(doc.linked ? 'editor.saveTitleFile' : 'editor.saveTitleNew')" @click="save(false)">
+          {{ t('common.save') }}
         </button>
-        <button class="wide-only" title="Save to a different file (Ctrl/Cmd+Shift+S)" @click="save(true)">Save as…</button>
-        <button v-if="folderTargets.length" title="Save this draft as a file in an open folder" @click="openSaveToFolder">
-          Save to folder…
+        <button class="wide-only" :title="t('editor.saveAsTitle')" @click="save(true)">{{ t('commands.titles.saveAs') }}</button>
+        <button v-if="folderTargets.length" :title="t('editor.saveToFolderTitle')" @click="openSaveToFolder">
+          {{ t('commands.titles.saveToFolder') }}
         </button>
       </template>
-      <button v-else title="Download a copy (Ctrl/Cmd+S)" @click="save(false)">Download</button>
-      <ToolbarMenu class="narrow-only" label="More" title="More actions" :items="moreItems" />
+      <button v-else :title="t('editor.downloadTitle')" @click="save(false)">{{ t('commands.titles.download') }}</button>
+      <ToolbarMenu class="narrow-only" :title="t('editor.moreActions')" :items="moreItems" />
     </div>
 
     <div v-if="doc.deletedAt" class="banner info" role="status">
-      <span><strong>This document is in the Trash.</strong> Restore it to keep it in your list.</span>
+      <span><T k="editor.inTrash" /></span>
       <span class="banner-actions">
-        <button class="primary" @click="restoreDoc(doc.id)">Restore</button>
+        <button class="primary" @click="restoreDoc(doc.id)">{{ t('common.restore') }}</button>
       </span>
     </div>
 
     <div v-if="diskNotice?.kind === 'changed'" class="banner notice" role="alert">
-      <span v-if="doc.diskDirty">
-        <strong>“{{ name }}” changed on disk</strong>, and you have changes not saved to it.
-        Reload to take the file's text (yours is kept in History), or keep yours (Save will ask before replacing the file).
-      </span>
-      <span v-else><strong>“{{ name }}” changed on disk.</strong></span>
+      <span v-if="doc.diskDirty"><T k="editor.changedConflict" :p="{ name }" /></span>
+      <span v-else><T k="editor.changed" :p="{ name }" /></span>
       <span class="banner-actions">
-        <button class="primary" @click="onReloadFromDisk">Reload from disk</button>
-        <button @click="keepMine(doc.id)">{{ doc.diskDirty ? 'Keep mine' : 'Not now' }}</button>
+        <button class="primary" @click="onReloadFromDisk">{{ t('editor.reload') }}</button>
+        <button @click="keepMine(doc.id)">{{ t(doc.diskDirty ? 'editor.keepMine' : 'tree.notNow') }}</button>
       </span>
     </div>
     <div v-else-if="diskNotice?.kind === 'deleted'" class="banner notice" role="status">
-      <span>
-        <strong>“{{ name }}” was deleted or moved on disk.</strong> Your text is still here; Save asks where to save it.
-      </span>
+      <span><T k="editor.deletedOnDisk" :p="{ name }" /></span>
       <span class="banner-actions">
-        <button @click="keepMine(doc.id)">OK</button>
+        <button @click="keepMine(doc.id)">{{ t('common.ok') }}</button>
       </span>
     </div>
 
     <div v-if="status === 'error'" class="banner" role="alert">
-      <span>
-        <strong>Not saved.</strong> Your browser's storage is full or unavailable, so these changes
-        will be lost when you close this tab. Download a copy, or free space by deleting other
-        documents and emptying the Trash.
-      </span>
+      <span><T k="editor.storageFailed" /></span>
       <span class="banner-actions">
-        <button class="primary" @click="save(false)">{{ inPlace ? 'Save to a file' : 'Download' }}</button>
-        <button @click="retryFailed">Try again</button>
+        <button class="primary" @click="save(false)">{{ t(inPlace ? 'editor.saveToFile' : 'commands.titles.download') }}</button>
+        <button @click="retryFailed">{{ t('editor.tryAgain') }}</button>
       </span>
     </div>
 
@@ -826,7 +818,7 @@ onBeforeUnmount(() => {
       <div v-else ref="host" class="source" />
       <SplitPane v-if="splitOpen" :id="prefs.split" @close="prefs.split = null; current()?.focus()" />
       <!-- Rendered by marked and sanitised by DOMPurify (see markdown.js). -->
-      <article v-if="previewOn" class="preview markdown" aria-label="Preview" v-html="previewHtml" />
+      <article v-if="previewOn" class="preview markdown" :aria-label="t('editor.preview')" v-html="previewHtml" />
       <HistoryPanel v-if="historyOpen" :doc="doc" @close="historyOpen = false; current()?.focus()" />
     </div>
 
@@ -838,7 +830,7 @@ onBeforeUnmount(() => {
 
     <SaveToFolderDialog
       v-if="savingTo"
-      :name="name || 'untitled.txt'"
+      :name="name || t('editor.untitledFile')"
       :folders="folderTargets"
       :error="savingTo.error"
       :busy="savingTo.busy"
@@ -848,63 +840,63 @@ onBeforeUnmount(() => {
 
     <footer ref="statusBar" class="status" :class="{ expanded: statusMore }">
       <span>
-        <button class="mini position" title="Go to line (Ctrl/Cmd+G)" @click="openGoTo">
-          Ln {{ cursor.line }}, Col {{ cursor.col }}
+        <button class="mini position" :title="t('editor.goToTitle')" @click="openGoTo">
+          {{ t('editor.position', { line: String(cursor.line), col: String(cursor.col) }) }}
         </button>
         <span v-if="selectionInfo"> ({{ selectionInfo }})</span>
         <button
           class="mini narrow-only"
           :aria-expanded="statusMore"
           aria-controls="status-controls"
-          :title="statusMore ? 'Hide the details' : 'Show encoding, line endings, language, indentation and text size'"
-          :aria-label="statusMore ? 'Hide details' : 'Show details'"
+          :title="t(statusMore ? 'editor.hideDetailsTitle' : 'editor.showDetailsTitle')"
+          :aria-label="t(statusMore ? 'editor.hideDetails' : 'editor.showDetails')"
           @click="statusMore = !statusMore"
         >⋯</button>
       </span>
       <span id="status-controls" class="status-controls">
-        <select v-model="encoding" aria-label="Encoding used when downloading" title="Encoding">
+        <select v-model="encoding" :aria-label="t('editor.encodingLabel')" :title="t('editor.encoding')">
           <option v-for="[v, label] in encodingOptions" :key="v" :value="v">{{ label }}</option>
         </select>
-        <select v-model="eol" aria-label="Line endings used when downloading" title="Line endings">
-          <option v-if="doc.lineEnds" :value="MIXED" :title="`Each line keeps its own ending; new lines get ${EOLS[doc.eol ?? '\n']}`">
-            Mixed
+        <select v-model="eol" :aria-label="t('editor.lineEndingsLabel')" :title="t('editor.lineEndings')">
+          <option v-if="doc.lineEnds" :value="MIXED" :title="t('editor.mixedTitle', { eol: EOLS[doc.eol ?? '\n'] })">
+            {{ t('editor.mixed') }}
           </option>
           <option v-for="(label, v) in EOLS" :key="v" :value="v">{{ label }}</option>
         </select>
         <select
           v-model="languageChoice"
           class="language"
-          aria-label="Language for syntax highlighting"
-          title="Language for syntax highlighting"
+          :aria-label="t('editor.languageLabel')"
+          :title="t('editor.languageLabel')"
         >
-          <option :value="AUTO" title="Chosen from the file name">{{ detected }} (auto)</option>
-          <option :value="PLAIN">Plain text</option>
+          <option :value="AUTO" :title="t('editor.autoTitle')">{{ t('editor.auto', { language: detected }) }}</option>
+          <option :value="PLAIN">{{ t('editor.plainText') }}</option>
           <option v-for="n in languageNames" :key="n" :value="n">{{ n }}</option>
         </select>
         <IndentMenu :indent="indent" :detected="detectedIndent" @set="setIndent" @convert="convertTo" />
-        <span class="font-size" role="group" aria-label="Text size">
+        <span class="font-size" role="group" :aria-label="t('settings.textSize')">
           <!-- Named by their (screen-reader) text, not aria-label, so the name
                a voice-control user reads off the screen still works. -->
-          <button class="mini" title="Smaller text" @click="stepFontSize(-1)"><span aria-hidden="true">A−</span><span class="sr-only">Smaller text</span></button>
-          <span aria-live="polite">{{ prefs.fontSize }}px</span>
-          <button class="mini" title="Larger text" @click="stepFontSize(1)"><span aria-hidden="true">A+</span><span class="sr-only">Larger text</span></button>
+          <button class="mini" :title="t('commands.titles.smallerText')" @click="stepFontSize(-1)"><span aria-hidden="true">A−</span><span class="sr-only">{{ t('commands.titles.smallerText') }}</span></button>
+          <span aria-live="polite">{{ t('editor.px', { size: prefs.fontSize }) }}</span>
+          <button class="mini" :title="t('commands.titles.biggerText')" @click="stepFontSize(1)"><span aria-hidden="true">A+</span><span class="sr-only">{{ t('commands.titles.biggerText') }}</span></button>
         </span>
       </span>
       <span>
         <button
           v-if="cursor.problems"
           class="mini problems"
-          title="Show the problems (Ctrl/Cmd+Shift+M; F8 goes to the next one)"
+          :title="t('editor.problemsTitle')"
           @click="current()?.run('openLintPanel')"
-        >⚠ {{ formatNumber(cursor.problems) }} problem{{ cursor.problems === 1 ? '' : 's' }}</button>
-        <span class="status-counts">{{ formatNumber(lineCount) }} lines · {{ formatNumber(stats.words) }} words · {{ formatNumber(stats.chars) }} chars · </span>
+        >⚠ {{ t('editor.problems', { count: cursor.problems }) }}</button>
+        <span class="status-counts">{{ t('editor.lines', { count: lineCount }) }} · {{ t('editor.words', { count: stats.words }) }} · {{ t('common.chars', { count: stats.chars }) }} · </span>
         <!-- A file's own state comes first: it's the one that matters. -->
         <template v-if="fileState">
           <span
             :class="['save', 'file-status', { notice: fileState !== 'saved' }]"
             :title="FILE_STATUS[fileState].title()"
             aria-live="polite"
-          >{{ FILE_STATUS[fileState].text }}</span>
+          >{{ FILE_STATUS[fileState].text() }}</span>
           <template v-if="browserLabel"> · </template>
         </template>
         <span
@@ -918,6 +910,6 @@ onBeforeUnmount(() => {
   </section>
 
   <section v-else class="home">
-    <p class="empty">Document not found. <RouterLink to="/">Back to documents</RouterLink></p>
+    <p class="empty">{{ t('editor.notFound') }} <RouterLink to="/">{{ t('editor.backToDocuments') }}</RouterLink></p>
   </section>
 </template>

@@ -17,12 +17,13 @@ import { applyUpdate, initPwa, install, pwa } from './pwa'
 import { showToast } from './toast'
 import { openFiles } from './openFiles'
 import { droppedHandles } from './fileaccess'
+import { t } from './i18n'
+import { keyLabel } from './keys'
 
 // Drop files anywhere in the app to open them.
 const router = useRouter()
 const route = useRoute()
 const quickOpen = ref(null)
-const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
 
 // F1 anywhere, or "?" when not typing, shows the keyboard shortcuts.
 const typing = (el) => el?.closest?.('input, textarea, select, [contenteditable="true"], .cm-editor')
@@ -74,8 +75,8 @@ function onKey(e) {
 // operating system ("Open with" the installed app; save in place works).
 initPwa({
   onUpdate: () =>
-    showToast('A new version of Plumb is ready.', {
-      action: { label: 'Reload', run: applyUpdate },
+    showToast(t('app.updateReady'), {
+      action: { label: t('app.reload'), run: applyUpdate },
       timeout: 60 * 60 * 1000,
     }),
 })
@@ -95,7 +96,7 @@ loadWorkspaces()
 startLiveReload()
 setReloadedHandler((doc) => {
   if (route.name === 'edit' && route.params.id === doc?.id) {
-    showToast(`Reloaded “${displayName(doc.name)}”: it changed on disk.`, { timeout: 2500 })
+    showToast(t('tree.reloaded', { name: displayName(doc.name) }), { timeout: 2500 })
   }
 })
 const onVisible = () => document.visibilityState === 'visible' && checkOpenDocs()
@@ -103,47 +104,45 @@ const onVisible = () => document.visibilityState === 'visible' && checkOpenDocs(
 // "saved": only Save writes the file; the browser keeps the edits until then.
 const savedHint = computed(() => {
   const doc = route.name === 'edit' ? getDoc(route.params.id) : null
-  const text = doc?.linked
-    ? `Edits are kept in your browser until you save them (${isMac ? '⌘S' : 'Ctrl+S'})`
-    : 'Everything is saved in your browser'
-  return pwa.offline ? `Offline · ${text[0].toLowerCase()}${text.slice(1)}` : text
+  const key = doc?.linked ? 'app.keptUntilSave' : 'app.allSaved'
+  return t(pwa.offline ? `${key}Offline` : key, { key: keyLabel('Mod+S') })
 })
 const showSidebar = computed(() => prefs.sidebar && prefs.workspaces.length > 0 && canOpenFolder())
 async function onOpenFolder() {
   try {
     await openFolder()
   } catch (e) {
-    showToast(`Couldn't open the folder: ${e.message}`)
+    showToast(t('app.cantOpenFolder', { error: e.message }))
   }
 }
 
 // Commands available everywhere (the editor adds its own while open).
 registerCommands([
   {
-    id: 'newDocument', title: 'New document', group: 'documents',
+    id: 'newDocument', get title() { return t('commands.titles.newDocument') }, group: 'documents',
     run: () => {
       const doc = createDoc()
       requestPersistence()
       router.push({ name: 'edit', params: { id: doc.id } })
     },
   },
-  { id: 'goToDocument', title: 'Go to document…', group: 'documents', shortcut: 'quickOpen', run: () => quickOpen.value.show() },
+  { id: 'goToDocument', get title() { return t('commands.titles.goToDocument') }, group: 'documents', shortcut: 'quickOpen', run: () => quickOpen.value.show() },
   // In a Markdown document: its headings in the quick switcher ("#").
-  { id: 'goToHeading', title: 'Go to heading…', group: 'editor', when: () => (ui.headings?.() ?? []).length > 0, run: () => quickOpen.value.show('#') },
-  { id: 'allDocuments', title: 'Show all documents', group: 'documents', run: () => router.push({ name: 'home' }) },
-  { id: 'settings', title: 'Open settings', group: 'settings', shortcut: 'settings', run: () => router.push({ name: 'settings' }) },
-  { id: 'searchAll', title: 'Search in all documents and folders', group: 'documents', shortcut: 'searchAll', run: openSearch },
-  { id: 'saveAll', title: 'Save all changed files', group: 'files', shortcut: 'saveAll', when: () => unsavedToDisk().length > 0, run: saveAll },
-  { id: 'openFolder', title: 'Open folder…', group: 'files', when: canOpenFolder, run: onOpenFolder },
+  { id: 'goToHeading', get title() { return t('commands.titles.goToHeading') }, group: 'editor', when: () => (ui.headings?.() ?? []).length > 0, run: () => quickOpen.value.show('#') },
+  { id: 'allDocuments', get title() { return t('commands.titles.allDocuments') }, group: 'documents', run: () => router.push({ name: 'home' }) },
+  { id: 'settings', get title() { return t('commands.titles.settings') }, group: 'settings', shortcut: 'settings', run: () => router.push({ name: 'settings' }) },
+  { id: 'searchAll', get title() { return t('commands.titles.searchAll') }, group: 'documents', shortcut: 'searchAll', run: openSearch },
+  { id: 'saveAll', get title() { return t('commands.titles.saveAll') }, group: 'files', shortcut: 'saveAll', when: () => unsavedToDisk().length > 0, run: saveAll },
+  { id: 'openFolder', get title() { return t('commands.titles.openFolder') }, group: 'files', when: canOpenFolder, run: onOpenFolder },
   {
-    id: 'toggleSidebar', title: 'Show or hide the folder sidebar', group: 'files', shortcut: 'sidebar',
+    id: 'toggleSidebar', get title() { return t('commands.titles.toggleSidebar') }, group: 'files', shortcut: 'sidebar',
     when: () => prefs.workspaces.length > 0, run: () => (prefs.sidebar = !prefs.sidebar),
   },
-  { id: 'refreshFolders', title: 'Read folders from disk again', group: 'files', when: () => prefs.workspaces.length > 0, run: () => forgetListings() },
-  { id: 'exportBackup', title: 'Export all documents as a backup', group: 'documents', run: downloadBackup },
-  { id: 'shortcuts', title: 'Show keyboard shortcuts', group: 'help', shortcut: 'shortcuts', run: () => (ui.shortcutsOpen = true) },
-  { id: 'install', title: 'Install Plumb as an app', group: 'help', when: () => pwa.canInstall, run: install },
-  { id: 'update', title: 'Reload to use the new version', group: 'help', when: () => pwa.updateReady, run: applyUpdate },
+  { id: 'refreshFolders', get title() { return t('commands.titles.refreshFolders') }, group: 'files', when: () => prefs.workspaces.length > 0, run: () => forgetListings() },
+  { id: 'exportBackup', get title() { return t('commands.titles.exportBackup') }, group: 'documents', run: downloadBackup },
+  { id: 'shortcuts', get title() { return t('commands.titles.shortcuts') }, group: 'help', shortcut: 'shortcuts', run: () => (ui.shortcutsOpen = true) },
+  { id: 'install', get title() { return t('commands.titles.install') }, group: 'help', when: () => pwa.canInstall, run: install },
+  { id: 'update', get title() { return t('commands.titles.update') }, group: 'help', when: () => pwa.updateReady, run: applyUpdate },
 ])
 const dragging = ref(false)
 let depth = 0
@@ -213,28 +212,28 @@ onBeforeUnmount(() => {
     </RouterLink>
     <span class="topbar-right">
       <span class="hint">{{ savedHint }}</span>
-      <button v-if="pwa.canInstall" class="quick-button" title="Install Plumb as an app that works offline" @click="install">
-        Install
+      <button v-if="pwa.canInstall" class="quick-button" :title="t('app.installTitle')" @click="install">
+        {{ t('app.install') }}
       </button>
       <button
         v-if="prefs.workspaces.length && canOpenFolder()"
         class="quick-button"
         :aria-pressed="!!prefs.sidebar"
-        :title="`Show or hide the folder sidebar (${isMac ? '⌘⇧E' : 'Ctrl+Shift+E'})`"
+        :title="t('app.foldersTitle', { key: keyLabel('Mod+Shift+E') })"
         @click="prefs.sidebar = !prefs.sidebar"
       >
-        Folders
+        {{ t('app.folders') }}
       </button>
-      <button class="quick-button" :title="`Search in all documents and folders (${isMac ? '⌘⇧F' : 'Ctrl+Shift+F'})`" @click="openSearch">
-        Search
+      <button class="quick-button" :title="t('app.searchTitle', { key: keyLabel('Mod+Shift+F') })" @click="openSearch">
+        {{ t('app.search') }}
       </button>
-      <button class="quick-button" :title="`Go to a document (${isMac ? '⌘' : 'Ctrl+'}P)`" @click="quickOpen.show()">
-        Go to… <kbd>{{ isMac ? '⌘P' : 'Ctrl+P' }}</kbd>
+      <button class="quick-button" :title="t('app.goToTitle', { key: keyLabel('Mod+P') })" @click="quickOpen.show()">
+        {{ t('app.goTo') }} <kbd>{{ keyLabel('Mod+P') }}</kbd>
       </button>
-      <button class="quick-button help-button" :title="`Settings (${isMac ? '⌘,' : 'Ctrl+,'})`" aria-label="Settings" @click="router.push({ name: 'settings' })">
+      <button class="quick-button help-button" :title="t('app.settingsTitle', { key: keyLabel('Mod+,') })" :aria-label="t('app.settings')" @click="router.push({ name: 'settings' })">
         ⚙
       </button>
-      <button class="quick-button help-button" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts" @click="ui.shortcutsOpen = true">
+      <button class="quick-button help-button" :title="t('app.shortcutsTitle')" :aria-label="t('shortcuts.title')" @click="ui.shortcutsOpen = true">
         ?
       </button>
     </span>
@@ -244,7 +243,7 @@ onBeforeUnmount(() => {
     <div class="view"><RouterView /></div>
   </main>
   <div v-if="dragging" class="drop-overlay" aria-hidden="true">
-    <div>Drop files to open them</div>
+    <div>{{ t('app.drop') }}</div>
   </div>
   <QuickOpen ref="quickOpen" />
   <ShortcutsDialog v-if="ui.shortcutsOpen" @close="ui.shortcutsOpen = false" />
