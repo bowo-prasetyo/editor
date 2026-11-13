@@ -2,7 +2,7 @@
 
 > **Status: accepted.** This sets the direction for Plumb. Nothing here is
 > built yet unless it says so. The [decisions](#decisions) section records what
-> has been settled; one [open question](#open-questions) remains.
+> has been settled. There are no open questions right now.
 
 ## The name
 
@@ -134,6 +134,11 @@ Closing a folder with nothing unsaved just closes it.
 In Markdown files it should mean **bold**, as it does almost everywhere, and the
 sidebar needs a shortcut that doesn't clash.
 
+### Firefox and Safari get a smaller promise, kept in full
+
+Plumb works best in Chrome and Edge and says so plainly. Firefox and Safari get
+Drafts and single files, with faithful downloads. See [Platforms](#platforms).
+
 ## Scope
 
 ### In scope: the core
@@ -183,13 +188,52 @@ If the feature is right but the page is wrong, change the page in the same PR.
 
 ## Platforms
 
+**Plumb works best in Chrome and Edge, and says so plainly.** Opening folders,
+saving in place and watching for changes depend on the browser's File System
+Access API. Chromium browsers have it. Firefox has declined to build it and
+Safari hasn't shipped it. That's outside Plumb's control; being honest about it
+is not.
+
 - **Chromium browsers (Chrome, Edge, Brave, Opera, Arc), desktop**: the full
   product, including opening folders, saving in place and watching for changes.
-- **Firefox and Safari, desktop**: Drafts, plus opening files and saving them as
-  downloads. The interface should **say plainly** what's missing and why, rather
-  than hiding it.
-- **Phones and tablets**: reading and light editing of Drafts. Not a goal to go
-  further for now.
+- **Firefox and Safari, desktop**: a smaller promise, fully kept (below).
+- **Phones and tablets**: reading and light editing of Drafts. On iPhone and
+  iPad that means the Safari promise. Not a goal to go further for now.
+
+### The Firefox and Safari promise
+
+**Promised:**
+
+- **Drafts**, fully: Trash, version history, backup, works offline.
+- **Single files**: open one (picker or drag and drop), edit it, and Save
+  downloads a copy that keeps the original **name, encoding and line endings**.
+  *Faithful to the file* still holds, even where *in place* can't.
+- **Every principle** except saving in place: never lose text, private, ready
+  in a second, calm.
+
+**Not promised:** folders, saving in place, live reload, search across a folder.
+
+### How Plumb says it
+
+Calm, not naggy:
+
+- **Show what's missing; don't hide it.** *Open folder…* appears greyed out,
+  with one line of reason: "Opening folders needs Chrome or Edge. Your browser
+  can open single files."
+- **A one-time, dismissible note** on the first visit, for example: "In Firefox,
+  Save downloads a copy. To save straight back to your files, use Chrome or Edge."
+- **After a download, say where it went** ("Saved a copy to your Downloads
+  folder"), so nobody wonders whether their file changed.
+- **The README and the app's description** say "Works best in Chrome and Edge"
+  up front.
+
+### What we won't do
+
+- **No workarounds** that imitate folders: no read-only folder upload, no
+  folders kept inside the browser's own storage. Each adds a third way files
+  can behave. Revisit only if a browser ships the real API.
+- **No blocking or nagging.** Drafts with faithful downloads is a good product in
+  its own right, and suits the scratchpad audience well.
 
 ## What "good shape" looks like
 
@@ -209,7 +253,7 @@ There's no telemetry, by design, so success is judged by things we can check:
 In order:
 
 1. ~~**Agree on this document.**~~ Done: the name (**Plumb**), closing folders,
-   drafts and Markdown are decided above.
+   drafts, Markdown and the Firefox and Safari promise are decided above.
 2. **A stabilisation round, with no new features:**
    - End-to-end tests (Playwright) for saving, reloading, conflicts, the page
      closing mid-save, and byte-for-byte file round-trips.
@@ -222,12 +266,14 @@ In order:
    - virtual folders become read-only labels; pinning and **Save to folder…** for drafts.
 4. **Markdown first-class**: `.md` drafts, the preview toggle, the writing
    conveniences, and moving the sidebar off Ctrl/Cmd+B.
-5. **Explain the platform differences** in the interface.
+5. **Explain the platform differences**, as described in
+   [How Plumb says it](#how-plumb-says-it): greyed-out folder actions with a
+   reason, a one-time note, where downloads went, and "Works best in Chrome and
+   Edge" in the README and the app's description.
 6. **Rewrite the README** as a short user guide, and move the full feature list
    to a separate reference page.
 7. **Releases and a changelog**, starting at `0.2.0`.
 
 ## Open questions
 
-- **Firefox and Safari.** Is "Drafts mode" there good enough to promise, or
-  should Plumb say plainly that it works best in Chromium browsers?
+None right now. New ones go here, and move to [Decisions](#decisions) once settled.
