@@ -73,3 +73,37 @@ test('brackets are matched, with or without a language', async () => {
     assert.equal(bad?.matched ?? false, false, `${file}: mismatched bracket flagged`)
   }
 })
+
+// --- Smart Enter ---------------------------------------------------------------
+
+import { enter, indentSettings, smartEnter } from '../src/cm.js'
+import { EditorSelection as Sel } from '@codemirror/state'
+
+async function pressEnter(fileName, doc, indent, smart = true) {
+  const support = await loadLanguage(findLanguage(fileName))
+  let state = EditorState.create({
+    doc,
+    selection: Sel.single(doc.indexOf('|') === -1 ? doc.length : doc.indexOf('|')),
+    extensions: [indentSettings(indent), support ?? [], smart ? smartEnter.of(true) : []],
+  })
+  if (doc.includes('|')) {
+    const at = doc.indexOf('|')
+    state = state.update({ changes: { from: at, to: at + 1 }, selection: Sel.single(at) }).state
+  }
+  ensureSyntaxTree(state, state.doc.length, 5000)
+  enter({ state, dispatch: (tr) => (state = tr.state) })
+  const pos = state.selection.main.head
+  return state.doc.toString().slice(0, pos) + '|' + state.doc.toString().slice(pos)
+}
+
+test('smart Enter indents a level after an opening bracket, with tabs or spaces', async () => {
+  assert.equal(await pressEnter('a.js', 'if (x) {', { type: 'spaces', size: 2 }), 'if (x) {\n  |')
+  assert.equal(await pressEnter('a.js', 'if (x) {', { type: 'spaces', size: 4 }), 'if (x) {\n    |')
+  assert.equal(await pressEnter('a.go', 'func f() {', { type: 'tabs', size: 4 }), 'func f() {\n\t|')
+  assert.equal(await pressEnter('a.js', 'f({|})', { type: 'spaces', size: 2 }), 'f({\n  |\n})', 'between brackets')
+  assert.equal(await pressEnter('a.py', 'def f():', { type: 'spaces', size: 4 }), 'def f():\n    |')
+})
+
+test('without a code language, Enter copies the indentation exactly', async () => {
+  assert.equal(await pressEnter('notes.txt', '\t  item {', { type: 'spaces', size: 2 }, false), '\t  item {\n\t  |')
+})

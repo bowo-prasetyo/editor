@@ -2,7 +2,7 @@
 // API (Chrome, Edge and other Chromium browsers). Elsewhere, saving falls
 // back to a download.
 import { ENCODINGS } from './textcodec.js'
-import { docBlob, downloadDoc, getFileHandle, linkFile, setDocOptions } from './store.js'
+import { docBlob, downloadDoc, getFileHandle, linkFile, recordVersion, setDocOptions } from './store.js'
 
 // (globalThis is window in a page.)
 export const canSaveInPlace = () =>
@@ -103,6 +103,7 @@ export async function saveDoc(doc, { saveAs = false, confirm: confirmFn = (m) =>
   if (!blob) return { result: 'cancelled' }
   const lastModified = await write(handle, blob)
   await linkFile(doc.id, handle, lastModified)
+  recordVersion(doc.id, 'saved')
   if (handle.name && handle.name !== doc.name) setDocOptions(doc.id, { name: handle.name, autoName: false })
   return { result: 'saved', name: handle.name }
 }

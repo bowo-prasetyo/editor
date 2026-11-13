@@ -3,6 +3,7 @@ import { decodeBytes, encodeText } from './textcodec.js'
 import { DEFAULT_NAME, nameFromContent } from './naming.js'
 import { extension } from './filetype.js'
 import { openBackend } from './backends.js'
+import { createHistory } from './history.js'
 import { normalizeFolder, parentFolder, renamedFolder } from './folders.js'
 
 // Documents live in the browser: IndexedDB normally, localStorage where
@@ -14,6 +15,7 @@ const SAVE_DELAY = 400
 export const state = reactive({ docs: [], status: {}, backend: null, persisted: false })
 
 let backend = null
+let history = null
 const timers = new Map()
 const versions = new Map() // bumped on every change, to know if a finished write is still current
 const chains = new Map() // per-document queue, so writes and deletes land in order
@@ -52,6 +54,7 @@ async function init(chosen) {
   state.status = {}
   try {
     backend = chosen ?? (await openBackend())
+    history = createHistory(backend)
     state.backend = backend.kind
     const { docs, failed } = await backend.loadAll()
     for (const doc of docs) {
@@ -192,6 +195,8 @@ function flush(id) {
       if (getDoc(id) && versions.get(id) === version && !timers.has(id)) state.status[id] = 'saved'
       if (state.status[id] === 'saved') dropRescue(id)
       announce({ type: 'put', doc: snapshot })
+      // Every few minutes of editing, keep a version (see history.js).
+      if (!snapshot.deletedAt) history?.maybeRecord(snapshot).catch((e) => console.error('Could not keep a version', e))
     } catch (e) {
       console.error(`Could not save "${snapshot.name}"`, e)
       if (getDoc(id)) state.status[id] = 'error'
@@ -273,6 +278,36 @@ export function setDocOptions(id, patch) {
   if (!doc) return
   Object.assign(doc, patch)
   schedule(id)
+}
+
+// --- Version history (see history.js) ----------------------------------------
+
+// Keep the document's current text as a version: kind 'manual' (with an
+// optional label), 'saved' (written to a file), 'opened', or 'auto' (skipped
+// if nothing changed since the newest version).
+export async function recordVersion(id, kind = 'manual', label = '') {
+  const doc = getDoc(id)
+  if (!doc || !history) return null
+  try {
+    return await history.record(plain(doc), kind, label)
+  } catch (e) {
+    console.error('Could not keep a version', e)
+    return null
+  }
+}
+
+export const listVersions = (id) => history?.list(id) ?? Promise.resolve([])
+export const versionText = (versionId) => history?.text(versionId) ?? Promise.resolve(null)
+
+// Bring back an older version. The current text is kept as a version first,
+// so restoring can itself be undone. Returns the restored text, or null.
+export async function restoreVersion(id, versionId) {
+  const text = await versionText(versionId)
+  if (text == null || !getDoc(id)) return null
+  if (text === getDoc(id).content) return text
+  await recordVersion(id, 'restore')
+  updateDoc(id, { content: text })
+  return text
 }
 
 // --- Folders (see folders.js) ------------------------------------------------
@@ -357,6 +392,7 @@ function purgeOldTrash(now = Date.now()) {
 // Delete forever.
 export async function deleteDoc(id) {
   removeLocal(id)
+  history?.forget(id)
   await enqueue(id, async () => {
     try {
       await backend.remove(id)
@@ -430,6 +466,7 @@ export async function importFile(file, handle = null) {
   if (decoded.binary) throw new BinaryFileError(file.name)
   const { text, encoding, bom, eol } = decoded
   const doc = createDoc(file.name, text, { autoName: false, encoding, bom, eol })
+  recordVersion(doc.id, 'opened')
   if (handle) {
     try {
       await linkFile(doc.id, handle, file.lastModified)

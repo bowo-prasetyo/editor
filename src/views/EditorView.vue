@@ -6,6 +6,7 @@ import {
   updateDoc,
   setDocOptions,
   moveToFolder,
+  recordVersion,
   flushAll,
   retryFailed,
   restoreDoc,
@@ -22,6 +23,9 @@ import FindBar from '../components/FindBar.vue'
 import GoToBar from '../components/GoToBar.vue'
 import TabBar from '../components/TabBar.vue'
 import FolderDialog from '../components/FolderDialog.vue'
+import IndentMenu from '../components/IndentMenu.vue'
+import HistoryPanel from '../components/HistoryPanel.vue'
+import { convertIndentation, detectIndent, effectiveIndent } from '../indentation'
 import { folderTree } from '../folders'
 import { liveTabs, opened, saveSnapshot, takeSnapshot } from '../session'
 import { cycleTab } from '../tabs'
@@ -47,7 +51,9 @@ const name = computed({
 
 const view = computed(() => viewSettings(doc.value))
 const isMarkdown = computed(() => ['md', 'markdown', 'mdown'].includes(extension(name.value)))
-const previewOn = computed(() => isMarkdown.value && !!doc.value?.preview)
+const historyOpen = ref(false)
+// The history panel takes the preview's place while it's open.
+const previewOn = computed(() => isMarkdown.value && !!doc.value?.preview && !historyOpen.value)
 const toggle = (key) => setDocOptions(props.id, { [key]: !view.value[key] })
 
 const status = computed(() => state.status[props.id])
@@ -145,6 +151,39 @@ async function print() {
 // another document (so undo history doesn't leak between documents).
 let editorFor = null // the document the current editor shows
 
+// --- Indentation ----------------------------------------------------------------
+
+// What the text suggests, worked out when the document is opened (not on
+// every keystroke) or renamed, or when asked for in the menu.
+const detectedIndent = ref({ type: 'spaces', size: 2, auto: true })
+function detectIndentation() {
+  detectedIndent.value = effectiveIndent({ name: name.value, content: content.value })
+}
+const indent = computed(() =>
+  doc.value?.indent ? { ...doc.value.indent, auto: false } : detectedIndent.value,
+)
+watch(name, detectIndentation)
+watch(indent, (i) => current()?.setIndent(i))
+
+function setIndent(value) {
+  if (!value) detectIndentation()
+  setDocOptions(props.id, { indent: value ?? undefined })
+}
+
+// Re-indent the whole text (one undoable edit) and use that setting from now on.
+function convertTo(type) {
+  const found = detectIndent(content.value)
+  const from = {
+    type: found?.type ?? indent.value.type,
+    size: found?.type === 'spaces' ? found.size : indent.value.size,
+  }
+  const to = { type, size: indent.value.size }
+  const text = convertIndentation(content.value, from, to)
+  if (text !== content.value) current()?.replace(0, content.value.length, text, { select: false })
+  setDocOptions(props.id, { indent: { type, size: to.size } })
+  showToast(text === content.value ? 'The indentation already matches.' : `Converted the indentation to ${type}.`)
+}
+
 // The editor, if it shows the current document. When the route moves to
 // another document, watchers run before the editor is swapped: they must not
 // push the new document's text or settings into the old one's editor.
@@ -159,7 +198,12 @@ function mountEditor([, id] = [], [, oldId] = []) {
   if (!host.value || !doc.value) return
   opened(props.id, oldId !== props.id ? oldId : null)
   editorFor = props.id
+  // Keep the text as it is when opened (if it changed since the newest
+  // version), so edits made from here on can always be undone.
+  if (content.value) recordVersion(props.id, 'auto')
+  detectIndentation()
   editor.value = createEditor({
+    indent: indent.value,
     saved: takeSnapshot(props.id),
     parent: host.value,
     text: content.value,
@@ -195,6 +239,8 @@ const language = computed(() =>
   languageChoice.value === AUTO && tooBig.value ? null : findLanguage(name.value, languageChoice.value),
 )
 let languageLoads = 0
+// Smart indentation on Enter for code; prose (Markdown) keeps the line's indentation.
+const isCode = (desc, support) => !!support && desc?.name !== 'Markdown'
 watch(
   [language, editor],
   async ([desc, ed]) => {
@@ -202,15 +248,16 @@ watch(
     const load = ++languageLoads
     const support = await loadLanguage(desc)
     // Ignore a slow load that a newer choice (or another document) replaced.
-    if (load === languageLoads && editor.value === ed) ed.setLanguage(name.value, support)
+    if (load === languageLoads && editor.value === ed) ed.setLanguage(name.value, support, { smart: isCode(desc, support) })
   },
   { immediate: true },
 )
 // Renaming can change the fallback comment syntax even if the language doesn't.
 watch(name, async (n) => {
   const ed = current()
-  const support = await loadLanguage(language.value)
-  if (ed && ed === current()) ed.setLanguage(n, support)
+  const desc = language.value
+  const support = await loadLanguage(desc)
+  if (ed && ed === current()) ed.setLanguage(n, support, { smart: isCode(desc, support) })
 })
 watch(
   () => prefs.fontSize,
@@ -379,6 +426,14 @@ onBeforeUnmount(() => {
         Preview
       </button>
       <button title="Find and replace (Ctrl/Cmd+F)" @click="openFind(false)">Find</button>
+      <button
+        class="toggle"
+        :aria-pressed="historyOpen"
+        title="Earlier versions of this document"
+        @click="historyOpen = !historyOpen"
+      >
+        History
+      </button>
       <button title="Print the whole document" @click="print">Print</button>
       <template v-if="inPlace">
         <button :title="doc.linked ? 'Save to the file (Ctrl/Cmd+S)' : 'Save to a file (Ctrl/Cmd+S)'" @click="save(false)">
@@ -418,10 +473,11 @@ onBeforeUnmount(() => {
     />
     <GoToBar v-if="goToOpen" :editor="editor" :lines="lineCount" @close="closeGoTo" />
 
-    <div class="pane" :class="{ 'preview-on': previewOn }" :style="{ fontSize: prefs.fontSize + 'px' }">
+    <div class="pane" :class="{ 'preview-on': previewOn || historyOpen }" :style="{ fontSize: prefs.fontSize + 'px' }">
       <div ref="host" class="source" />
       <!-- Rendered by marked and sanitised by DOMPurify (see markdown.js). -->
       <article v-if="previewOn" class="preview markdown" aria-label="Preview" v-html="previewHtml" />
+      <HistoryPanel v-if="historyOpen" :doc="doc" @close="historyOpen = false; current()?.focus()" />
     </div>
 
     <!-- What gets printed: the whole text (the editor only draws what's visible). -->
@@ -465,6 +521,7 @@ onBeforeUnmount(() => {
           <option :value="PLAIN">Plain text</option>
           <option v-for="n in languageNames" :key="n" :value="n">{{ n }}</option>
         </select>
+        <IndentMenu :indent="indent" :detected="detectedIndent" @set="setIndent" @convert="convertTo" />
         <span class="font-size" role="group" aria-label="Text size">
           <button class="mini" aria-label="Smaller text" title="Smaller text" @click="stepFontSize(-1)">A−</button>
           <span aria-live="polite">{{ prefs.fontSize }}px</span>
