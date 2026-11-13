@@ -37,6 +37,7 @@ import { convertIndentation, detectIndent, effectiveIndent } from '../indentatio
 import { closeTab, liveTabs, opened, saveSnapshot, takeSnapshot } from '../session'
 import { registerCommands, ui } from '../commands'
 import { cycleTab } from '../tabs'
+import { keyLabel } from '../keys'
 import { useRoute, useRouter } from 'vue-router'
 
 const props = defineProps({ id: { type: String, required: true } })
@@ -65,9 +66,25 @@ const historyOpen = ref(false)
 const previewOn = computed(() => isMarkdown.value && !!doc.value?.preview && !historyOpen.value)
 const toggle = (key) => setDocOptions(props.id, { [key]: !view.value[key] })
 
+// Two kinds of saving: to the browser (every edit, automatically) and to the
+// file on disk (Ctrl/Cmd+S). For a draft only the first exists. For a file,
+// only the file can be "saved": the browser part just says that edits not
+// yet written to the file are safe, so the status never reads "Saved" while
+// the file is out of date.
 const status = computed(() => state.status[props.id])
-const statusLabel = computed(
-  () => ({ saved: 'Saved ✓', pending: 'Saving…', error: 'Not saved' })[status.value] ?? '',
+const saveKey = keyLabel('Mod+S')
+const browserLabel = computed(() => {
+  if (status.value === 'error') return 'Not saved'
+  if (!doc.value?.linked) return { saved: 'Saved ✓', pending: 'Saving…' }[status.value] ?? ''
+  if (!doc.value.diskDirty) return ''
+  return { saved: 'Edits kept in browser ✓', pending: 'Keeping edits in browser…' }[status.value] ?? ''
+})
+const browserTitle = computed(() =>
+  status.value === 'error'
+    ? "Your browser's storage is full or unavailable"
+    : doc.value?.linked
+      ? 'Changes not yet saved to the file are kept in this browser, so a reload or crash loses nothing'
+      : 'Kept in this browser',
 )
 
 // --- Saving to disk, encoding and line endings ---------------------------------
@@ -813,14 +830,21 @@ onBeforeUnmount(() => {
           @click="current()?.run('openLintPanel')"
         >⚠ {{ cursor.problems }} problem{{ cursor.problems === 1 ? '' : 's' }}</button>
         {{ lineCount }} lines · {{ stats.words }} words · {{ stats.chars }} chars ·
-        <span :class="['save', status]" aria-live="polite">{{ statusLabel }}</span>
+        <!-- A file's own state comes first: it's the one that matters. -->
         <template v-if="fileStatus">
-          ·
           <span
-            :class="['save', { error: doc.diskDirty || fileStatus === 'File not on disk' }]"
-            :title="fileStatus === 'File not on disk' ? 'The file was deleted or moved: Save asks where to save' : doc.diskDirty ? 'Press Ctrl/Cmd+S to write your changes to the file' : 'The file on disk matches'"
+            :class="['save', 'file-status', { error: doc.diskDirty || fileStatus === 'File not on disk' }]"
+            :title="fileStatus === 'File not on disk' ? 'The file was deleted or moved: Save asks where to save' : doc.diskDirty ? `Press ${saveKey} to write your changes to the file` : 'The file on disk matches'"
+            aria-live="polite"
           >{{ fileStatus }}</span>
+          <template v-if="browserLabel"> · </template>
         </template>
+        <span
+          :class="['save', 'browser-status', status]"
+          :data-state="status"
+          :title="browserLabel ? browserTitle : undefined"
+          aria-live="polite"
+        >{{ browserLabel }}</span>
       </span>
     </footer>
   </section>

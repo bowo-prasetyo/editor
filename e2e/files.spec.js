@@ -120,6 +120,31 @@ test('an edit is written in the file’s own encoding and line endings', async (
   expect(await readBytes(page, 'notes.txt')).toEqual([0xff, 0xfe, ...bytes('first\r\nsecond\r\nthird ✓', 'utf16le')])
 })
 
+test('the status never says “saved” while the file on disk is out of date', async ({ page }) => {
+  await writeFile(page, 'todo.txt', 'one\n')
+  await openFromDisk(page, 'todo.txt')
+  const status = page.locator('footer.status')
+  const header = page.locator('.topbar .hint')
+  await expect(header).toContainText('Edits are kept in your browser until you save them')
+  await expect(page.locator('footer.status .browser-status')).toHaveText('')
+
+  await toEnd(page)
+  await page.keyboard.type('two')
+  await expect(fileStatus(page)).toHaveText('Not saved to file')
+  await expect(page.locator('footer.status .browser-status')).toHaveText('Edits kept in browser ✓')
+  await expect(status).not.toContainText('Saved ✓')
+  await expect(header).not.toContainText('Everything is saved')
+
+  await saveToFile(page)
+  await expect(page.locator('footer.status .browser-status')).toHaveText('')
+
+  // A draft: the browser is where it's saved.
+  await newDocument(page)
+  await page.keyboard.type('a draft')
+  await expect(page.locator('footer.status .browser-status')).toHaveText('Saved ✓')
+  await expect(header).toHaveText('Everything is saved in your browser')
+})
+
 test('a file changed on disk is not overwritten without asking', async ({ page }) => {
   await writeFile(page, 'shared.txt', 'original\n')
   await openFromDisk(page, 'shared.txt')

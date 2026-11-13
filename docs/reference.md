@@ -326,8 +326,11 @@ deletes them.
 
 ## Never losing text
 
-- **Autosave:** saving happens shortly after you stop typing. The status bar
-  shows *Saving… / Saved / Not saved*.
+- **Autosave:** saving happens shortly after you stop typing. For a draft, the
+  status bar shows *Saving… / Saved / Not saved*. For a file, it shows the
+  file's own state first (*Not saved to file* or *Saved to file*); until you
+  save, it adds *Edits kept in browser*, so it never says "saved" while the
+  file on disk is out of date.
 - **Rescue copies:** if the page closes mid-save, a rescue copy is recovered on
   the next visit.
 - **When storage fails:** if the browser's storage is full or unavailable, a

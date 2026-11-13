@@ -11,6 +11,7 @@ import { isMac, keyLabel, shortcut } from '../keys'
 import { BinaryFileError } from '../store'
 import { showToast } from '../toast'
 import { ensureAllIndexes, fileIndex, openWorkspaceFile } from '../workspace'
+import { useModal } from '../modal'
 
 // Ctrl/Cmd+P: jump to any document by typing part of its name or folder.
 // With nothing typed, recently opened documents come first.
@@ -22,6 +23,10 @@ const active = ref(0)
 const input = ref(null)
 const list = ref(null)
 let returnFocus = null
+// Focus stays in the dialog and Escape closes it (see modal.js); hide()
+// puts focus back itself.
+const root = ref(null)
+useModal(root, { onEscape: () => hide(), restoreFocus: false })
 
 const MAX_SHOWN = 50
 const commandMode = computed(() => query.value.startsWith('>'))
@@ -143,7 +148,8 @@ async function show(prefix = '') {
 
 function hide(refocus = true) {
   open.value = false
-  if (refocus) returnFocus?.focus?.()
+  // Once the dialog has gone (while it's open, it keeps focus: modal.js).
+  if (refocus) nextTick(() => returnFocus?.focus?.())
 }
 
 function choose(i) {
@@ -188,7 +194,6 @@ function onKey(e) {
   if (e.key === 'ArrowDown') active.value = (active.value + 1) % Math.max(1, count.value)
   else if (e.key === 'ArrowUp') active.value = (active.value - 1 + count.value) % Math.max(1, count.value)
   else if (e.key === 'Enter') choose(active.value)
-  else if (e.key === 'Escape') hide()
   else return
   e.preventDefault()
 }
@@ -216,7 +221,7 @@ const id = (i) => `quick-open-${i}`
 
 <template>
   <div v-if="open" class="quick-backdrop" @mousedown.self="hide()">
-    <div class="quick" role="dialog" aria-modal="true" :aria-label="commandMode ? 'Run a command' : headingMode ? 'Go to heading' : 'Go to document'">
+    <div ref="root" class="quick" role="dialog" aria-modal="true" :aria-label="commandMode ? 'Run a command' : headingMode ? 'Go to heading' : 'Go to document'">
       <input
         ref="input"
         v-model="query"

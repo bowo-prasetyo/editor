@@ -1,21 +1,24 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useModal } from '../modal'
 
 // Closing a folder that has files with unsaved changes: save them all, keep
 // them as drafts, or cancel. Nothing unsaved is ever thrown away.
-defineProps({
+const props = defineProps({
   folder: { type: String, required: true },
   files: { type: Array, required: true }, // names of the files with unsaved changes
   busy: { type: Boolean, default: false }, // saving
 })
 const emit = defineEmits(['save', 'keep', 'cancel'])
 const first = ref(null)
+const root = ref(null)
+useModal(root, { onEscape: () => !props.busy && emit('cancel') })
 onMounted(() => first.value?.focus())
 </script>
 
 <template>
-  <div class="quick-backdrop" @mousedown.self="!busy && emit('cancel')" @keydown.esc.prevent="!busy && emit('cancel')">
-    <div class="quick dialog" role="dialog" aria-modal="true" :aria-label="`Close ${folder}`">
+  <div class="quick-backdrop" @mousedown.self="!busy && emit('cancel')">
+    <div ref="root" class="quick dialog" role="dialog" aria-modal="true" :aria-label="`Close ${folder}`">
       <h2 class="dialog-title">
         “{{ folder }}” has {{ files.length === 1 ? '1 file' : `${files.length} files` }} with unsaved changes
       </h2>
