@@ -288,7 +288,7 @@ export function updateDoc(id, patch) {
   if (!doc) return
   if ('name' in patch && !('autoName' in patch)) patch = { ...patch, autoName: false }
   if (doc.autoName && 'content' in patch && !('name' in patch)) {
-    patch = { ...patch, name: nameFromContent(patch.content, extension(doc.name) || 'txt') }
+    patch = { ...patch, name: nameFromContent(patch.content, extension(doc.name) || 'md') }
   }
   // A document linked to a file on disk now differs from that file.
   if ('content' in patch && doc.linked) patch = { ...patch, diskDirty: true }

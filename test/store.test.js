@@ -186,10 +186,10 @@ test('new documents are named from their first line until renamed', async () => 
   const s = await load()
   const d = s.createDoc()
   s.updateDoc(d.id, { content: 'Groceries\nmilk' })
-  assert.equal(s.getDoc(d.id).name, 'Groceries.txt')
-  s.updateDoc(d.id, { name: 'list.md' })
+  assert.equal(s.getDoc(d.id).name, 'Groceries.md')
+  s.updateDoc(d.id, { name: 'list.txt' })
   s.updateDoc(d.id, { content: 'Something else' })
-  assert.equal(s.getDoc(d.id).name, 'list.md')
+  assert.equal(s.getDoc(d.id).name, 'list.txt')
   assert.equal(s.createDoc('opened.txt', 'x').autoName, false)
 })
 

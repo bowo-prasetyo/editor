@@ -1,10 +1,10 @@
 # Plan: Markdown as a first-class kind of document
 
-> **Status: proposed.** This plans step 4 of [VISION.md](../VISION.md#next-steps),
-> following the decision in the vision
+> **Status: accepted; phase 1 done.** This plans step 4 of
+> [VISION.md](../VISION.md#next-steps), following the decision in the vision
 > ([Markdown is first-class, within limits](../VISION.md#markdown-is-first-class-within-limits)).
-> No code changes yet. The [questions](#questions-for-the-maintainer) at the
-> end need a decision before work starts.
+> The [decisions](#decisions) are recorded at the end. [Phase 1](#phases) is
+> built; phase 2 (writing helpers) is next.
 
 ## Why
 
@@ -168,6 +168,21 @@ Each phase is one PR that ships on its own, with its tests.
 The README, `TESTING.md`, the shortcuts panel and the plan's status are
 updated in the phase that changes them.
 
+**Phase 1 is done** (`src/mdedit.js`, `markdownKeys` in `src/cm.js`).
+Details settled while building it:
+
+- **The Markdown keys** are added when the loaded language is Markdown,
+  whatever the file's name. If the person picks *Plain text* for a `.md`
+  file, there are no helpers. They sit above the default keymap, where
+  Ctrl/Cmd+I would otherwise select the enclosing syntax.
+- **Ctrl/Cmd+B outside Markdown** works as before: `App.vue` toggles the
+  sidebar only when the editor hasn't handled the key.
+- **The Folders button** sits in the header, not next to the folder's name: a
+  hidden sidebar couldn't show its own button. It appears while a folder is
+  open and shows whether the sidebar is on (`aria-pressed`).
+- **Toggling emphasis** counts stars, so italic on `**bold**` gives
+  `***bold***` and back, and bold never takes an italic's star.
+
 ## Risks
 
 | Risk | How it's handled |
@@ -177,7 +192,19 @@ updated in the phase that changes them.
 | A helper changes text the person didn't mean to | Each helper acts only on the cursor's line or the selection, in response to a key, and is one undo step. Tests check that other lines are untouched |
 | The preview renders something unsafe from an opened file | Unchanged: everything is sanitised by DOMPurify, and links open in a new tab |
 
-## Questions for the maintainer
+## Decisions
+
+Settled by the maintainer, as recommended:
+
+1. **Ctrl/Cmd+B** means bold inside Markdown documents, and shows or hides
+   the sidebar everywhere else. A visible sidebar button is added.
+2. **Markers:** `**bold**` and `*italic*`.
+3. **The preview** doesn't start on for new drafts. It's one click away and
+   remembered per document.
+4. **No shortcut for the preview** for now: Ctrl/Cmd+Shift+V is the browser's
+   "paste as plain text".
+
+## The questions as asked
 
 1. **What happens to Ctrl/Cmd+B?**
    - **A (recommended): bold in Markdown, the sidebar everywhere else.** In a

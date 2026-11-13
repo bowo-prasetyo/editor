@@ -50,8 +50,9 @@ function onKey(e) {
     e.preventDefault()
     return saveAll()
   }
-  // Ctrl/Cmd+B: show or hide the folder sidebar.
-  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'b' && prefs.workspaces.length) {
+  // Ctrl/Cmd+B: show or hide the folder sidebar. (In a Markdown document
+  // the editor takes it first, for bold: see markdownKeys in cm.js.)
+  if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'b' && !e.defaultPrevented && prefs.workspaces.length) {
     e.preventDefault()
     prefs.sidebar = !prefs.sidebar
     return
@@ -181,6 +182,15 @@ onBeforeUnmount(() => {
       <span class="hint">{{ pwa.offline ? 'Offline · everything is saved in your browser' : 'Everything is saved in your browser' }}</span>
       <button v-if="pwa.canInstall" class="quick-button" title="Install Plumb as an app that works offline" @click="install">
         Install
+      </button>
+      <button
+        v-if="prefs.workspaces.length && canOpenFolder()"
+        class="quick-button"
+        :aria-pressed="!!prefs.sidebar"
+        :title="`Show or hide the folder sidebar (${isMac ? '⌘B' : 'Ctrl+B'} outside Markdown documents)`"
+        @click="prefs.sidebar = !prefs.sidebar"
+      >
+        Folders
       </button>
       <button class="quick-button" :title="`Search in all documents and folders (${isMac ? '⌘⇧F' : 'Ctrl+Shift+F'})`" @click="openSearch">
         Search

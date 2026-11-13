@@ -117,6 +117,14 @@ The scenarios follow the principles in [VISION.md](VISION.md#principles).
 | Migration step 3: single files kept as drafts become recent files (20 most recent, plus any with unsaved changes); older ones are offered as copies | `recent.spec.js`, `test/recent.test.js` |
 | Migration: each kind of old document becomes a draft or a file as planned, runs once, never deletes text; copies from closed folders are offered to the Trash (with Undo) or kept | `migration.spec.js`, `test/filesdrafts.test.js` |
 
+### Markdown ([plan](docs/markdown.md))
+
+| Scenario | Test |
+|---|---|
+| New drafts (and the quick switcher's) are named `.md`; the preview is off until turned on | `markdown.spec.js`, `test/naming.test.js` |
+| Ctrl/Cmd+B and Ctrl/Cmd+I wrap and unwrap the selection, insert a pair with nothing selected, toggle every selection, and don't take each other's stars | `markdown.spec.js`, `test/mdedit.test.js` |
+| Outside Markdown, Ctrl/Cmd+B shows and hides the sidebar and adds no stars; the Folders button does too | `markdown.spec.js` |
+
 ### The editor screen
 
 Naming from the first line and renaming; find and replace all with a one-step
