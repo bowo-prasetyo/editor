@@ -2,11 +2,10 @@
 // syntax highlighting for the document's language (see languages.js). It
 // handles very large documents (only the visible lines are drawn), several
 // cursors, and the usual editing commands.
-import { Compartment, EditorSelection, EditorState, Prec } from '@codemirror/state'
+import { Compartment, EditorSelection, EditorState, Prec, RangeSetBuilder, StateEffect, StateField } from '@codemirror/state'
 import {
   EditorView,
   Decoration,
-  MatchDecorator,
   ViewPlugin,
   crosshairCursor,
   drawSelection,
@@ -23,7 +22,6 @@ import { HighlightStyle, bracketMatching, indentUnit, syntaxHighlighting } from 
 import { tags as t } from '@lezer/highlight'
 import { highlightSelectionMatches, selectNextOccurrence, selectSelectionMatches } from '@codemirror/search'
 import { commentTokensFor } from './filetype.js'
-import { searchRegExp } from './find.js'
 
 export const INDENT = '  '
 
@@ -138,22 +136,57 @@ export const highlightStyle = HighlightStyle.define([
 
 // --- Find highlighting ----------------------------------------------------
 
-// Every match of the find bar's query is highlighted. (CodeMirror's own
-// search highlighting only works with its search panel, which we don't use.)
+// Every match the find bar found is highlighted. It hands over its list of
+// matches (sorted [start, end] pairs), so what's highlighted is exactly what
+// it counts, including matches that span lines. Until it sends a new list,
+// edits shift the old one along with the text.
+const setFindMatches = StateEffect.define()
+export const findMatchesField = StateField.define({
+  create: () => [],
+  update(list, tr) {
+    for (const e of tr.effects) if (e.is(setFindMatches)) return e.value
+    if (!tr.docChanged || !list.length) return list
+    return list.map(([from, to]) => [tr.changes.mapPos(from, 1), Math.max(tr.changes.mapPos(from, 1), tr.changes.mapPos(to, -1))])
+  },
+})
+
 const findMark = Decoration.mark({ class: 'cm-findMatch' })
-function findHighlighter(re) {
-  if (!re) return []
-  const decorator = new MatchDecorator({ regexp: re, decoration: findMark, maxLength: 2000 })
-  return ViewPlugin.define(
-    (view) => ({
-      decorations: decorator.createDeco(view),
-      update(u) {
-        this.decorations = decorator.updateDeco(u, this.decorations)
-      },
-    }),
-    { decorations: (v) => v.decorations },
-  )
+
+// Decorations for the matches on screen only (there can be 100,000).
+function visibleFindMarks(view) {
+  const list = view.state.field(findMatchesField)
+  const builder = new RangeSetBuilder()
+  if (!list.length) return builder.finish()
+  for (const { from, to } of view.visibleRanges) {
+    // First match ending after `from` (binary search).
+    let lo = 0
+    let hi = list.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (list[mid][1] <= from) lo = mid + 1
+      else hi = mid
+    }
+    for (let i = lo; i < list.length && list[i][0] < to; i++) {
+      const [s, e] = list[i]
+      if (e > s) builder.add(s, e, findMark) // empty matches (e.g. "^") have nothing to colour
+    }
+  }
+  return builder.finish()
 }
+
+const findHighlighter = ViewPlugin.fromClass(
+  class {
+    constructor(view) {
+      this.decorations = visibleFindMarks(view)
+    }
+    update(u) {
+      if (u.docChanged || u.viewportChanged || u.startState.field(findMatchesField) !== u.state.field(findMatchesField)) {
+        this.decorations = visibleFindMarks(u.view)
+      }
+    }
+  },
+  { decorations: (v) => v.decorations },
+)
 
 // --- The editor -----------------------------------------------------------
 
@@ -164,7 +197,6 @@ export function createEditor({ parent, text, name, wrap, spellcheck, onChange, o
   const wrapping = new Compartment()
   const spelling = new Compartment()
   const language = new Compartment()
-  const finding = new Compartment()
 
   const spellAttrs = (on) => EditorView.contentAttributes.of({ spellcheck: on ? 'true' : 'false' })
 
@@ -215,7 +247,8 @@ export function createEditor({ parent, text, name, wrap, spellcheck, onChange, o
         wrapping.of(wrap ? EditorView.lineWrapping : []),
         spelling.of(spellAttrs(spellcheck)),
         language.of(commentData(name)),
-        finding.of([]),
+        findMatchesField,
+        findHighlighter,
         EditorView.contentAttributes.of({ 'aria-label': 'Document text', autocapitalize: 'off' }),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) {
@@ -274,8 +307,9 @@ export function createEditor({ parent, text, name, wrap, spellcheck, onChange, o
         userEvent: 'input.replace',
       })
     },
-    highlight(query, options) {
-      view.dispatch({ effects: finding.reconfigure(findHighlighter(searchRegExp(query, options))) })
+    // Highlight these [start, end] matches (sorted), or none.
+    highlight(matches = []) {
+      view.dispatch({ effects: setFindMatches.of(matches) })
     },
 
     goTo(input) {
