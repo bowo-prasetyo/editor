@@ -276,13 +276,14 @@ export const theme = EditorView.theme({
   '&': { height: '100%', color: 'var(--fg)', backgroundColor: 'var(--bg)', fontSize: 'inherit' },
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': { fontFamily: 'var(--mono)', lineHeight: '1.6' },
-  '.cm-content': { padding: '12px 0', caretColor: 'var(--fg)' },
+  '.cm-content': { padding: '12px 0', caretColor: 'var(--accent)' },
   '.cm-line': { padding: '0 12px' },
   '.cm-gutters': { backgroundColor: 'var(--panel)', color: 'var(--muted)', borderRight: '1px solid var(--border)' },
   '.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 12px', minWidth: '3ch' },
   '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--accent) 6%, transparent)' },
   '.cm-activeLineGutter': { backgroundColor: 'color-mix(in srgb, var(--accent) 12%, var(--panel))', color: 'var(--fg)' },
-  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--fg)', borderLeftWidth: '2px' },
+  // The cursor in the accent blue: Plumb's mark is a text cursor.
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent)', borderLeftWidth: '2px' },
   '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
     backgroundColor: 'color-mix(in srgb, var(--accent) 28%, transparent) !important',
   },
@@ -321,8 +322,8 @@ export const theme = EditorView.theme({
   '.cm-completionDetail': { color: 'var(--muted)', fontStyle: 'normal', marginLeft: '0.6em' },
   '.cm-completionMatchedText': { textDecoration: 'none', fontWeight: 'bold' },
   '.cm-findMatch': {
-    backgroundColor: 'color-mix(in srgb, #f5c400 40%, transparent)',
-    outline: '1px solid color-mix(in srgb, #c99a00 70%, transparent)',
+    backgroundColor: 'color-mix(in srgb, var(--highlight) 40%, transparent)',
+    outline: '1px solid color-mix(in srgb, var(--brass) 70%, transparent)',
     borderRadius: '2px',
   },
 })

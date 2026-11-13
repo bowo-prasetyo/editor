@@ -771,7 +771,7 @@ onBeforeUnmount(() => {
       </span>
     </div>
 
-    <div v-if="diskNotice?.kind === 'changed'" class="banner info" role="alert">
+    <div v-if="diskNotice?.kind === 'changed'" class="banner notice" role="alert">
       <span v-if="doc.diskDirty">
         <strong>“{{ name }}” changed on disk</strong>, and you have changes not saved to it.
         Reload to take the file's text (yours is kept in History), or keep yours (Save will ask before replacing the file).
@@ -782,7 +782,7 @@ onBeforeUnmount(() => {
         <button @click="keepMine(doc.id)">{{ doc.diskDirty ? 'Keep mine' : 'Not now' }}</button>
       </span>
     </div>
-    <div v-else-if="diskNotice?.kind === 'deleted'" class="banner info" role="status">
+    <div v-else-if="diskNotice?.kind === 'deleted'" class="banner notice" role="status">
       <span>
         <strong>“{{ name }}” was deleted or moved on disk.</strong> Your text is still here; Save asks where to save it.
       </span>
@@ -894,7 +894,7 @@ onBeforeUnmount(() => {
         <!-- A file's own state comes first: it's the one that matters. -->
         <template v-if="fileStatus">
           <span
-            :class="['save', 'file-status', { error: doc.diskDirty || fileStatus === 'File not on disk' }]"
+            :class="['save', 'file-status', { notice: doc.diskDirty || fileStatus === 'File not on disk' }]"
             :title="fileStatus === 'File not on disk' ? 'The file was deleted or moved: Save asks where to save' : doc.diskDirty ? `Press ${saveKey} to write your changes to the file` : 'The file on disk matches'"
             aria-live="polite"
           >{{ fileStatus }}</span>

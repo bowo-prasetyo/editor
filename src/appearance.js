@@ -2,6 +2,7 @@
 // (before the app shows), so it doesn't flash in the wrong colours.
 import { watchEffect } from 'vue'
 import { prefs } from './prefs.js'
+import { applyThemeBar } from './themebar.js'
 
 export const THEMES = { system: 'Same as the system', light: 'Light', dark: 'Dark' }
 
@@ -23,6 +24,7 @@ watchEffect(() => {
   const root = document.documentElement
   if (prefs.theme === 'light' || prefs.theme === 'dark') root.dataset.theme = prefs.theme
   else delete root.dataset.theme
+  applyThemeBar(prefs.theme)
   // Fonts named by hand fall back to monospace if not installed.
   const font = String(prefs.font ?? '').trim()
   if (font) root.style.setProperty('--mono', /monospace|serif|sans-serif|system-ui/.test(font) ? font : `${font}, monospace`)
