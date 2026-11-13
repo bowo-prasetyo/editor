@@ -18,6 +18,7 @@ export function nameFromContent(content, ext = 'txt') {
   }
   let title = line
     .replace(/^\s*(#+|[-*+>]|\d+[.)])\s+/, '') // Markdown heading / list / quote markers
+    // eslint-disable-next-line no-control-regex -- control characters are exactly what's removed
     .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '') // not allowed in file names
     .replace(/\s+/g, ' ')
     .trim()

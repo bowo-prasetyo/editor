@@ -254,11 +254,13 @@ In order:
 
 1. ~~**Agree on this document.**~~ Done: the name (**Plumb**), closing folders,
    drafts, Markdown and the Firefox and Safari promise are decided above.
-2. **A stabilisation round, with no new features:**
+2. **A stabilisation round, with no new features:** *(first pass done: see
+   [TESTING.md](TESTING.md), including the known gaps it found)*
    - End-to-end tests (Playwright) for saving, reloading, conflicts, the page
      closing mid-save, and byte-for-byte file round-trips.
    - Linting in CI.
    - Tests for the screens, starting with `EditorView.vue`.
+   - Fix what those tests find: first, mixed line endings being normalised.
 3. **The Files / Drafts split** described above:
    - files from folders become temporary, with only unsaved edits and history kept;
    - a one-time cleanup of documents that are copies of folder files;

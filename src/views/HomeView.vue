@@ -23,7 +23,7 @@ import { canSaveInPlace, pickFiles } from '../fileaccess'
 import { canOpenFolder, openFolder } from '../workspace'
 import { showToast } from '../toast'
 import { prefs } from '../prefs'
-import { NONE, SORTS, folderTree, inFolder, normalizeFolder, parentFolder, renamedFolder, sortDocs } from '../folders'
+import { NONE, SORTS, folderTree, inFolder, parentFolder, renamedFolder, sortDocs } from '../folders'
 import FolderDialog from '../components/FolderDialog.vue'
 
 const router = useRouter()

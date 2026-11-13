@@ -90,8 +90,12 @@ npm run dev
 ## Test
 
 ```bash
-npm test
+npm test            # unit tests
+npm run test:e2e    # end-to-end tests in Chromium (first time: npx playwright install chromium)
+npm run lint        # ESLint
 ```
+
+See [TESTING.md](TESTING.md) for what is tested and how.
 
 ## Build
 
