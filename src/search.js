@@ -99,7 +99,6 @@ export function searchText(text, query, options = {}, limit = Infinity) {
 // in open folders, including those opened as documents).
 export const SCOPES = { all: 'Everything', documents: 'Documents', folders: 'Open folders' }
 
-const rootName = (id) => prefs.workspaces.find((w) => w.id === id)?.name ?? ''
 const docPath = (doc) => (doc.folder ? `${doc.folder}/` : '') + displayName(doc.name)
 
 // What could be searched: documents, and folder files with no document.

@@ -2,7 +2,7 @@
 // in order (ignoring case), and matches at word starts, in a row, or in the
 // file name (rather than its folder) rank higher.
 
-const isBoundary = (text, i) => i === 0 || /[\s/._\-]/.test(text[i - 1]) || (/[a-z]/.test(text[i - 1]) && /[A-Z]/.test(text[i]))
+const isBoundary = (text, i) => i === 0 || /[\s/._-]/.test(text[i - 1]) || (/[a-z]/.test(text[i - 1]) && /[A-Z]/.test(text[i]))
 
 // { score, positions } or null when the query doesn't match. `nameStart` is
 // where the file name begins in `text` (after its folder path).
