@@ -23,6 +23,7 @@ import {
   updateDoc,
 } from './store.js'
 import { decodeBytes } from './textcodec.js'
+import { editorSettings, parseEditorConfig, propertiesFor } from './editorconfig.js'
 
 export const canOpenFolder = () => typeof globalThis.showDirectoryPicker === 'function'
 
@@ -145,7 +146,53 @@ export async function loadListing(rootId, path, dir) {
 // file goes too, and is made again when next needed.
 export function forgetListings(rootId = null) {
   for (const key of [...listings.keys()]) if (!rootId || key.startsWith(rootId + ':')) listings.delete(key)
+  for (const key of [...editorConfigs.keys()]) if (!rootId || key.startsWith(rootId + ':')) editorConfigs.delete(key)
   forgetIndex(rootId)
+}
+
+// --- .editorconfig (see editorconfig.js) ------------------------------------------------
+
+// "rootId:dir" -> parsed .editorconfig, or null where there's none.
+const editorConfigs = new Map()
+
+async function readEditorConfig(rootId, dirPath, dir) {
+  const key = `${rootId}:${dirPath}`
+  if (!editorConfigs.has(key)) {
+    let config = null
+    try {
+      const file = await (await dir.getFileHandle('.editorconfig')).getFile()
+      config = parseEditorConfig(await file.text())
+    } catch {
+      // none here (or unreadable)
+    }
+    editorConfigs.set(key, config)
+  }
+  return editorConfigs.get(key)
+}
+
+// What the folder's .editorconfig files say about a file (see
+// editorSettings()), or null when they say nothing (or can't be read).
+export async function editorConfigFor(rootId, path) {
+  const root = roots.get(rootId)
+  if (!root || root.permission !== 'granted') return null
+  const dirs = path.split('/').slice(0, -1)
+  const configs = []
+  let dir = root.handle
+  let dirPath = ''
+  try {
+    for (let i = 0; ; i++) {
+      const config = await readEditorConfig(rootId, dirPath, dir)
+      if (config) configs.push({ dir: dirPath, config })
+      if (i === dirs.length) break
+      dir = await dir.getDirectoryHandle(dirs[i])
+      dirPath = joinPath(dirPath, dirs[i])
+    }
+  } catch {
+    // a folder on the way went away: use what was found
+  }
+  if (!configs.length) return null
+  const settings = editorSettings(propertiesFor(configs, path))
+  return Object.keys(settings).length ? settings : null
 }
 
 // --- Every file in a folder (for the quick switcher and search) ----------------------

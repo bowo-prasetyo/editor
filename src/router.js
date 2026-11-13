@@ -11,6 +11,7 @@ export default createRouter({
     { path: '/edit/:id', name: 'edit', component: () => import('./views/EditorView.vue'), props: true },
     // Search across every document and the files in open folders.
     { path: '/search', name: 'search', component: () => import('./views/SearchView.vue') },
+    { path: '/settings', name: 'settings', component: () => import('./views/SettingsView.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

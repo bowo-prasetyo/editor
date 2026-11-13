@@ -118,7 +118,7 @@ export async function saveAllToFiles({ prepare, confirm } = {}) {
   const out = { saved: 0, cancelled: 0, failed: [] }
   for (const { id } of unsavedToDisk()) {
     try {
-      prepare?.(getDoc(id))
+      await prepare?.(getDoc(id))
       const r = await saveDoc(getDoc(id), confirm ? { confirm } : {})
       if (r.result === 'saved') out.saved++
       else out.cancelled++

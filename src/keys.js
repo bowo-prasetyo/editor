@@ -15,6 +15,8 @@ export const SHORTCUTS = [
   { id: 'shortcuts', group: 'Documents', label: 'Show keyboard shortcuts', keys: ['F1', '?'] },
   { id: 'searchAll', group: 'Documents', label: 'Search (and replace) in all documents and folders', keys: ['Mod+Shift+F'] },
   { id: 'saveAll', group: 'Documents', label: 'Save all changed files', keys: ['Mod+Alt+S'] },
+  { id: 'settings', group: 'Documents', label: 'Settings', keys: ['Mod+,'] },
+  { id: 'split', group: 'Documents', label: 'Split the editor / close the split', keys: ['Mod+\\'] },
   { id: 'sidebar', group: 'Documents', label: 'Show / hide the folder sidebar', keys: ['Mod+B'] },
   // Find
   { id: 'find', group: 'Find', label: 'Find', keys: ['Mod+F'] },
@@ -34,6 +36,8 @@ export const SHORTCUTS = [
   { id: 'undo', group: 'Editing', label: 'Undo / redo', keys: ['Mod+Z', isMac ? 'Mod+Shift+Z' : 'Mod+Y'] },
   { id: 'wrap', group: 'Editing', label: 'Word wrap on / off', keys: ['Alt+Z'] },
   { id: 'complete', group: 'Editing', label: 'Show suggestions (Enter accepts, Escape closes)', keys: ['Ctrl+Space'] },
+  { id: 'problems', group: 'Editing', label: 'Show problems (JSON, YAML)', keys: ['Mod+Shift+M'] },
+  { id: 'nextProblem', group: 'Editing', label: 'Go to the next problem', keys: ['F8'] },
   // Folding
   { id: 'fold', group: 'Folding', label: 'Fold / unfold at the cursor', keys: isMac ? ['Mod+Alt+[', 'Mod+Alt+]'] : ['Ctrl+Shift+[', 'Ctrl+Shift+]'] },
   { id: 'foldAll', group: 'Folding', label: 'Fold all / unfold all', keys: ['Ctrl+Alt+[', 'Ctrl+Alt+]'] },

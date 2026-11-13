@@ -26,6 +26,16 @@ const defaults = {
   workspaces: [],
   sidebar: true,
   expanded: {},
+  // Settings page (see SettingsView.vue).
+  theme: 'system', // 'system' | 'light' | 'dark'
+  font: '', // CSS font-family for text; '' = the system's monospace font
+  keymap: 'standard', // 'standard' | 'vim'
+  lint: true, // check JSON and YAML as you type
+  editorConfig: true, // follow .editorconfig files in open folders
+  indentDefault: { type: 'spaces', size: 2 }, // for file types without a convention
+  wrapProse: true,
+  wrapCode: false,
+  split: null, // the document shown in the right-hand pane, if split
 }
 
 function load() {
@@ -35,7 +45,10 @@ function load() {
       ['tabs', 'recent', 'folders', 'workspaces'].map((k) => [k, Array.isArray(saved[k]) ? saved[k] : []]),
     )
     const expanded = saved.expanded && typeof saved.expanded === 'object' ? saved.expanded : {}
-    return { ...defaults, ...saved, ...lists, expanded }
+    const indentDefault = ['spaces', 'tabs'].includes(saved.indentDefault?.type) && +saved.indentDefault.size > 0
+      ? saved.indentDefault
+      : defaults.indentDefault
+    return { ...defaults, ...saved, ...lists, expanded, indentDefault }
   } catch {
     return structuredClone(defaults)
   }

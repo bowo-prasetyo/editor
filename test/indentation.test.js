@@ -37,3 +37,15 @@ test('converting between tabs and spaces keeps the structure', () => {
   assert.equal(convertIndentation('  \tx', { type: 'tabs', size: 4 }, { type: 'spaces', size: 4 }), '    x', 'mixed: a tab after 2 spaces reaches column 4')
   assert.equal(convertIndentation('a  b\n', { type: 'spaces', size: 2 }, { type: 'tabs', size: 2 }), 'a  b\n', 'only leading whitespace')
 })
+
+test('indentation: own choice, then .editorconfig, then the text, then the default (a setting for plain types)', () => {
+  const doc = { name: 'a.js', content: 'x\n    y\n    z\n' }
+  assert.deepEqual(effectiveIndent(doc), { type: 'spaces', size: 4, auto: true })
+  assert.deepEqual(effectiveIndent(doc, { config: { indent: { type: 'tabs', size: 8 } } }), { type: 'tabs', size: 8, auto: true, from: 'editorconfig' })
+  assert.deepEqual(effectiveIndent({ ...doc, indent: { type: 'spaces', size: 2 } }, { config: { indent: { type: 'tabs', size: 8 } } }), { type: 'spaces', size: 2, auto: false })
+  // Only a size from .editorconfig: the text's style, that size.
+  assert.deepEqual(effectiveIndent({ name: 'a.js', content: '\tx\n\ty\n' }, { config: { indentSize: 3 } }), { type: 'tabs', size: 3, auto: true, from: 'editorconfig' })
+  // Nothing to detect: the setting for types without a convention; Python keeps its 4.
+  assert.deepEqual(effectiveIndent({ name: 'a.txt', content: '' }, { fallback: { type: 'tabs', size: 8 } }), { type: 'tabs', size: 8, auto: true })
+  assert.deepEqual(effectiveIndent({ name: 'a.py', content: '' }, { fallback: { type: 'tabs', size: 8 } }), { type: 'spaces', size: 4, auto: true })
+})

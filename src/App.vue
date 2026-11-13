@@ -41,6 +41,11 @@ function onKey(e) {
     e.preventDefault()
     return openSearch()
   }
+  // Ctrl/Cmd+,: settings.
+  if (mod && !e.altKey && !e.shiftKey && e.key === ',') {
+    e.preventDefault()
+    return router.push({ name: 'settings' })
+  }
   // Ctrl/Cmd+Alt+S: save every changed file.
   if (mod && e.altKey && !e.shiftKey && e.code === 'KeyS') {
     e.preventDefault()
@@ -98,6 +103,7 @@ registerCommands([
   },
   { id: 'goToDocument', title: 'Go to document…', group: 'Documents', shortcut: 'quickOpen', run: () => quickOpen.value.show() },
   { id: 'allDocuments', title: 'Show all documents', group: 'Documents', run: () => router.push({ name: 'home' }) },
+  { id: 'settings', title: 'Open settings', group: 'Settings', shortcut: 'settings', run: () => router.push({ name: 'settings' }) },
   { id: 'searchAll', title: 'Search in all documents and folders', group: 'Documents', shortcut: 'searchAll', run: openSearch },
   { id: 'saveAll', title: 'Save all changed files', group: 'Files', shortcut: 'saveAll', when: () => unsavedToDisk().length > 0, run: saveAll },
   { id: 'openFolder', title: 'Open folder…', group: 'Files', when: canOpenFolder, run: onOpenFolder },
@@ -165,6 +171,9 @@ onBeforeUnmount(() => Object.entries(events).forEach(([k, f]) => window.removeEv
       </button>
       <button class="quick-button" :title="`Go to a document (${isMac ? '⌘' : 'Ctrl+'}P)`" @click="quickOpen.show()">
         Go to… <kbd>{{ isMac ? '⌘P' : 'Ctrl+P' }}</kbd>
+      </button>
+      <button class="quick-button help-button" :title="`Settings (${isMac ? '⌘,' : 'Ctrl+,'})`" aria-label="Settings" @click="router.push({ name: 'settings' })">
+        ⚙
       </button>
       <button class="quick-button help-button" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts" @click="ui.shortcutsOpen = true">
         ?

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import {
   state,
   getDoc,
@@ -20,6 +20,8 @@ import { countWords } from '../stats'
 import { createEditor } from '../cm'
 import { EditorView } from '@codemirror/view'
 import { whitespaceFix } from '../textops'
+import { docEditorConfig, editedInOtherPane, helpOptions, keysFor, noteEdit, saveFixes } from '../editorsetup'
+import SplitPane from '../components/SplitPane.vue'
 import { AUTO, PLAIN, findLanguage, languageNames, loadLanguage } from '../languages'
 import FindBar from '../components/FindBar.vue'
 import GoToBar from '../components/GoToBar.vue'
@@ -53,7 +55,7 @@ const name = computed({
   set: (v) => updateDoc(props.id, { name: v }),
 })
 
-const view = computed(() => viewSettings(doc.value))
+const view = computed(() => viewSettings(doc.value, { wrapProse: prefs.wrapProse, wrapCode: prefs.wrapCode }))
 const isMarkdown = computed(() => ['md', 'markdown', 'mdown'].includes(extension(name.value)))
 const historyOpen = ref(false)
 // The history panel takes the preview's place while it's open.
@@ -121,13 +123,25 @@ async function save(saveAs = false) {
 }
 
 // Before writing a file: trailing spaces and the final line break, if
-// turned on. In Markdown, two spaces at the end of a line are a line break,
-// so they stay. Undoable like any edit.
+// Settings or the project's .editorconfig say so. In Markdown, two spaces at
+// the end of a line are a line break, so they stay. Undoable like any edit.
 function fixWhitespace() {
-  const trim = prefs.trimOnSave && !isMarkdown.value
-  if (!trim && !prefs.finalNewline) return
-  current()?.apply(whitespaceFix({ trim, finalNewline: prefs.finalNewline }))
+  const { trim, finalNewline } = saveFixes(doc.value, projectConfig.value)
+  if (!trim && !finalNewline) return
+  current()?.apply(whitespaceFix({ trim, finalNewline }))
 }
+
+// --- The project's .editorconfig (documents opened from a folder) ------------------
+
+const projectConfig = ref(null)
+async function loadProjectConfig() {
+  const id = props.id
+  const config = await docEditorConfig(doc.value)
+  if (id !== props.id) return // moved to another document meanwhile
+  projectConfig.value = config
+  detectIndentation()
+}
+watch([() => props.id, () => prefs.editorConfig], loadProjectConfig, { immediate: true })
 
 // --- Markdown preview -------------------------------------------------------
 
@@ -171,8 +185,12 @@ let editorFor = null // the document the current editor shows
 // every keystroke) or renamed, or when asked for in the menu.
 const detectedIndent = ref({ type: 'spaces', size: 2, auto: true })
 function detectIndentation() {
-  detectedIndent.value = effectiveIndent({ name: name.value, content: content.value })
+  detectedIndent.value = effectiveIndent(
+    { name: name.value, content: content.value },
+    { config: projectConfig.value, fallback: prefs.indentDefault },
+  )
 }
+watch(() => prefs.indentDefault, detectIndentation, { deep: true })
 const indent = computed(() =>
   doc.value?.indent ? { ...doc.value.indent, auto: false } : detectedIndent.value,
 )
@@ -225,7 +243,11 @@ function mountEditor([, id] = [], [, oldId] = []) {
     wrap: view.value.wrap,
     spellcheck: view.value.spellcheck,
     help: help.value,
-    onChange: (text) => (content.value = text),
+    keys: keys.value,
+    onChange: (text) => {
+      noteEdit(props.id, text, 'main')
+      content.value = text
+    },
     onSelection: (info) => (cursor.value = info),
   })
   editor.value.focus()
@@ -249,7 +271,9 @@ watch(
 )
 
 // Keep the editor in step with the document and its settings.
-watch(content, (text) => current()?.setText(text))
+// An edit typed in the other pane of a split stays out of this pane's undo
+// history (it's undone there).
+watch(content, (text) => current()?.setText(text, { history: !editedInOtherPane(props.id, text, 'main') }))
 watch(() => view.value.wrap, (on) => current()?.setWrap(on))
 watch(() => view.value.spellcheck, (on) => current()?.setSpellcheck(on))
 // --- Language (syntax highlighting) --------------------------------------------
@@ -291,13 +315,28 @@ watch(
 // turned off (see helpers() in cm.js). Suggestions are always available with
 // Ctrl+Space.
 const codeLoaded = ref(false)
-const help = computed(() => ({
-  code: codeLoaded.value,
-  closeBrackets: prefs.closeBrackets,
-  autocomplete: prefs.autocomplete,
-  guides: prefs.indentGuides,
-}))
+const help = computed(() => helpOptions({ code: codeLoaded.value, name: name.value, language: language.value?.name }))
 watch(help, (h) => current()?.setHelpers(h))
+
+// Vim keys, if chosen in Settings (loaded when first needed).
+const keys = shallowRef(null)
+watch(
+  () => prefs.keymap,
+  async (mode) => {
+    const ext = await keysFor(mode)
+    if (mode !== prefs.keymap) return
+    keys.value = ext
+    editor.value?.setKeys(ext)
+  },
+  { immediate: true },
+)
+
+// --- Split: a second document (or the same one) side by side --------------------------
+
+const splitOpen = computed(() => !!prefs.split && !!getDoc(prefs.split) && !getDoc(prefs.split).deletedAt)
+function toggleSplit() {
+  prefs.split = splitOpen.value ? null : props.id
+}
 const onOff = (on) => (on ? 'on' : 'off')
 const flip = (key, label) => () => {
   prefs[key] = !prefs[key]
@@ -424,6 +463,10 @@ function onWindowKeydown(e) {
     // Alt+PageUp / Alt+PageDown: previous / next tab.
     e.preventDefault()
     goToTab(e.key === 'PageUp' ? -1 : 1)
+  } else if (mod && !e.altKey && !e.shiftKey && e.key === '\\') {
+    // Ctrl/Cmd+\: split the editor, or close the split.
+    e.preventDefault()
+    toggleSplit()
   } else if (e.altKey && !mod && e.code === 'KeyZ') {
     e.preventDefault()
     toggle('wrap')
@@ -509,6 +552,26 @@ const editorCommands = [
   setting('prefIndentGuides', 'indentGuides', 'Indentation guides'),
   setting('prefTrimOnSave', 'trimOnSave', 'Trim trailing whitespace when saving to a file'),
   setting('prefFinalNewline', 'finalNewline', 'Add a final newline when saving to a file'),
+  setting('prefLint', 'lint', 'Check JSON and YAML'),
+  {
+    id: 'prefVim', group: 'Settings',
+    get title() {
+      return prefs.keymap === 'vim' ? 'Vim keys: turn off' : 'Vim keys: turn on'
+    },
+    run: () => {
+      prefs.keymap = prefs.keymap === 'vim' ? 'standard' : 'vim'
+      showToast(`Vim keys: ${prefs.keymap === 'vim' ? 'on' : 'off'}.`, { timeout: 2500 })
+    },
+  },
+  {
+    id: 'split', group: G, shortcut: 'split',
+    get title() {
+      return splitOpen.value ? 'Close the split' : 'Split the editor (side by side)'
+    },
+    run: toggleSplit,
+  },
+  { id: 'problems', title: 'Show problems (JSON, YAML)', group: E, shortcut: 'problems', run: edit('openLintPanel') },
+  { id: 'nextProblem', title: 'Go to the next problem', group: E, shortcut: 'nextProblem', run: edit('nextDiagnostic') },
   { id: 'undo', title: 'Undo', group: E, shortcut: 'undo', run: edit('undo') },
   { id: 'redo', title: 'Redo', group: E, run: edit('redo') },
 ]
@@ -619,8 +682,9 @@ onBeforeUnmount(() => {
     />
     <GoToBar v-if="goToOpen" :editor="editor" :lines="lineCount" @close="closeGoTo" />
 
-    <div class="pane" :class="{ 'preview-on': previewOn || historyOpen }" :style="{ fontSize: prefs.fontSize + 'px' }">
+    <div class="pane" :class="{ 'preview-on': previewOn || historyOpen || splitOpen }" :style="{ fontSize: prefs.fontSize + 'px' }">
       <div ref="host" class="source" />
+      <SplitPane v-if="splitOpen" :id="prefs.split" @close="prefs.split = null; current()?.focus()" />
       <!-- Rendered by marked and sanitised by DOMPurify (see markdown.js). -->
       <article v-if="previewOn" class="preview markdown" aria-label="Preview" v-html="previewHtml" />
       <HistoryPanel v-if="historyOpen" :doc="doc" @close="historyOpen = false; current()?.focus()" />
@@ -675,6 +739,12 @@ onBeforeUnmount(() => {
         </span>
       </span>
       <span>
+        <button
+          v-if="cursor.problems"
+          class="mini problems"
+          title="Show the problems (Ctrl/Cmd+Shift+M; F8 goes to the next one)"
+          @click="current()?.run('openLintPanel')"
+        >⚠ {{ cursor.problems }} problem{{ cursor.problems === 1 ? '' : 's' }}</button>
         {{ lineCount }} lines · {{ stats.words }} words · {{ stats.chars }} chars ·
         <span :class="['save', status]" aria-live="polite">{{ statusLabel }}</span>
         <template v-if="fileStatus">
