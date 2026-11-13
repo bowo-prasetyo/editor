@@ -260,7 +260,7 @@ In order:
      closing mid-save, and byte-for-byte file round-trips.
    - Linting in CI.
    - Tests for the screens, starting with `EditorView.vue`.
-   - Fix what those tests find: first, mixed line endings being normalised.
+   - Fix what those tests find: ~~mixed line endings being normalised~~ (fixed).
 3. **The Files / Drafts split** described above:
    - files from folders become temporary, with only unsaved edits and history kept;
    - a one-time cleanup of documents that are copies of folder files;

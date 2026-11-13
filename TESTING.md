@@ -85,8 +85,10 @@ The scenarios follow the principles in [VISION.md](VISION.md#principles).
 
 | Scenario | Test |
 |---|---|
-| Saving with no edits keeps the file **byte for byte**: UTF-8 with and without BOM, UTF-16 LE and BE, Windows-1252; LF, CRLF and CR; no final newline; trailing whitespace; non-ASCII; an empty file | `files.spec.js` |
+| Saving with no edits keeps the file **byte for byte**: UTF-8 with and without BOM, UTF-16 LE and BE, Windows-1252; LF, CRLF and CR, and **mixed** line endings; no final newline; trailing whitespace; non-ASCII; an empty file | `files.spec.js` |
 | An edit is written in the file's own encoding and line endings | `files.spec.js` |
+| In a file with mixed line endings, untouched and edited lines keep theirs and added lines get the main one; picking one ending in the status bar converts the file | `files.spec.js`, `test/lineends.test.js` |
+| A change to only the line endings on disk (e.g. `dos2unix`) is taken, not undone by the next save | `files.spec.js` |
 | A file changed on disk is not overwritten without asking | `files.spec.js` |
 | Plumb's own save isn't mistaken for a change on disk | `livereload.spec.js` |
 | A document with nothing unsaved follows its file, and Undo brings the old text back | `livereload.spec.js` |
@@ -101,15 +103,12 @@ Markdown preview; word wrap remembered per document. (`editor.spec.js`)
 
 ## Known gaps
 
-Problems the tests have found but this round doesn't fix. Each is a
+Problems the tests have found but that aren't fixed yet. Each is a
 `test.fail()`: the test still runs, and it **fails when the bug is fixed**, so
 whoever fixes it removes the marker.
 
-- **Mixed line endings are normalised.** A file that mixes LF and CRLF is saved
-  with every line ending changed to the most common one, even with no edits.
-  This breaks *Faithful to the file*. A fix needs Plumb to remember each line's
-  ending (or at least to leave unedited lines alone). Test:
-  `files.spec.js`, "mixed line endings".
+None right now. (The first one, mixed line endings being normalised on save,
+was fixed: see `src/lineends.js`.)
 
 ## Not covered (yet)
 
