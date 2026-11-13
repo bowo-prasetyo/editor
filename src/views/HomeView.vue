@@ -26,6 +26,7 @@ import { SORTS, labelsOf, sortDocs } from '../folders'
 import { togglePin } from '../drafts'
 import { forgetRecentFile, recentFiles } from '../recent'
 import { FOLDER_NOTE, downloadsNote, savesAsDownloads } from '../platform'
+import { keyLabel } from '../keys'
 
 const router = useRouter()
 const fileInput = ref(null)
@@ -97,6 +98,13 @@ const trash = computed(() =>
 )
 const showTrash = ref(false)
 
+// Nothing here yet: no drafts, recent files, Trash or open folders.
+const firstVisit = computed(
+  () => !live.value.length && !recent.value.length && !trash.value.length && !prefs.workspaces.length,
+)
+const saveKey = keyLabel('Mod+S')
+const canSaveFiles = canSaveInPlace()
+
 function newDoc() {
   const doc = createDoc()
   requestPersistence()
@@ -119,7 +127,7 @@ async function openPicker() {
 async function onOpenFolder() {
   try {
     const w = await openFolder()
-    if (w) showToast(`Opened “${w.name}”. Its files are in the sidebar (Ctrl/Cmd+B shows or hides it).`, { timeout: 5000 })
+    if (w) showToast(`Opened “${w.name}”. Its files are in the sidebar (Ctrl/Cmd+Shift+E shows or hides it).`, { timeout: 5000 })
   } catch (e) {
     showToast(`Couldn't open the folder: ${e.message}`)
   }
@@ -181,6 +189,7 @@ const daysLeft = (d) =>
 
 <template>
   <section class="home">
+    <h1 class="sr-only">Plumb: your drafts and files</h1>
     <div class="actions">
       <button class="primary" @click="newDoc">New document</button>
       <button @click="openPicker">Open files…</button>
@@ -212,8 +221,8 @@ const daysLeft = (d) =>
       </span>
     </div>
 
-    <div class="home-body">
-      <nav class="folders" aria-label="Labels">
+    <div class="home-body" :class="{ single: firstVisit }">
+      <nav v-if="!firstVisit" class="folders" aria-label="Labels">
         <button
           class="folder-item"
           :class="{ active: !label }"
@@ -293,7 +302,17 @@ const daysLeft = (d) =>
           </label>
         </div>
 
-        <p v-if="!live.length" class="empty">
+        <!-- First visit (nothing here yet): how Plumb works, in three lines. -->
+        <div v-if="firstVisit" class="welcome">
+          <h2 class="welcome-title">Welcome to Plumb</h2>
+          <ul>
+            <li><strong>Files stay on your disk.</strong> Open a file or a folder, edit it, and Save ({{ saveKey }}) writes it back{{ canSaveFiles ? '' : ' as a download' }}. Until then, your edits are kept in this browser.</li>
+            <li><strong>Drafts live in this browser.</strong> <em>New document</em> starts one: notes, pasted text, anything that isn't a file yet. They're saved as you type.</li>
+            <li><strong>Nothing leaves your computer.</strong> No account, no server; it works offline.</li>
+          </ul>
+          <p class="hint">Drop files anywhere on this page to open them. Press {{ keyLabel('Mod+P') }} to find anything, F1 for all the shortcuts.</p>
+        </div>
+        <p v-else-if="!live.length" class="empty">
           No drafts yet. Create one, open a file, or drop files anywhere on this page.
         </p>
         <p v-else-if="!docs.length && query" class="empty">No drafts match “{{ query }}”.</p>
@@ -337,7 +356,8 @@ const daysLeft = (d) =>
       </div>
     </div>
 
-    <p v-if="state.backend" class="hint storage-info">
+    <!-- Only once there's something stored: on a first visit it's just alarming. -->
+    <p v-if="state.backend && !firstVisit" class="hint storage-info">
       <template v-if="state.backend === 'localStorage'">
         Documents are kept in this browser's small localStorage (about 5 MB) because IndexedDB isn't available.
       </template>

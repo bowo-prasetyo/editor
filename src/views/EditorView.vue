@@ -28,13 +28,16 @@ import GoToBar from '../components/GoToBar.vue'
 import TabBar from '../components/TabBar.vue'
 import SaveToFolderDialog from '../components/SaveToFolderDialog.vue'
 import { saveDraftToFolder, saveTargets, togglePin, undoSaveToFolder } from '../drafts'
-import { headings } from '../mdedit'
+import { headings, toggleBold, toggleItalic } from '../mdedit'
+import { displayName } from '../naming'
 import { downloadedMessage } from '../platform'
 import IndentMenu from '../components/IndentMenu.vue'
+import ToolbarMenu from '../components/ToolbarMenu.vue'
 import HistoryPanel from '../components/HistoryPanel.vue'
 import UnreadFile from '../components/UnreadFile.vue'
 import { convertIndentation, detectIndent, effectiveIndent } from '../indentation'
-import { closeTab, liveTabs, opened, saveSnapshot, takeSnapshot } from '../session'
+import { liveTabs, opened, saveSnapshot, takeSnapshot } from '../session'
+import { closeDocTab } from '../closetab'
 import { registerCommands, ui } from '../commands'
 import { cycleTab } from '../tabs'
 import { keyLabel } from '../keys'
@@ -376,6 +379,43 @@ const splitOpen = computed(() => !!prefs.split && !!getDoc(prefs.split) && !getD
 function toggleSplit() {
   prefs.split = splitOpen.value ? null : props.id
 }
+
+// --- Narrow screens -----------------------------------------------------------
+//
+// Below 600px wide, the toolbar keeps the everyday buttons and moves the rest
+// into a More menu (the same actions, from moreItems); the status bar folds
+// its controls behind a ⋯ button. On touch screens, Markdown documents get
+// Bold and Italic buttons (there's no Ctrl+B without a keyboard).
+const moreItems = computed(() => [
+  { id: 'wrap', label: 'Wrap long lines', checked: !!view.value.wrap, run: () => toggle('wrap') },
+  { id: 'spelling', label: 'Underline spelling mistakes', checked: !!view.value.spellcheck, run: () => toggle('spellcheck') },
+  { id: 'history', label: 'History', checked: historyOpen.value, run: () => (historyOpen.value = !historyOpen.value) },
+  { id: 'print', label: 'Print', run: () => print() },
+  ...(inPlace ? [{ id: 'saveAs', label: 'Save as…', run: () => save(true) }] : []),
+])
+const statusMore = ref(false)
+
+// Messages (toasts) sit just above the status bar, however tall it wraps,
+// so they never cover its controls: its height, as --status-h on the page.
+const statusBar = ref(null)
+let statusObserver = null
+watch(statusBar, (el) => {
+  statusObserver?.disconnect()
+  statusObserver = null
+  const root = document.documentElement.style
+  if (!el) return root.removeProperty('--status-h')
+  statusObserver = new ResizeObserver(() => root.setProperty('--status-h', `${el.offsetHeight}px`))
+  statusObserver.observe(el)
+})
+onBeforeUnmount(() => {
+  statusObserver?.disconnect()
+  document.documentElement.style.removeProperty('--status-h')
+})
+// Keep the editor's focus (and the phone's keyboard) while formatting.
+const format = (cmd) => {
+  current()?.apply(cmd)
+  current()?.focus()
+}
 const onOff = (on) => (on ? 'on' : 'off')
 const flip = (key, label) => () => {
   prefs[key] = !prefs[key]
@@ -570,10 +610,7 @@ const editorCommands = [
   { id: 'prevTab', title: 'Previous tab', group: G, shortcut: 'prevTab', run: () => goToTab(-1) },
   {
     id: 'closeTab', title: 'Close tab', group: G,
-    run: () => {
-      const next = closeTab(props.id)
-      router.push(next ? { name: 'edit', params: { id: next } } : { name: 'home' })
-    },
+    run: () => closeDocTab(router, props.id, props.id),
   },
   { id: 'toggleComment', title: 'Comment or uncomment lines', group: E, shortcut: 'toggleComment', run: edit('toggleComment') },
   { id: 'moveLineUp', title: 'Move lines up', group: E, shortcut: 'moveLineUp', run: edit('moveLineUp') },
@@ -663,11 +700,16 @@ onBeforeUnmount(() => {
 <template>
   <section v-if="doc" class="editor">
     <TabBar :active="id" />
+    <h1 class="sr-only">{{ displayName(name) }}</h1>
     <div class="toolbar">
       <span v-if="doc.kind === 'file' && doc.folder" class="folder-path" :title="`In ${doc.folder}`">{{ doc.folder }}</span>
-      <input ref="nameInput" v-model="name" class="name" spellcheck="false" aria-label="File name" />
+      <input ref="nameInput" v-model="name" class="name" spellcheck="false" aria-label="File name" title="Rename" />
+      <template v-if="isMarkdown">
+        <button class="touch-only format" title="Bold (Ctrl/Cmd+B)" aria-label="Bold" @pointerdown.prevent @click="format(toggleBold)"><b>B</b></button>
+        <button class="touch-only format" title="Italic (Ctrl/Cmd+I)" aria-label="Italic" @pointerdown.prevent @click="format(toggleItalic)"><i>I</i></button>
+      </template>
       <button
-        class="toggle"
+        class="toggle wide-only"
         :aria-pressed="view.wrap"
         title="Wrap long lines (Alt+Z)"
         @click="toggle('wrap')"
@@ -675,7 +717,7 @@ onBeforeUnmount(() => {
         Wrap
       </button>
       <button
-        class="toggle"
+        class="toggle wide-only"
         :aria-pressed="view.spellcheck"
         title="Underline spelling mistakes"
         @click="toggle('spellcheck')"
@@ -693,24 +735,33 @@ onBeforeUnmount(() => {
       </button>
       <button title="Find and replace (Ctrl/Cmd+F)" @click="openFind(false)">Find</button>
       <button
-        class="toggle"
+        class="toggle wide-only"
         :aria-pressed="historyOpen"
         title="Earlier versions of this document"
         @click="historyOpen = !historyOpen"
       >
         History
       </button>
-      <button title="Print the whole document" @click="print">Print</button>
+      <button
+        class="toggle wide-only"
+        :aria-pressed="splitOpen"
+        title="Show a second document (or this one) side by side (Ctrl/Cmd+\)"
+        @click="toggleSplit"
+      >
+        Split
+      </button>
+      <button class="wide-only" title="Print the whole document" @click="print">Print</button>
       <template v-if="inPlace">
         <button :title="doc.linked ? 'Save to the file (Ctrl/Cmd+S)' : 'Save to a file (Ctrl/Cmd+S)'" @click="save(false)">
           Save
         </button>
-        <button title="Save to a different file (Ctrl/Cmd+Shift+S)" @click="save(true)">Save as…</button>
+        <button class="wide-only" title="Save to a different file (Ctrl/Cmd+Shift+S)" @click="save(true)">Save as…</button>
         <button v-if="folderTargets.length" title="Save this draft as a file in an open folder" @click="openSaveToFolder">
           Save to folder…
         </button>
       </template>
       <button v-else title="Download a copy (Ctrl/Cmd+S)" @click="save(false)">Download</button>
+      <ToolbarMenu class="narrow-only" label="More" title="More actions" :items="moreItems" />
     </div>
 
     <div v-if="doc.deletedAt" class="banner info" role="status">
@@ -788,14 +839,22 @@ onBeforeUnmount(() => {
       @cancel="savingTo = null"
     />
 
-    <footer class="status">
+    <footer ref="statusBar" class="status" :class="{ expanded: statusMore }">
       <span>
         <button class="mini position" title="Go to line (Ctrl/Cmd+G)" @click="openGoTo">
           Ln {{ cursor.line }}, Col {{ cursor.col }}
         </button>
         <span v-if="selectionInfo"> ({{ selectionInfo }})</span>
+        <button
+          class="mini narrow-only"
+          :aria-expanded="statusMore"
+          aria-controls="status-controls"
+          :title="statusMore ? 'Hide the details' : 'Show encoding, line endings, language, indentation and text size'"
+          :aria-label="statusMore ? 'Hide details' : 'Show details'"
+          @click="statusMore = !statusMore"
+        >⋯</button>
       </span>
-      <span class="status-controls">
+      <span id="status-controls" class="status-controls">
         <select v-model="encoding" aria-label="Encoding used when downloading" title="Encoding">
           <option v-for="[v, label] in encodingOptions" :key="v" :value="v">{{ label }}</option>
         </select>
@@ -817,9 +876,11 @@ onBeforeUnmount(() => {
         </select>
         <IndentMenu :indent="indent" :detected="detectedIndent" @set="setIndent" @convert="convertTo" />
         <span class="font-size" role="group" aria-label="Text size">
-          <button class="mini" aria-label="Smaller text" title="Smaller text" @click="stepFontSize(-1)">A−</button>
+          <!-- Named by their (screen-reader) text, not aria-label, so the name
+               a voice-control user reads off the screen still works. -->
+          <button class="mini" title="Smaller text" @click="stepFontSize(-1)"><span aria-hidden="true">A−</span><span class="sr-only">Smaller text</span></button>
           <span aria-live="polite">{{ prefs.fontSize }}px</span>
-          <button class="mini" aria-label="Larger text" title="Larger text" @click="stepFontSize(1)">A+</button>
+          <button class="mini" title="Larger text" @click="stepFontSize(1)"><span aria-hidden="true">A+</span><span class="sr-only">Larger text</span></button>
         </span>
       </span>
       <span>
@@ -829,7 +890,7 @@ onBeforeUnmount(() => {
           title="Show the problems (Ctrl/Cmd+Shift+M; F8 goes to the next one)"
           @click="current()?.run('openLintPanel')"
         >⚠ {{ cursor.problems }} problem{{ cursor.problems === 1 ? '' : 's' }}</button>
-        {{ lineCount }} lines · {{ stats.words }} words · {{ stats.chars }} chars ·
+        <span class="status-counts">{{ lineCount }} lines · {{ stats.words }} words · {{ stats.chars }} chars · </span>
         <!-- A file's own state comes first: it's the one that matters. -->
         <template v-if="fileStatus">
           <span

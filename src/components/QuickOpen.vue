@@ -23,6 +23,7 @@ const active = ref(0)
 const input = ref(null)
 const list = ref(null)
 let returnFocus = null
+const MAX_RECENT_COMMANDS = 5
 // Focus stays in the dialog and Escape closes it (see modal.js); hide()
 // puts focus back itself.
 const root = ref(null)
@@ -48,7 +49,12 @@ const commandResults = computed(() => {
   if (!commandMode.value) return []
   const q = query.value.slice(1).trim()
   const list = availableCommands()
-  if (!q) return list.map((c) => ({ command: c, positions: [] }))
+  if (!q) {
+    // The commands run lately first, then the rest in their usual order.
+    const recent = (prefs.recentCommands ?? []).map((id) => list.find((c) => c.id === id)).filter(Boolean)
+    const rest = list.filter((c) => !recent.includes(c))
+    return [...recent.map((c) => ({ command: c, positions: [], recent: true })), ...rest.map((c) => ({ command: c, positions: [] }))]
+  }
   return list
     .map((c) => ({ command: c, m: fuzzyMatch(q, c.title) }))
     .filter((r) => r.m)
@@ -163,6 +169,7 @@ function choose(i) {
   if (commandMode.value) {
     const c = commandResults.value[i]?.command
     if (!c) return
+    prefs.recentCommands = [c.id, ...(prefs.recentCommands ?? []).filter((id) => id !== c.id)].slice(0, MAX_RECENT_COMMANDS)
     hide()
     // After the dialog is gone, so the command can move focus itself.
     nextTick(() => c.run())
@@ -277,7 +284,7 @@ const id = (i) => `quick-open-${i}`
                 <mark v-if="run.hit">{{ run.text }}</mark><template v-else>{{ run.text }}</template>
               </template>
             </span>
-            <span class="quick-folder">{{ r.command.group }}</span>
+            <span class="quick-folder">{{ r.recent ? 'Recently used' : r.command.group }}</span>
             <kbd v-if="keysFor(r.command)" class="quick-keys">{{ keysFor(r.command) }}</kbd>
           </li>
           <li v-if="!commandResults.length" class="quick-empty">No matching commands</li>

@@ -42,13 +42,13 @@ test('switching tabs keeps each document’s text and undo history', async ({ pa
   await page.keyboard.type('second')
   await expectSaved(page)
 
-  await page.getByRole('tab', { name: /^first/ }).click()
+  await page.getByRole('navigation', { name: 'Open documents' }).getByRole('link', { name: /^first/ }).click()
   await expect.poll(() => editorText(page)).toBe('first')
   await editor(page).click()
   await page.keyboard.press(`${mod}+z`)
   await expect.poll(() => editorText(page)).toBe('')
 
-  await page.getByRole('tab', { name: /^second/ }).click()
+  await page.getByRole('navigation', { name: 'Open documents' }).getByRole('link', { name: /^second/ }).click()
   await expect.poll(() => editorText(page)).toBe('second')
 })
 

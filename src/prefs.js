@@ -17,6 +17,7 @@ const defaults = {
   fontSize: 14,
   tabs: [],
   recent: [],
+  recentCommands: [], // command ids, most recently run first (the palette lists them first)
   sort: 'updated',
   labelView: '',
   downloadsNoteSeen: false,

@@ -82,8 +82,8 @@ Chrome and Edge only.
 
 - **Opening:** use *Open folder…* on the start page, or the command palette.
 - **The sidebar:** the folder's files show in a sidebar tree. The *Folders*
-  button in the header shows or hides it, and so does Ctrl+B outside Markdown
-  documents.
+  button in the header shows or hides it, and so does Ctrl+Shift+E (anywhere)
+  or Ctrl+B (outside Markdown documents, where it means bold).
 - **Large folders:** a folder's contents are read only when you expand it, so big
   projects stay quick.
 - **Opening a file:** click it, or use the arrow keys and Enter. Save writes back
@@ -196,6 +196,7 @@ These work in Markdown documents (`.md`, `.markdown`, `.mdown`).
   or unwrap it.
   - With nothing selected, they insert the pair with the cursor between.
   - Outside Markdown, Ctrl+B shows or hides the folder sidebar.
+  - On touch screens, **B** and *I* buttons in the toolbar do the same.
 - **Lists continue on Enter.**
   - This covers bullets, numbers, `- [ ]` tasks (a new task is unchecked) and
     `>` quotes.
@@ -277,6 +278,8 @@ deletes them.
     position.
   - Close a tab with × or a middle-click. Alt+PageUp / Alt+PageDown move
     between tabs.
+  - Closing the tab of a file with changes not saved to it keeps them (in the
+    browser, as always) and says so, with *Reopen*.
 - **Quick switcher:** Ctrl+P, or *Go to…* in the header.
   - Type part of a document's name or folder. Letters in order are enough:
     `wcl` finds `Work/Clients/…`.
@@ -289,7 +292,8 @@ deletes them.
     headings.
 - **Command palette:** Ctrl+Shift+P, or type `>` in the quick switcher. It runs
   any action by name, from Find and Go to line to Convert indentation, Close
-  tab or Export backup, with its shortcut shown alongside.
+  tab or Export backup, with its shortcut shown alongside. The five commands
+  run most recently come first, marked *Recently used*.
 - **Keyboard shortcuts panel:** F1, `?`, or the `?` button in the header. It
   lists every shortcut, grouped and searchable, with ⌘/⌥ symbols on a Mac.
 - **Search everywhere:** Ctrl+Shift+F, or *Search* in the header.
@@ -318,7 +322,8 @@ deletes them.
   - **Save all** (Ctrl+Alt+S, the button on the search page, or the command
     palette) then writes every changed file. It asks before replacing a file
     that changed on disk.
-- **Split the editor:** Ctrl+\\, or the command palette.
+- **Split the editor:** Ctrl+\\, the *Split* button in the toolbar, or the
+  command palette.
   - It shows a second document, or the same one, side by side. Pick what the
     right-hand pane shows from its menu.
   - Edits show in both panes, and each pane undoes its own typing.
@@ -419,6 +424,9 @@ In Firefox and Safari, Plumb says what's missing instead of hiding it:
 - each download says where it went.
 
 On phones and tablets, Plumb is for reading and light editing of drafts.
+On narrow screens the toolbar keeps *Preview*, *Find* and *Save*, and puts the
+rest under *More*; the status bar shows the position and save status, with
+**⋯** for the encoding, line endings, language, indentation and text size.
 
 ## Limits
 
@@ -449,7 +457,8 @@ Ctrl means Cmd on a Mac. F1 in Plumb lists them all, searchable.
 | Ctrl+Space | Show suggestions (Enter accepts, Escape closes) |
 | Ctrl+Shift+[ / Ctrl+Shift+] | Fold / unfold the block at the cursor (Cmd+Alt+[ / ] on a Mac) |
 | Ctrl+Alt+[ / Ctrl+Alt+] | Fold all / unfold all |
-| Ctrl+B / Ctrl+I | In Markdown documents: bold / italic. Elsewhere, Ctrl+B shows or hides the folder sidebar (also the *Folders* button in the header) |
+| Ctrl+B / Ctrl+I | In Markdown documents: bold / italic. Elsewhere, Ctrl+B also shows or hides the folder sidebar |
+| Ctrl+Shift+E | Show or hide the folder sidebar, in any document (also the *Folders* button in the header) |
 | Ctrl+Shift+F | Search (and replace) in all drafts and folders |
 | Ctrl+Alt+S | Save all changed files |
 | Ctrl+, | Settings |
