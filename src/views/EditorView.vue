@@ -29,6 +29,7 @@ import TabBar from '../components/TabBar.vue'
 import SaveToFolderDialog from '../components/SaveToFolderDialog.vue'
 import { saveDraftToFolder, saveTargets, togglePin, undoSaveToFolder } from '../drafts'
 import { headings } from '../mdedit'
+import { downloadedMessage } from '../platform'
 import IndentMenu from '../components/IndentMenu.vue'
 import HistoryPanel from '../components/HistoryPanel.vue'
 import UnreadFile from '../components/UnreadFile.vue'
@@ -114,6 +115,8 @@ async function save(saveAs = false) {
     const encodingBefore = ENCODINGS[doc.value.encoding] ?? doc.value.encoding
     const r = await saveDoc(doc.value, { saveAs })
     if (r.result === 'saved') showToast(`Saved to “${r.name}”.`, { timeout: 3000 })
+    // Firefox, Safari: say where the copy went, so nobody wonders whether their file changed.
+    if (r.result === 'downloaded' && !r.lossy) showToast(downloadedMessage(r.name), { timeout: 6000 })
     if (r.lossy) {
       showToast(
         `Some characters can't be written as ${encodingBefore}, so this copy was saved as UTF-8.`,
