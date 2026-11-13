@@ -15,6 +15,7 @@ import {
   importBackup,
   restoreDoc,
   trashDoc,
+  setDocOptions,
   TRASH_DAYS,
 } from '../store'
 import { displayName } from '../naming'
@@ -31,7 +32,23 @@ const fileInput = ref(null)
 const backupInput = ref(null)
 const query = ref('')
 
-const live = computed(() => state.docs.filter((d) => !d.deletedAt))
+// Drafts only: files from open folders are in the sidebar, not here
+// (see docs/files-and-drafts.md).
+const live = computed(() => state.docs.filter((d) => !d.deletedAt && d.kind !== 'file'))
+
+// Copies of files from folders closed before Plumb kept files and drafts
+// apart (see migrate.js): offered to the Trash once.
+const copies = computed(() => live.value.filter((d) => d.copyOf))
+function trashCopies() {
+  const list = copies.value.map((d) => d.id)
+  for (const id of list) trashDoc(id)
+  forgetCopies(list)
+  showToast(`Moved ${list.length} cop${list.length === 1 ? 'y' : 'ies'} to the Trash.`, {
+    action: { label: 'Undo', run: () => list.forEach((id) => restoreDoc(id)) },
+    timeout: 10000,
+  })
+}
+const forgetCopies = (ids = copies.value.map((d) => d.id)) => ids.forEach((id) => setDocOptions(id, { copyOf: undefined }))
 
 // --- Folders and sorting ------------------------------------------------------
 
@@ -234,7 +251,7 @@ const daysLeft = (d) =>
           :aria-current="!folder ? 'true' : undefined"
           @click="folder = ''"
         >
-          <span>All documents</span><span class="count">{{ live.length }}</span>
+          <span>All drafts</span><span class="count">{{ live.length }}</span>
         </button>
         <button
           v-for="f in tree"
@@ -267,6 +284,18 @@ const daysLeft = (d) =>
       </nav>
 
       <div class="list-pane">
+        <div v-if="copies.length" class="banner info" role="status">
+          <span>
+            <strong v-if="copies.length === 1">1 draft is a copy of a file from a folder you closed.</strong>
+            <strong v-else>{{ copies.length }} drafts are copies of files from folders you closed.</strong>
+            The files are on your disk: Plumb no longer keeps copies of them.
+          </span>
+          <span class="banner-actions">
+            <button class="primary" @click="trashCopies">Move them to the Trash</button>
+            <button @click="forgetCopies()">Keep them</button>
+            <button title="Download every draft as one backup file first" @click="downloadBackup">Export a backup first</button>
+          </span>
+        </div>
         <div v-if="folder && folder !== NONE" class="folder-head">
           <strong>📁 {{ folder }}</strong>
           <span class="spacer" />
@@ -291,9 +320,9 @@ const daysLeft = (d) =>
         </div>
 
         <p v-if="!live.length" class="empty">
-          No documents yet. Create one, open a file, or drop files anywhere on this page.
+          No drafts yet. Create one, open a file, or drop files anywhere on this page.
         </p>
-        <p v-else-if="!docs.length && query" class="empty">No documents match “{{ query }}”.</p>
+        <p v-else-if="!docs.length && query" class="empty">No drafts match “{{ query }}”.</p>
         <p v-else-if="!docs.length" class="empty">
           This folder is empty. New documents and opened files go into the folder shown, or drag a document onto a folder.
         </p>

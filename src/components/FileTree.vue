@@ -194,9 +194,16 @@ async function onReconnect(rootId) {
   if (!(await reconnect(rootId))) showToast('The browser didn’t allow access to the folder.')
 }
 
-function onClose(w) {
-  closeFolder(w.id)
-  showToast(`Closed “${w.name}”. Documents opened from it stay in your list.`, { timeout: 4000 })
+// Files with unsaved changes become drafts, so nothing is lost; the others
+// are on disk (see closeFolder).
+async function onClose(w) {
+  const kept = await closeFolder(w.id)
+  showToast(
+    kept
+      ? `Closed “${w.name}”. ${kept === 1 ? '1 file with unsaved changes was kept as a draft' : `${kept} files with unsaved changes were kept as drafts`}.`
+      : `Closed “${w.name}”.`,
+    { timeout: kept ? 8000 : 3000 },
+  )
 }
 
 const refresh = (rootId) => forgetListings(rootId)

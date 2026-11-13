@@ -30,6 +30,7 @@ import TabBar from '../components/TabBar.vue'
 import FolderDialog from '../components/FolderDialog.vue'
 import IndentMenu from '../components/IndentMenu.vue'
 import HistoryPanel from '../components/HistoryPanel.vue'
+import UnreadFile from '../components/UnreadFile.vue'
 import { convertIndentation, detectIndent, effectiveIndent } from '../indentation'
 import { folderTree } from '../folders'
 import { closeTab, liveTabs, opened, saveSnapshot, takeSnapshot } from '../session'
@@ -106,7 +107,7 @@ const fileStatus = computed(() => {
 })
 let saving = false
 async function save(saveAs = false) {
-  if (saving) return
+  if (saving || doc.value?.unread) return
   saving = true
   try {
     fixWhitespace()
@@ -721,7 +722,9 @@ onBeforeUnmount(() => {
     <GoToBar v-if="goToOpen" :editor="editor" :lines="lineCount" @close="closeGoTo" />
 
     <div class="pane" :class="{ 'preview-on': previewOn || historyOpen || splitOpen }" :style="{ fontSize: prefs.fontSize + 'px' }">
-      <div ref="host" class="source" />
+      <!-- A file's text is read from disk before the editor shows it. -->
+      <UnreadFile v-if="doc.unread" :doc="doc" class="source" />
+      <div v-else ref="host" class="source" />
       <SplitPane v-if="splitOpen" :id="prefs.split" @close="prefs.split = null; current()?.focus()" />
       <!-- Rendered by marked and sanitised by DOMPurify (see markdown.js). -->
       <article v-if="previewOn" class="preview markdown" aria-label="Preview" v-html="previewHtml" />

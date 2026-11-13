@@ -262,8 +262,8 @@ In order:
    - Tests for the screens, starting with `EditorView.vue`.
    - Fix what those tests find: ~~mixed line endings being normalised~~ (fixed).
 3. **The Files / Drafts split** described above *(plan: [docs/files-and-drafts.md](docs/files-and-drafts.md))*:
-   - files from folders become temporary, with only unsaved edits and history kept;
-   - a one-time cleanup of documents that are copies of folder files;
+   - ~~files from folders become temporary, with only unsaved edits and history kept~~ (phase 1, done);
+   - ~~a one-time cleanup of documents that are copies of folder files~~ (phase 1, done);
    - closing a folder with unsaved edits, as decided;
    - virtual folders become read-only labels; pinning and **Save to folder…** for drafts.
 4. **Markdown first-class**: `.md` drafts, the preview toggle, the writing

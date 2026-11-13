@@ -97,7 +97,7 @@ export function searchText(text, query, options = {}, limit = Infinity) {
 
 // Where to look: 'all', 'documents' (in the browser) or 'folders' (files
 // in open folders, including those opened as documents).
-export const SCOPES = { all: 'Everything', documents: 'Documents', folders: 'Open folders' }
+export const SCOPES = { all: 'Everything', documents: 'Drafts', folders: 'Open folders' }
 
 const docPath = (doc) => (doc.folder ? `${doc.folder}/` : '') + displayName(doc.name)
 
@@ -107,7 +107,11 @@ export async function searchTargets(scope = 'all') {
   const targets = []
   for (const doc of state.docs) {
     if (doc.deletedAt) continue
-    if (scope === 'folders' && !doc.source) continue
+    const file = doc.kind === 'file'
+    if (scope === 'folders' && !file) continue
+    if (scope === 'documents' && file) continue
+    // A file with nothing unsaved is searched from disk, as a folder file below.
+    if (file && !doc.diskDirty) continue
     targets.push({ key: doc.id, kind: 'doc', name: displayName(doc.name), folder: doc.folder ?? '', path: docPath(doc), doc })
   }
   if (scope === 'documents') return targets
@@ -116,7 +120,7 @@ export async function searchTargets(scope = 'all') {
     const index = fileIndex.get(w.id)
     if (!index?.ready) continue
     for (const { path, handle } of index.files) {
-      if (findWorkspaceDoc(w.id, path)) continue // searched as a document
+      if (findWorkspaceDoc(w.id, path)?.diskDirty) continue // searched as its edited text
       const slash = path.lastIndexOf('/')
       const folder = [w.name, ...(slash === -1 ? [] : [path.slice(0, slash)])].join('/')
       targets.push({
@@ -232,7 +236,8 @@ export async function warmCache({ signal, concurrency = 8 } = {}) {
 // the search are respected. Returns { doc, count }.
 export async function replaceInTarget(target, query, options, replacement) {
   let doc = target.kind === 'doc' ? getDoc(target.doc.id) : findWorkspaceDoc(target.rootId, target.filePath)
-  if (!doc) doc = (await openWorkspaceFile(target.rootId, target.filePath, target.handle)).doc
+  // (Opening it reads the text of a file not read yet.)
+  if (!doc || doc.unread) doc = (await openWorkspaceFile(target.rootId, target.filePath, target.handle)).doc
   const text = doc.content
   const edit = replaceAllEdit(text, findMatches(text, query, options), replacement, options.regex)
   if (!edit) return { doc, count: 0 }

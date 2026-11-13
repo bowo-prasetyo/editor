@@ -43,7 +43,8 @@ const isNotFound = (e) => e?.name === 'NotFoundError'
 // Returns 'same' | 'reloaded' | 'changed' | 'deleted' | 'skipped'.
 export async function checkDoc(id) {
   const doc = getDoc(id)
-  if (!doc?.linked || doc.deletedAt) return 'skipped'
+  // A file not read yet has nothing to compare: it's read fresh when shown.
+  if (!doc?.linked || doc.deletedAt || doc.unread) return 'skipped'
   // Our own save in progress: look again once it's done.
   if (isWriting(id)) return later(id), 'skipped'
   const handle = await getFileHandle(id).catch(() => null)

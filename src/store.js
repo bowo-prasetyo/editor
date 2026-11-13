@@ -23,6 +23,37 @@ const chains = new Map() // per-document queue, so writes and deletes land in or
 const isDoc = (d) => d && typeof d.id === 'string' && typeof d.content === 'string'
 const plain = (doc) => ({ ...toRaw(doc) })
 
+// --- Files and drafts (see docs/files-and-drafts.md) -------------------------
+//
+// A document is a draft (`kind: 'draft'`, its text kept here) or stands for a
+// file in an open folder (`kind: 'file'`, its text on disk). The browser keeps
+// only what isn't on disk: a file with no unsaved changes is stored without
+// its text, and read from disk again when it's shown. Until then it's
+// `unread` (in memory only) and its `content` is empty.
+export const isFile = (doc) => doc?.kind === 'file'
+const textOnDisk = (doc) => isFile(doc) && !doc.diskDirty
+
+// What goes into storage for a document.
+function storedForm(snapshot) {
+  const out = { ...snapshot }
+  delete out.unread
+  if (textOnDisk(snapshot)) {
+    out.content = ''
+    out.textOnDisk = true
+  } else delete out.textOnDisk
+  return out
+}
+
+// A record loaded from storage: one stored without its text is unread.
+function loaded(doc) {
+  if (doc.textOnDisk) {
+    delete doc.textOnDisk
+    doc.content = ''
+    doc.unread = true
+  }
+  return doc
+}
+
 function enqueue(id, task) {
   const next = (chains.get(id) ?? Promise.resolve()).then(task, task)
   chains.set(id, next)
@@ -58,12 +89,12 @@ async function init(chosen) {
     state.backend = backend.kind
     const { docs, failed } = await backend.loadAll()
     for (const doc of docs) {
-      state.docs.push(doc)
+      state.docs.push(loaded(doc))
       state.status[doc.id] = 'saved'
     }
     for (const doc of failed) {
       if (getDoc(doc.id)) continue
-      state.docs.push(doc)
+      state.docs.push(loaded(doc))
       state.status[doc.id] = 'error'
     }
   } catch (e) {
@@ -98,7 +129,7 @@ export function rescueUnsaved() {
   for (const [id, s] of Object.entries(state.status)) {
     if (s === 'saved') continue
     const doc = getDoc(id)
-    if (!doc) continue
+    if (!doc || textOnDisk(doc)) continue // nothing unsaved: the text is on disk
     try {
       ls.setItem(RESCUE + id, JSON.stringify(plain(doc)))
     } catch {
@@ -190,13 +221,13 @@ function flush(id) {
   const version = versions.get(id)
   return enqueue(id, async () => {
     try {
-      await backend.put(snapshot)
+      await backend.put(storedForm(snapshot))
       // Only call it saved if nothing changed while we were writing.
       if (getDoc(id) && versions.get(id) === version && !timers.has(id)) state.status[id] = 'saved'
       if (state.status[id] === 'saved') dropRescue(id)
       announce({ type: 'put', doc: snapshot })
       // Every few minutes of editing, keep a version (see history.js).
-      if (!snapshot.deletedAt) history?.maybeRecord(snapshot).catch((e) => console.error('Could not keep a version', e))
+      if (!snapshot.deletedAt && !snapshot.unread) history?.maybeRecord(snapshot).catch((e) => console.error('Could not keep a version', e))
     } catch (e) {
       console.error(`Could not save "${snapshot.name}"`, e)
       if (getDoc(id)) state.status[id] = 'error'
@@ -237,7 +268,7 @@ export function hasUnsaved() {
 // A new blank document is named from its first line until the user renames it.
 export function createDoc(name = DEFAULT_NAME, content = '', extra = { autoName: name === DEFAULT_NAME }) {
   const now = Date.now()
-  const doc = { id: crypto.randomUUID(), name, content, createdAt: now, updatedAt: now, ...extra }
+  const doc = { id: crypto.randomUUID(), kind: 'draft', name, content, createdAt: now, updatedAt: now, ...extra }
   state.docs.unshift(doc)
   schedule(doc.id)
   flush(doc.id)
@@ -257,7 +288,17 @@ export function updateDoc(id, patch) {
   }
   // A document linked to a file on disk now differs from that file.
   if ('content' in patch && doc.linked) patch = { ...patch, diskDirty: true }
+  if ('content' in patch) delete doc.unread
   Object.assign(doc, patch, { updatedAt: Date.now() })
+  schedule(id)
+}
+
+// A file's text, as just read from disk (not an edit): see isFile above.
+export function fillText(id, text, format = {}) {
+  const doc = getDoc(id)
+  if (!doc) return
+  Object.assign(doc, format, { content: text })
+  delete doc.unread
   schedule(id)
 }
 
@@ -436,8 +477,11 @@ export function handleRemoteChange(msg) {
     state.docs.unshift(incoming)
     state.status[incoming.id] = 'saved'
   } else if (!dirty(incoming.id)) {
+    // A tab that hasn't read a file's text yet sends it without: keep ours.
+    const keep = incoming.unread && !local.unread ? { content: local.content } : {}
     for (const key of Object.keys(local)) if (!(key in incoming)) delete local[key]
-    Object.assign(local, incoming)
+    Object.assign(local, incoming, keep)
+    if (keep.content !== undefined) delete local.unread
   } else if (incoming.content !== local.content) {
     createDoc(`${incoming.name} (changed in another tab)`, incoming.content)
   }
@@ -473,10 +517,10 @@ export class BinaryFileError extends Error {
 // Open a file from the user's disk and store it as a new document, keeping
 // its encoding and line endings so saving writes it back the same way. With
 // a file handle, the document stays linked to the file so Save writes to it.
-export async function importFile(file, handle = null) {
+export async function importFile(file, handle = null, extra = {}) {
   const decoded = decodeBytes(new Uint8Array(await file.arrayBuffer()))
   if (decoded.binary) throw new BinaryFileError(file.name)
-  const doc = createDoc(file.name, decoded.text, { autoName: false, ...fileFormat(decoded) })
+  const doc = createDoc(file.name, decoded.text, { autoName: false, ...fileFormat(decoded), ...extra })
   recordVersion(doc.id, 'opened')
   if (handle) {
     try {
@@ -518,10 +562,11 @@ export function downloadDoc(doc) {
 export const BACKUP_FORMAT = 'editor-backup'
 
 // Links to files on disk only make sense in this browser, so they're left out.
-const FILE_FIELDS = ['linked', 'diskDirty', 'diskModified', 'source']
+const FILE_FIELDS = ['linked', 'diskDirty', 'diskModified', 'source', 'unread', 'textOnDisk']
 function withoutFileLink(doc) {
   const d = plain(doc)
   for (const f of FILE_FIELDS) delete d[f]
+  d.kind = 'draft'
   return d
 }
 
@@ -530,7 +575,8 @@ export function exportBackup() {
     format: BACKUP_FORMAT,
     version: 1,
     exportedAt: new Date().toISOString(),
-    docs: state.docs.map(withoutFileLink),
+    // Files with nothing unsaved are on disk already: only their edits are exported.
+    docs: state.docs.filter((d) => !textOnDisk(d)).map(withoutFileLink),
   }
 }
 
@@ -549,7 +595,7 @@ export function importBackup(data) {
   let added = 0
   let skipped = 0
   for (const d of data.docs) {
-    if (!isDoc(d)) continue
+    if (!isDoc(d) || d.textOnDisk) continue
     const existing = getDoc(d.id)
     const copyName = `${d.name} (from backup)`
     const alreadyHere = state.docs.some(
