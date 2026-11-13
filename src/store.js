@@ -1,6 +1,6 @@
 import { reactive, toRaw } from 'vue'
 import { decodeBytes, encodeText, fileFormat } from './textcodec.js'
-import { DEFAULT_NAME, nameFromContent } from './naming.js'
+import { defaultName, nameFromContent } from './naming.js'
 import { extension } from './filetype.js'
 import { openBackend } from './backends.js'
 import { createHistory } from './history.js'
@@ -271,7 +271,7 @@ export function hasUnsaved() {
 
 // extra: { autoName, eol, encoding, bom } and anything else to keep on the doc.
 // A new blank document is named from its first line until the user renames it.
-export function createDoc(name = DEFAULT_NAME, content = '', extra = { autoName: name === DEFAULT_NAME }) {
+export function createDoc(name = defaultName(), content = '', extra = { autoName: name === defaultName() }) {
   const now = Date.now()
   const doc = { id: crypto.randomUUID(), kind: 'draft', name, content, createdAt: now, updatedAt: now, ...extra }
   state.docs.unshift(doc)

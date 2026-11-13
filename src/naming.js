@@ -1,8 +1,10 @@
 // Names for documents.
 import { segmenter } from './locale.js'
+import { t } from './i18n.js'
 
 // New drafts are Markdown (see docs/markdown.md); plain text is valid Markdown.
-export const DEFAULT_NAME = 'Untitled.md'
+// "Untitled.md", in the interface language.
+export const defaultName = () => `${t('naming.untitled')}.md`
 
 // "Shopping list for Saturday" -> "Shopping list for Saturday.md"
 export function nameFromContent(content, ext = 'md') {
@@ -29,7 +31,7 @@ export function nameFromContent(content, ext = 'md') {
     title = cut.replace(/\s+\S*$/, '') || cut
   }
   title = title.replace(/[.\s]+$/, '')
-  return title ? `${title}.${ext}` : DEFAULT_NAME
+  return title ? `${title}.${ext}` : defaultName()
 }
 
 // At most `max` UTF-16 code units of `text`, cut between characters as
@@ -47,4 +49,4 @@ export function clip(text, max) {
   return text.slice(0, end)
 }
 
-export const displayName = (name) => (name && name.trim() ? name : '(untitled)')
+export const displayName = (name) => (name && name.trim() ? name : t('naming.noName'))

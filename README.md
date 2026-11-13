@@ -82,7 +82,7 @@ Everything, with all the details: **[the reference](docs/reference.md)**.
 - [Vision](VISION.md): what Plumb is for, its principles, and what's next
 - [Testing](TESTING.md): how Plumb is tested
 - [Brand](docs/brand.md): the name, the logo, the colours and what they mean, and how Plumb talks
-- [Translating](docs/translating.md): adding a language
+- [Translating](docs/translating.md): Plumb is in English and Indonesian; adding a language
 
 ## Develop
 

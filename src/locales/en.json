@@ -726,5 +726,9 @@
     "settingsTitle": "Settings ({{key}})",
     "shortcutsTitle": "Keyboard shortcuts (F1)",
     "drop": "Drop files to open them"
+  },
+  "naming": {
+    "untitled": "Untitled",
+    "noName": "(untitled)"
   }
 }

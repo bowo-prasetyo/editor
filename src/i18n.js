@@ -190,8 +190,11 @@ export async function useLanguage(choice = '', browser = globalThis.navigator?.l
 }
 
 // A language's name in that language ("Deutsch"), for the language picker.
+// Where Intl's name isn't the one people use for their language.
+const ENDONYMS = { id: 'Bahasa Indonesia' }
 export function languageName(lang) {
   if (lang === PSEUDO) return 'Pseudo (testing)'
+  if (ENDONYMS[lang]) return ENDONYMS[lang]
   try {
     const name = new Intl.DisplayNames([lang], { type: 'language' }).of(lang)
     return name ? name[0].toLocaleUpperCase(lang) + name.slice(1) : lang
