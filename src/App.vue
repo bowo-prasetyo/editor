@@ -5,6 +5,11 @@ import { prefs } from './prefs'
 import { NONE } from './folders'
 import AppToast from './components/AppToast.vue'
 import QuickOpen from './components/QuickOpen.vue'
+import ShortcutsDialog from './components/ShortcutsDialog.vue'
+import { registerCommands, ui } from './commands'
+import { createDoc, downloadBackup, requestPersistence } from './store'
+import { applyUpdate, initPwa, install, pwa } from './pwa'
+import { showToast } from './toast'
 import { openFiles } from './openFiles'
 import { droppedHandles } from './fileaccess'
 
@@ -15,6 +20,50 @@ const route = useRoute()
 const dropFolder = () => (route.name === 'home' && prefs.folderView !== NONE ? prefs.folderView : '')
 const quickOpen = ref(null)
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
+
+// F1 anywhere, or "?" when not typing, shows the keyboard shortcuts.
+const typing = (el) => el?.closest?.('input, textarea, select, [contenteditable="true"], .cm-editor')
+function onKey(e) {
+  if (e.key === 'F1' || (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target))) {
+    e.preventDefault()
+    ui.shortcutsOpen = !ui.shortcutsOpen
+  }
+}
+
+// Offline app: install button, update prompt, and files opened from the
+// operating system ("Open with" the installed app; save in place works).
+initPwa({
+  onUpdate: () =>
+    showToast('A new version of the editor is ready.', {
+      action: { label: 'Reload', run: applyUpdate },
+      timeout: 60 * 60 * 1000,
+    }),
+})
+if ('launchQueue' in window) {
+  window.launchQueue.setConsumer(async ({ files }) => {
+    if (!files?.length) return
+    const entries = await Promise.all(files.map(async (handle) => ({ file: await handle.getFile(), handle })))
+    openFiles(entries, router)
+  })
+}
+
+// Commands available everywhere (the editor adds its own while open).
+registerCommands([
+  {
+    id: 'newDocument', title: 'New document', group: 'Documents',
+    run: () => {
+      const doc = createDoc()
+      requestPersistence()
+      router.push({ name: 'edit', params: { id: doc.id } })
+    },
+  },
+  { id: 'goToDocument', title: 'Go to document…', group: 'Documents', shortcut: 'quickOpen', run: () => quickOpen.value.show() },
+  { id: 'allDocuments', title: 'Show all documents', group: 'Documents', run: () => router.push({ name: 'home' }) },
+  { id: 'exportBackup', title: 'Export all documents as a backup', group: 'Documents', run: downloadBackup },
+  { id: 'shortcuts', title: 'Show keyboard shortcuts', group: 'Help', shortcut: 'shortcuts', run: () => (ui.shortcutsOpen = true) },
+  { id: 'install', title: 'Install the editor as an app', group: 'Help', when: () => pwa.canInstall, run: install },
+  { id: 'update', title: 'Reload to use the new version', group: 'Help', when: () => pwa.updateReady, run: applyUpdate },
+])
 const dragging = ref(false)
 let depth = 0
 const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files')
@@ -51,7 +100,7 @@ function onDrop(e) {
   )
 }
 
-const events = { dragenter: onDragEnter, dragleave: onDragLeave, dragover: onDragOver, drop: onDrop }
+const events = { dragenter: onDragEnter, dragleave: onDragLeave, dragover: onDragOver, drop: onDrop, keydown: onKey }
 onMounted(() => Object.entries(events).forEach(([k, f]) => window.addEventListener(k, f)))
 onBeforeUnmount(() => Object.entries(events).forEach(([k, f]) => window.removeEventListener(k, f)))
 </script>
@@ -60,9 +109,15 @@ onBeforeUnmount(() => Object.entries(events).forEach(([k, f]) => window.removeEv
   <header class="topbar">
     <RouterLink to="/" class="brand">📝 Editor</RouterLink>
     <span class="topbar-right">
-      <span class="hint">Everything is saved in your browser</span>
+      <span class="hint">{{ pwa.offline ? 'Offline · everything is saved in your browser' : 'Everything is saved in your browser' }}</span>
+      <button v-if="pwa.canInstall" class="quick-button" title="Install the editor as an app that works offline" @click="install">
+        Install
+      </button>
       <button class="quick-button" :title="`Go to a document (${isMac ? '⌘' : 'Ctrl+'}P)`" @click="quickOpen.show()">
         Go to… <kbd>{{ isMac ? '⌘P' : 'Ctrl+P' }}</kbd>
+      </button>
+      <button class="quick-button help-button" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts" @click="ui.shortcutsOpen = true">
+        ?
       </button>
     </span>
   </header>
@@ -73,5 +128,6 @@ onBeforeUnmount(() => Object.entries(events).forEach(([k, f]) => window.removeEv
     <div>Drop files to open them</div>
   </div>
   <QuickOpen ref="quickOpen" />
+  <ShortcutsDialog v-if="ui.shortcutsOpen" @close="ui.shortcutsOpen = false" />
   <AppToast />
 </template>

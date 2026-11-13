@@ -17,7 +17,26 @@ import {
   lineNumbers,
   rectangularSelection,
 } from '@codemirror/view'
-import { defaultKeymap, history, historyKeymap, indentLess, indentMore, insertNewlineAndIndent } from '@codemirror/commands'
+import {
+  addCursorAbove,
+  addCursorBelow,
+  copyLineDown,
+  copyLineUp,
+  cursorMatchingBracket,
+  defaultKeymap,
+  deleteLine,
+  history,
+  historyKeymap,
+  indentLess,
+  indentMore,
+  insertNewlineAndIndent,
+  moveLineDown,
+  moveLineUp,
+  redo,
+  selectLine,
+  toggleComment,
+  undo,
+} from '@codemirror/commands'
 import { HighlightStyle, bracketMatching, indentUnit, syntaxHighlighting } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
 import { highlightSelectionMatches, selectNextOccurrence, selectSelectionMatches } from '@codemirror/search'
@@ -92,6 +111,26 @@ export const smartEnter = Facet.define({ combine: (values) => values.some(Boolea
 
 export function enter(target) {
   return target.state.facet(smartEnter) ? insertNewlineAndIndent(target) : newlineKeepIndent(target)
+}
+
+// Editing commands the command palette can run by name.
+export const EDITOR_COMMANDS = {
+  toggleComment,
+  moveLineUp,
+  moveLineDown,
+  copyLineUp,
+  copyLineDown,
+  deleteLine,
+  indentMore,
+  indentLess,
+  selectNextOccurrence,
+  selectSelectionMatches,
+  addCursorAbove,
+  addCursorBelow,
+  cursorMatchingBracket,
+  selectLine,
+  undo,
+  redo,
 }
 
 // --- Look ----------------------------------------------------------------
@@ -315,6 +354,13 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, onC
 
   return {
     view,
+    // Run one of EDITOR_COMMANDS, then put focus back in the text.
+    run(name) {
+      const cmd = EDITOR_COMMANDS[name]
+      if (!cmd) return false
+      view.focus()
+      return cmd(view)
+    },
     // Everything needed to resume this editor later (see `saved` above).
     snapshot: () => ({ state: view.state, scroll: view.scrollSnapshot() }),
     focus: () => view.focus(),

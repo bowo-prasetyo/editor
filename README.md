@@ -13,6 +13,9 @@ A minimal, client-only text editor that runs entirely in the browser. Built with
 - **Sort** the list by last edited, name, date created or size.
 - **Version history** (*History* in the editor): a version is kept when you open a file, every few minutes while you edit (if the text changed), each time you save to a file, before you restore an older version, and whenever you press *Save version…* (optionally with a name). Pick a version to see what changed since then, restore it (undoable, and the text it replaces is kept as a version), or open it as a copy. Older automatic versions thin out: all from the last hour, then one per hour for a day and one per day for 30 days; named and saved-to-file versions are kept longer. Deleting a document forever deletes its history.
 - **Indentation**, per document: tabs or spaces, 2, 4 or 8 wide, detected from the file (defaults: 4 spaces for Python and similar, tabs for Go and Makefiles, 2 spaces otherwise). Change it, or convert the whole file between tabs and spaces, from the menu in the status bar. In code, Enter indents by the language's rules (a level deeper after `{`, `(` or `:`); in plain text and Markdown it keeps the current line's indentation.
+- **Command palette** (Ctrl/Cmd+Shift+P, or type `>` in the quick switcher): run any action by name, from Find and Go to line to Convert indentation, Close tab or Export backup, with its shortcut shown alongside.
+- **Keyboard shortcuts panel** (F1, `?`, or the `?` button in the header): every shortcut, grouped and searchable, with ⌘/⌥ symbols on a Mac.
+- **Works offline and installs as an app.** After the first visit, the whole editor (every language included) is kept by a service worker, so it opens and works without a connection. In Chrome and Edge an *Install* button appears in the header; installed, the editor can open text files from your computer (*Open with*), and Save writes back to them. When a new version is published, a prompt offers to reload into it.
 - Export all documents (Trash included) as one backup file, and import it again; importing never overwrites existing documents.
 - Markdown preview for `.md` files (side by side on wide screens), adjustable text size, and printing of the whole document.
 - Syntax highlighting for 140+ languages, picked from the file name (`.js`, `.py`, `Dockerfile`, `.yaml`…). Each language is downloaded only when a document needs it. Pick another language, or plain text, in the status bar; the choice is kept per document. Files over 5 million characters start as plain text. Matching brackets are highlighted (mismatched ones in red); Ctrl/Cmd+Shift+\\ jumps to the matching bracket.
@@ -39,6 +42,8 @@ Ctrl means Cmd on a Mac.
 | Ctrl+click / Alt+drag | Add a cursor / select a rectangular block |
 | Escape | Back to a single cursor |
 | Ctrl+P | Quick switcher: go to any document, or create one |
+| Ctrl+Shift+P | Command palette: run any action by name |
+| F1 or ? | Show all keyboard shortcuts |
 | Alt+PageUp / Alt+PageDown | Previous / next tab |
 | Ctrl+G | Go to a line, or `line:column` (or click the position in the status bar) |
 | Ctrl+[ / Ctrl+] | Outdent / indent the lines |
@@ -68,4 +73,4 @@ npm test
 npm run build
 ```
 
-The `dist/` folder is plain static files. Host it anywhere (GitHub Pages, Netlify, S3), or serve it locally with `npm run preview`.
+The `dist/` folder is plain static files, including `sw.js`, the service worker that makes the app work offline. It's generated at build time by `build/pwa.js` with the list of built files, and only runs in production builds (not in `npm run dev`). Serve the folder over HTTPS (or `localhost`) for offline support and installing. Host it anywhere (GitHub Pages, Netlify, S3), or serve it locally with `npm run preview`.
