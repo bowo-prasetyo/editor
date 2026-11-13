@@ -6,7 +6,10 @@ import { editorText, expectSaved, fileStatus, readText, saveToFile, tick, toEnd,
 const tree = (page) => page.getByRole('tree', { name: 'Files' })
 // A row of the tree by file name (its accessible name also has the "●" for unsaved changes).
 const item = (page, name) =>
-  tree(page).getByRole('treeitem').filter({ has: page.locator('.tree-name').getByText(name, { exact: true }) })
+  tree(page)
+    .getByRole('treeitem')
+    // Its own name: a folder's item also holds the rows inside it.
+    .filter({ has: page.locator(':scope > .tree-name, :scope > .root-row > .tree-name').getByText(name, { exact: true }) })
 
 test.beforeEach(async ({ page }) => {
   await useFakeDisk(page)
@@ -136,4 +139,45 @@ test('closing a folder keeps unsaved files as drafts; the others go', async ({ p
   await expect(list).not.toContainText('app.js')
   await list.getByText('README.md').click()
   await expect.poll(() => editorText(page)).toBe('# Project\nkeep this')
+})
+
+// Each folder is a tree holding only tree items: the folder's own row
+// first, its notes, then its files. Its buttons sit outside the tree.
+test('the folder tree is a proper tree: only items inside, the folder first', async ({ page }) => {
+  await item(page, 'src').click()
+  await expect(item(page, 'app.js')).toBeVisible()
+  const strays = await tree(page).evaluate((root) => {
+    const bad = []
+    const visit = (el) => {
+      for (const child of el.children) {
+        const role = child.getAttribute('role')
+        if (role === 'none' || role === 'presentation') visit(child)
+        else if (role === 'treeitem' || role === 'group') {
+          if (role === 'group') visit(child)
+          else for (const g of child.querySelectorAll(':scope > [role="group"]')) visit(g)
+        } else bad.push(child.outerHTML.slice(0, 80))
+      }
+    }
+    visit(root)
+    return bad
+  })
+  expect(strays).toEqual([])
+  await expect(tree(page).getByRole('treeitem', { name: 'project', exact: true })).toHaveAttribute('aria-level', '1')
+  await expect(item(page, 'app.js')).toHaveAttribute('aria-level', '3')
+})
+
+test('the folder’s buttons work from the keyboard, and arrow keys still move through the tree', async ({ page }) => {
+  const root = tree(page).getByRole('treeitem', { name: 'project', exact: true })
+  await root.focus()
+  await page.keyboard.press('ArrowDown')
+  await expect(item(page, 'src')).toBeFocused()
+  await page.keyboard.press('ArrowRight') // expand
+  await expect(item(page, 'app.js')).toBeVisible()
+  await page.keyboard.press('ArrowLeft') // collapse
+  await expect(item(page, 'app.js')).toHaveCount(0)
+
+  // Enter on the folder's button presses it.
+  await page.getByRole('button', { name: 'Close project' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(tree(page)).toHaveCount(0)
 })

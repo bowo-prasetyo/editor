@@ -59,6 +59,14 @@ minor version (0.x) can change how things work.
   focus is, and focus goes back where it was when it closes. Before, Tab
   could move focus to the page behind, where keys typed for the dialog
   edited the document (`src/modal.js`).
+- **The folder sidebar is a proper tree for screen readers.** Each open
+  folder is its own tree, holding only tree items: the folder's row, its
+  files and folders, and *Loading…* / *Empty* as items you can't pick. The
+  folder's buttons and notes (*Put the edits back*, *Allow access*) sit next
+  to its tree rather than inside it, where they made the tree invalid.
+- **Enter and Space press the sidebar's buttons.** On *+ File*, *+ Folder*,
+  *Put the edits back* and the others, the tree's own keys used to take them,
+  so the buttons couldn't be pressed from the keyboard.
 
 ## [0.2.0] – 2026-11-13
 

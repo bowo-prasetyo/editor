@@ -449,7 +449,10 @@ button.icon-button:hover { opacity: 1; border-color: var(--border); }
   background: var(--panel); font-size: 13px; padding: 4px 0 12px;
 }
 .file-tree ul { list-style: none; margin: 0; padding: 0; }
-.tree-root { position: relative; margin-top: 4px; }
+.tree-root { position: relative; margin-top: 4px; padding-top: 26px; }
+/* The folder's own row, pinned to the top: its notes come before the tree in
+   the page (FileTree.vue) but show under the row. 26px = the row's height. */
+.tree-root .root-item { position: absolute; top: 0; left: 0; right: 0; }
 .tree-row {
   display: flex; align-items: center; gap: 4px; padding: 2px 8px; cursor: pointer; white-space: nowrap;
   border: 1px solid transparent; line-height: 20px; user-select: none;

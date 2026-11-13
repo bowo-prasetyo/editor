@@ -4,8 +4,13 @@ import { test, expect } from '@playwright/test'
 import { editorText, expectSaved, fileStatus, pick, readText, saveToFile, toEnd, useFakeDisk, writeFile, tick } from './helpers.js'
 
 const tree = (page) => page.getByRole('tree', { name: 'Files' })
+// The sidebar: the folder's trees, and its notes and buttons around them.
+const sidebar = (page) => page.getByRole('navigation', { name: 'Folders on disk' })
 const item = (page, name) =>
-  tree(page).getByRole('treeitem').filter({ has: page.locator('.tree-name').getByText(name, { exact: true }) })
+  tree(page)
+    .getByRole('treeitem')
+    // Its own name: a folder's item also holds the rows inside it.
+    .filter({ has: page.locator(':scope > .tree-name, :scope > .root-row > .tree-name').getByText(name, { exact: true }) })
 const dialog = (page) => page.getByRole('dialog', { name: 'Close project' })
 
 // From the start page (reached without a reload: see TESTING.md, "Not covered").
@@ -76,7 +81,7 @@ test('Keep as drafts, open the folder again, and put the edits back', async ({ p
   await page.getByRole('link', { name: /Plumb/ }).click()
   await expect(page.locator('.list-pane')).toContainText('README.md')
   await openProject(page)
-  const offer = tree(page).getByRole('status').filter({ hasText: 'edits to files in this folder' })
+  const offer = sidebar(page).getByRole('status').filter({ hasText: 'edits to files in “project”' })
   await expect(offer).toContainText('1 draft has edits')
   await offer.getByRole('button', { name: 'Put the edits back' }).click()
   await expect(page.locator('.toast')).toContainText('Put back the edits to 1 file.')
@@ -96,7 +101,7 @@ test('a file changed while the folder was closed comes back with the “changed 
   await tick(page)
   await writeFile(page, 'project/README.md', '# changed while closed\n')
   await openProject(page)
-  await tree(page).getByRole('button', { name: 'Put the edits back' }).click()
+  await sidebar(page).getByRole('button', { name: 'Put the edits back' }).click()
   await expect(page.locator('.toast')).toContainText('changed on disk meanwhile')
 
   await item(page, 'README.md').click()
@@ -108,8 +113,8 @@ test('Not now leaves the drafts as drafts', async ({ page }) => {
   await page.getByRole('button', { name: 'Close project' }).click()
   await dialog(page).getByRole('button', { name: 'Keep as drafts' }).click()
   await openProject(page)
-  await tree(page).getByRole('button', { name: 'Not now' }).click()
-  await expect(tree(page).getByRole('button', { name: 'Put the edits back' })).toHaveCount(0)
+  await sidebar(page).getByRole('button', { name: 'Not now' }).click()
+  await expect(sidebar(page).getByRole('button', { name: 'Put the edits back' })).toHaveCount(0)
   await page.getByRole('link', { name: /Plumb/ }).click()
   await expect(page.locator('.list-pane')).toContainText('README.md')
 })

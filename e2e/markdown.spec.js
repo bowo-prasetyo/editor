@@ -69,7 +69,7 @@ test.describe('with a folder open', () => {
   })
 
   test('outside Markdown, Ctrl/Cmd+B still shows and hides the sidebar; in Markdown it means bold', async ({ page }) => {
-    await tree(page).getByRole('treeitem').filter({ hasText: 'app.js' }).click()
+    await tree(page).getByRole('treeitem', { name: 'app.js', exact: true }).click()
     await expect.poll(() => editorText(page)).toBe('let x = 1\n')
     await editor(page).click()
     await page.keyboard.press(`${mod}+b`)
@@ -78,7 +78,7 @@ test.describe('with a folder open', () => {
     await page.keyboard.press(`${mod}+b`)
     await expect(tree(page)).toBeVisible()
 
-    await tree(page).getByRole('treeitem').filter({ hasText: 'notes.md' }).click()
+    await tree(page).getByRole('treeitem', { name: 'notes.md', exact: true }).click()
     await expect.poll(() => editorText(page)).toBe('notes\n')
     await editor(page).click()
     await page.keyboard.press(`${mod}+End`)
@@ -88,7 +88,7 @@ test.describe('with a folder open', () => {
   })
 
   test('Ctrl/Cmd+Shift+E shows and hides the sidebar everywhere, Markdown included', async ({ page }) => {
-    await tree(page).getByRole('treeitem').filter({ hasText: 'notes.md' }).click()
+    await tree(page).getByRole('treeitem', { name: 'notes.md', exact: true }).click()
     await expect.poll(() => editorText(page)).toBe('notes\n')
     await editor(page).click()
     await page.keyboard.press(`${mod}+Shift+E`)
