@@ -5,6 +5,7 @@ import {
   getDoc,
   updateDoc,
   setDocOptions,
+  moveToFolder,
   flushAll,
   retryFailed,
   restoreDoc,
@@ -19,8 +20,15 @@ import { createEditor } from '../cm'
 import { AUTO, PLAIN, findLanguage, languageNames, loadLanguage } from '../languages'
 import FindBar from '../components/FindBar.vue'
 import GoToBar from '../components/GoToBar.vue'
+import TabBar from '../components/TabBar.vue'
+import FolderDialog from '../components/FolderDialog.vue'
+import { folderTree } from '../folders'
+import { liveTabs, opened, saveSnapshot, takeSnapshot } from '../session'
+import { cycleTab } from '../tabs'
+import { useRouter } from 'vue-router'
 
 const props = defineProps({ id: { type: String, required: true } })
+const router = useRouter()
 
 const doc = computed(() => getDoc(props.id))
 const host = ref(null) // where the editor is mounted
@@ -29,7 +37,8 @@ const cursor = ref({ line: 1, col: 1, cursors: 1, selected: 0, lines: 1 })
 
 const content = computed({
   get: () => doc.value?.content ?? '',
-  set: (v) => updateDoc(props.id, { content: v }),
+  // Ignore the editor echoing back text it was just given (not an edit).
+  set: (v) => v !== doc.value?.content && updateDoc(props.id, { content: v }),
 })
 const name = computed({
   get: () => doc.value?.name ?? '',
@@ -134,11 +143,24 @@ async function print() {
 
 // One CodeMirror editor per document; rebuilt when the route moves to
 // another document (so undo history doesn't leak between documents).
-function mountEditor() {
+let editorFor = null // the document the current editor shows
+
+// The editor, if it shows the current document. When the route moves to
+// another document, watchers run before the editor is swapped: they must not
+// push the new document's text or settings into the old one's editor.
+const current = () => (editorFor === props.id ? editor.value : null)
+
+// Switching documents keeps the old one's editor state (undo history,
+// selection, scroll) for when its tab is shown again.
+function mountEditor([, id] = [], [, oldId] = []) {
+  if (editor.value && oldId && oldId !== id) saveSnapshot(oldId, editor.value.snapshot())
   editor.value?.destroy()
   editor.value = null
   if (!host.value || !doc.value) return
+  opened(props.id, oldId !== props.id ? oldId : null)
+  editorFor = props.id
   editor.value = createEditor({
+    saved: takeSnapshot(props.id),
     parent: host.value,
     text: content.value,
     name: name.value,
@@ -152,9 +174,9 @@ function mountEditor() {
 watch([host, () => props.id], mountEditor, { flush: 'post' })
 
 // Keep the editor in step with the document and its settings.
-watch(content, (text) => editor.value?.setText(text))
-watch(() => view.value.wrap, (on) => editor.value?.setWrap(on))
-watch(() => view.value.spellcheck, (on) => editor.value?.setSpellcheck(on))
+watch(content, (text) => current()?.setText(text))
+watch(() => view.value.wrap, (on) => current()?.setWrap(on))
+watch(() => view.value.spellcheck, (on) => current()?.setSpellcheck(on))
 // --- Language (syntax highlighting) --------------------------------------------
 
 // Chosen from the file name, unless the user picked one in the status bar.
@@ -185,11 +207,31 @@ watch(
   { immediate: true },
 )
 // Renaming can change the fallback comment syntax even if the language doesn't.
-watch(name, async (n) => editor.value?.setLanguage(n, await loadLanguage(language.value)))
+watch(name, async (n) => {
+  const ed = current()
+  const support = await loadLanguage(language.value)
+  if (ed && ed === current()) ed.setLanguage(n, support)
+})
 watch(
   () => prefs.fontSize,
   () => nextTick(() => editor.value?.view.requestMeasure()),
 )
+
+// --- Folder -----------------------------------------------------------------
+
+const moving = ref(false)
+const folderPaths = computed(() =>
+  folderTree(
+    state.docs.filter((d) => !d.deletedAt),
+    prefs.folders,
+  ).map((f) => f.path),
+)
+function onMove(path) {
+  moving.value = false
+  moveToFolder(props.id, path)
+  if (path && !folderPaths.value.includes(path)) prefs.folders = [...prefs.folders, path]
+  current()?.focus()
+}
 
 // --- Counts -----------------------------------------------------------------
 
@@ -271,6 +313,11 @@ function onWindowKeydown(e) {
   } else if (mod && !e.altKey && !e.shiftKey && key === 'g') {
     e.preventDefault()
     openGoTo()
+  } else if (e.altKey && !mod && (e.key === 'PageUp' || e.key === 'PageDown')) {
+    // Alt+PageUp / Alt+PageDown: previous / next tab.
+    e.preventDefault()
+    const next = cycleTab(liveTabs(), props.id, e.key === 'PageUp' ? -1 : 1)
+    if (next && next !== props.id) router.push({ name: 'edit', params: { id: next } })
   } else if (e.altKey && !mod && e.code === 'KeyZ') {
     e.preventDefault()
     toggle('wrap')
@@ -287,6 +334,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('beforeprint', beforePrint)
   window.removeEventListener('afterprint', afterPrint)
   clearTimeout(statsTimer)
+  if (editor.value && doc.value) saveSnapshot(props.id, editor.value.snapshot())
   editor.value?.destroy()
   flushAll()
 })
@@ -294,7 +342,16 @@ onBeforeUnmount(() => {
 
 <template>
   <section v-if="doc" class="editor">
+    <TabBar :active="id" />
     <div class="toolbar">
+      <button
+        class="folder-button"
+        :class="{ empty: !doc.folder }"
+        :title="doc.folder ? `In ${doc.folder} — move to another folder` : 'Move to a folder'"
+        @click="moving = true"
+      >
+        📁<span v-if="doc.folder" class="folder-path">{{ doc.folder }}</span>
+      </button>
       <input v-model="name" class="name" spellcheck="false" aria-label="File name" />
       <button
         class="toggle"
@@ -322,7 +379,7 @@ onBeforeUnmount(() => {
         Preview
       </button>
       <button title="Find and replace (Ctrl/Cmd+F)" @click="openFind(false)">Find</button>
-      <button title="Print (Ctrl/Cmd+P)" @click="print">Print</button>
+      <button title="Print the whole document" @click="print">Print</button>
       <template v-if="inPlace">
         <button :title="doc.linked ? 'Save to the file (Ctrl/Cmd+S)' : 'Save to a file (Ctrl/Cmd+S)'" @click="save(false)">
           Save
@@ -372,6 +429,17 @@ onBeforeUnmount(() => {
       <article v-if="previewOn" class="markdown" v-html="previewHtml" />
       <pre v-else :class="{ wrap: view.wrap }">{{ content }}</pre>
     </div>
+
+    <FolderDialog
+      v-if="moving"
+      :title="`Move “${name || 'this document'}” to folder`"
+      :initial="doc.folder ?? ''"
+      confirm="Move"
+      :folders="folderPaths"
+      allow-empty
+      @submit="onMove"
+      @cancel="moving = false"
+    />
 
     <footer class="status">
       <span>

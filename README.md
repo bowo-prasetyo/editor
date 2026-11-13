@@ -7,6 +7,10 @@ A minimal, client-only text editor that runs entirely in the browser. Built with
 - Routes: `#/` lists documents, `#/edit/:id` edits one. Hash routing means no server rewrites are needed.
 - Open files (several at once, or drop them anywhere on the page). In Chrome and Edge, **Save (Ctrl/Cmd+S) writes back to the file you opened**, even after a reload, and warns you if the file was changed on disk in the meantime; **Save as… (Ctrl/Cmd+Shift+S)** picks another file. Other browsers download a copy instead. The encoding (UTF-8, UTF-16, Windows-1252), byte-order mark and line endings (LF, CRLF, CR) are detected on open and kept on save; change them in the status bar. Binary files are refused.
 - New documents are named after their first line until you rename them. Filter the document list by name or text.
+- **Tabs** for the documents you open (remembered in this browser). Switching tabs keeps each document's undo history, cursor and scroll position. Close a tab with × or a middle-click; Alt+PageUp / Alt+PageDown move between tabs.
+- **Quick switcher** (Ctrl/Cmd+P, or *Go to…* in the header): type part of a document's name or folder (letters in order, e.g. `wcl` finds `Work/Clients/…`). With nothing typed it lists recently opened documents. If nothing matches, it offers to create the document, e.g. `Work/todo.md` creates `todo.md` in the Work folder.
+- **Folders**, nested with `/` (e.g. `Work/Clients`). The sidebar shows each folder with how many documents it holds; pick one to see its documents and subfolders. Create, rename and remove folders (removing one never deletes documents: they move up a level). Move a document with its 📁 button, the folder button in the editor, or by dragging it onto a folder. New documents and opened or dropped files go into the folder shown.
+- **Sort** the list by last edited, name, date created or size.
 - Export all documents (Trash included) as one backup file, and import it again; importing never overwrites existing documents.
 - Markdown preview for `.md` files (side by side on wide screens), adjustable text size, and printing of the whole document.
 - Syntax highlighting for 140+ languages, picked from the file name (`.js`, `.py`, `Dockerfile`, `.yaml`…). Each language is downloaded only when a document needs it. Pick another language, or plain text, in the status bar; the choice is kept per document. Files over 5 million characters start as plain text. Matching brackets are highlighted (mismatched ones in red); Ctrl/Cmd+Shift+\\ jumps to the matching bracket.
@@ -32,6 +36,8 @@ Ctrl means Cmd on a Mac.
 | Ctrl+Alt+↑ / Ctrl+Alt+↓ | Add a cursor on the line above or below |
 | Ctrl+click / Alt+drag | Add a cursor / select a rectangular block |
 | Escape | Back to a single cursor |
+| Ctrl+P | Quick switcher: go to any document, or create one |
+| Alt+PageUp / Alt+PageDown | Previous / next tab |
 | Ctrl+G | Go to a line, or `line:column` (or click the position in the status bar) |
 | Ctrl+[ / Ctrl+] | Outdent / indent the lines |
 | Ctrl+Shift+\\ | Jump to the matching bracket |
