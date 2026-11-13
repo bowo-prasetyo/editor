@@ -14,10 +14,10 @@ const UA = {
 test('the browser is named for the notes, when it’s Firefox or Safari', () => {
   assert.equal(browserName(UA.firefox), 'Firefox')
   assert.equal(browserName(UA.safari), 'Safari')
-  assert.equal(browserName(UA.chrome), 'this browser')
-  assert.equal(browserName(UA.edge), 'this browser')
-  assert.equal(browserName(UA.iosChrome), 'this browser')
-  assert.equal(browserName(''), 'this browser')
+  assert.equal(browserName(UA.chrome), null)
+  assert.equal(browserName(UA.edge), null)
+  assert.equal(browserName(UA.iosChrome), null)
+  assert.equal(browserName(''), null)
 })
 
 test('the notes say what happens, and what to use instead', () => {

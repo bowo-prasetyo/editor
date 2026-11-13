@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { nameFromContent, displayName } from '../src/naming.js'
+import { clip, nameFromContent, displayName } from '../src/naming.js'
 
 test('names a document after its first non-empty line (Markdown by default)', () => {
   assert.equal(nameFromContent('\n  Shopping list  \nmilk'), 'Shopping list.md')
@@ -21,4 +21,14 @@ test('empty names display as (untitled)', () => {
   assert.equal(displayName(''), '(untitled)')
   assert.equal(displayName('  '), '(untitled)')
   assert.equal(displayName('a.txt'), 'a.txt')
+})
+
+test('long names are never cut through an emoji or an accented letter', () => {
+  const base = 'a'.repeat(39)
+  assert.equal(nameFromContent(`${base}😀 more`), `${base}.md`)
+  assert.equal(nameFromContent(`${base}e\u0301 more`), `${base}.md`, 'e and its combining accent stay together')
+  assert.equal(nameFromContent(`${'x'.repeat(38)}👩‍👩‍👧 family`), `${'x'.repeat(38)}.md`)
+  assert.equal(clip('ab😀', 3), 'ab')
+  assert.equal(clip('ab😀', 4), 'ab😀')
+  assert.equal(clip('short', 40), 'short')
 })

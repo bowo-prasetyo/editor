@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { SHORTCUTS, keyLabel } from '../keys'
+import { SHORTCUTS, SHORTCUT_GROUPS, keyLabel } from '../keys'
 import { useModal } from '../modal'
 
 // Every keyboard shortcut, grouped, with a filter.
@@ -19,7 +19,7 @@ const groups = computed(() => {
     if (!out.has(s.group)) out.set(s.group, [])
     out.get(s.group).push({ ...s, labels: keys })
   }
-  return [...out]
+  return [...out].map(([id, items]) => [SHORTCUT_GROUPS[id] ?? id, items])
 })
 
 onMounted(() => input.value?.focus())

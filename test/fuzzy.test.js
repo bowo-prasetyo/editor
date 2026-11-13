@@ -30,3 +30,15 @@ test('word starts are preferred when choosing which characters to highlight', ()
     { text: 's', hit: true }, { text: 'hopping ', hit: false }, { text: 'l', hit: true }, { text: 'ist', hit: false },
   ])
 })
+
+test('accents match however they are encoded, and highlights cover whole letters', () => {
+  // macOS stores file names decomposed: "e" followed by a combining accent.
+  const nfd = 'Cafe\u0301 notes.md'
+  assert.deepEqual(fuzzyMatch('café', nfd).positions, [0, 1, 2, 3, 4])
+  assert.deepEqual(fuzzyMatch('cafe\u0301', 'Café.md').positions, [0, 1, 2, 3])
+  assert.equal(fuzzyMatch('cafe', 'Café.md'), null, 'accents still matter')
+  // "İ" lowercases to two characters; positions still point into the original.
+  const m = fuzzyMatch('istanbul', 'İstanbul.txt')
+  assert.deepEqual(highlightRuns('İstanbul.txt', m.positions), [{ text: 'İstanbul', hit: true }, { text: '.txt', hit: false }])
+  assert.deepEqual(fuzzyMatch('rp', 'résumé plan.md').positions, [0, 7])
+})

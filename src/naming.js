@@ -1,4 +1,5 @@
 // Names for documents.
+import { segmenter } from './locale.js'
 
 // New drafts are Markdown (see docs/markdown.md); plain text is valid Markdown.
 export const DEFAULT_NAME = 'Untitled.md'
@@ -11,7 +12,7 @@ export function nameFromContent(content, ext = 'md') {
     const nl = content.indexOf('\n', start)
     const candidate = content.slice(start, nl === -1 ? content.length : nl)
     if (candidate.trim()) {
-      line = candidate.slice(0, 1000)
+      line = clip(candidate, 1000)
       break
     }
     if (nl === -1) break
@@ -23,9 +24,27 @@ export function nameFromContent(content, ext = 'md') {
     .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '') // not allowed in file names
     .replace(/\s+/g, ' ')
     .trim()
-  if (title.length > 40) title = title.slice(0, 40).replace(/\s+\S*$/, '') || title.slice(0, 40)
+  if (title.length > 40) {
+    const cut = clip(title, 40)
+    title = cut.replace(/\s+\S*$/, '') || cut
+  }
   title = title.replace(/[.\s]+$/, '')
   return title ? `${title}.${ext}` : DEFAULT_NAME
+}
+
+// At most `max` UTF-16 code units of `text`, cut between characters as
+// people see them: never through an emoji, a letter and its accent, or a
+// surrogate pair.
+export function clip(text, max) {
+  if (text.length <= max) return text
+  const graphemes = segmenter('grapheme')
+  if (!graphemes) return text.slice(0, max).replace(/[\uD800-\uDBFF]$/, '')
+  let end = 0
+  for (const { index, segment } of graphemes.segment(text)) {
+    if (index + segment.length > max) break
+    end = index + segment.length
+  }
+  return text.slice(0, end)
 }
 
 export const displayName = (name) => (name && name.trim() ? name : '(untitled)')

@@ -15,7 +15,8 @@ import { ENCODINGS, EOLS } from '../textcodec'
 import { prefs, stepFontSize } from '../prefs'
 import { showToast } from '../toast'
 import { canSaveInPlace, saveDoc } from '../fileaccess'
-import { countWords } from '../stats'
+import { countWords, slowToCount } from '../stats'
+import { formatNumber } from '../locale'
 import { createEditor } from '../cm'
 import { EditorView } from '@codemirror/view'
 import { whitespaceFix } from '../textops'
@@ -121,11 +122,18 @@ const eol = computed({
 // Save writes back to the file the document came from where the browser
 // allows it (Chrome, Edge); elsewhere it downloads a copy.
 const inPlace = canSaveInPlace()
-const fileStatus = computed(() => {
+// A file's state: 'deleted' (not on disk any more), 'dirty' (changes not
+// saved to it) or 'saved'; '' for a draft. What's shown for each is below.
+const fileState = computed(() => {
   if (!doc.value?.linked) return ''
-  if (diskNotices[props.id]?.kind === 'deleted') return 'File not on disk'
-  return doc.value.diskDirty ? 'Not saved to file' : 'Saved to file'
+  if (diskNotices[props.id]?.kind === 'deleted') return 'deleted'
+  return doc.value.diskDirty ? 'dirty' : 'saved'
 })
+const FILE_STATUS = {
+  deleted: { text: 'File not on disk', title: () => 'The file was deleted or moved: Save asks where to save' },
+  dirty: { text: 'Not saved to file', title: () => `Press ${saveKey} to write your changes to the file` },
+  saved: { text: 'Saved to file', title: () => 'The file on disk matches' },
+}
 let saving = false
 async function save(saveAs = false) {
   if (saving || doc.value?.unread) return
@@ -424,7 +432,7 @@ const flip = (key, label) => () => {
 // A command whose title says what it will do.
 const setting = (id, key, label) => ({
   id,
-  group: 'Settings',
+  group: 'settings',
   get title() {
     return `${label}: turn ${onOff(!prefs[key])}`
   },
@@ -476,13 +484,12 @@ async function onSaveToFolder({ rootId, path }) {
 const lineCount = computed(() => cursor.value.lines)
 const selectionInfo = computed(() => {
   const { cursors, selected } = cursor.value
-  if (cursors > 1) return `${cursors} cursors`
-  return selected ? `${selected} selected` : ''
+  if (cursors > 1) return `${formatNumber(cursors)} cursors`
+  return selected ? `${formatNumber(selected)} selected` : ''
 })
 
 // Words and characters: immediate for normal documents; for big ones,
 // counted once typing pauses.
-const BIG = 200_000
 const stats = ref({ words: 0, chars: 0 })
 let statsTimer
 function updateStats() {
@@ -494,7 +501,7 @@ watch(
   (text) => {
     clearTimeout(statsTimer)
     // Right away for a newly opened document; for big ones, after typing pauses.
-    if (text.length < BIG || statsFor !== props.id) updateStats()
+    if (!slowToCount(text) || statsFor !== props.id) updateStats()
     else statsTimer = setTimeout(updateStats, 500)
     statsFor = props.id
   },
@@ -579,8 +586,8 @@ async function saveNamedVersion() {
   await recordVersion(props.id, 'manual', label.trim())
   showToast('Version saved.')
 }
-const G = 'Editor'
-const E = 'Editing'
+const G = 'editor'
+const E = 'editing'
 let unregister = () => {}
 const editorCommands = [
   { id: 'find', title: 'Find', group: G, shortcut: 'find', run: () => openFind(false) },
@@ -645,7 +652,7 @@ const editorCommands = [
   setting('prefFinalNewline', 'finalNewline', 'Add a final newline when saving to a file'),
   setting('prefLint', 'lint', 'Check JSON and YAML'),
   {
-    id: 'prefVim', group: 'Settings',
+    id: 'prefVim', group: 'settings',
     get title() {
       return prefs.keymap === 'vim' ? 'Vim keys: turn off' : 'Vim keys: turn on'
     },
@@ -889,15 +896,15 @@ onBeforeUnmount(() => {
           class="mini problems"
           title="Show the problems (Ctrl/Cmd+Shift+M; F8 goes to the next one)"
           @click="current()?.run('openLintPanel')"
-        >⚠ {{ cursor.problems }} problem{{ cursor.problems === 1 ? '' : 's' }}</button>
-        <span class="status-counts">{{ lineCount }} lines · {{ stats.words }} words · {{ stats.chars }} chars · </span>
+        >⚠ {{ formatNumber(cursor.problems) }} problem{{ cursor.problems === 1 ? '' : 's' }}</button>
+        <span class="status-counts">{{ formatNumber(lineCount) }} lines · {{ formatNumber(stats.words) }} words · {{ formatNumber(stats.chars) }} chars · </span>
         <!-- A file's own state comes first: it's the one that matters. -->
-        <template v-if="fileStatus">
+        <template v-if="fileState">
           <span
-            :class="['save', 'file-status', { notice: doc.diskDirty || fileStatus === 'File not on disk' }]"
-            :title="fileStatus === 'File not on disk' ? 'The file was deleted or moved: Save asks where to save' : doc.diskDirty ? `Press ${saveKey} to write your changes to the file` : 'The file on disk matches'"
+            :class="['save', 'file-status', { notice: fileState !== 'saved' }]"
+            :title="FILE_STATUS[fileState].title()"
             aria-live="polite"
-          >{{ fileStatus }}</span>
+          >{{ FILE_STATUS[fileState].text }}</span>
           <template v-if="browserLabel"> · </template>
         </template>
         <span

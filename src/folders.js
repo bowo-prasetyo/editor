@@ -5,6 +5,7 @@
 // virtual folders. Labels can be filtered by and removed, but no new ones
 // are made (see docs/files-and-drafts.md, "Drafts"). For a file from an open
 // folder, `folder` is its place in that folder ("my-app/src").
+import { compareNatural } from './locale.js'
 
 // "  /Work//Clients/ " -> "Work/Clients"; "" for none.
 export function normalizeFolder(path = '') {
@@ -22,7 +23,7 @@ export function labelsOf(docs) {
   for (const d of docs) if (d.folder) counts.set(d.folder, (counts.get(d.folder) ?? 0) + 1)
   return [...counts]
     .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base', numeric: true }))
+    .sort((a, b) => compareNatural(a.label, b.label))
 }
 
 // --- Sorting --------------------------------------------------------------
@@ -31,7 +32,7 @@ export const SORTS = {
   updated: { label: 'Last edited', compare: (a, b) => b.updatedAt - a.updatedAt },
   name: {
     label: 'Name',
-    compare: (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }),
+    compare: (a, b) => compareNatural(a.name, b.name),
   },
   created: {
     label: 'Date created',

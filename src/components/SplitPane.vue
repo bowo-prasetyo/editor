@@ -14,6 +14,7 @@ import { downloadedMessage } from '../platform'
 import { liveTabs } from '../session'
 import { saveDoc } from '../fileaccess'
 import { showToast } from '../toast'
+import { collator } from '../locale'
 import { whitespaceFix } from '../textops'
 import { docEditorConfig, editedInOtherPane, helpOptions, keysFor, noteEdit, saveFixes } from '../editorsetup'
 
@@ -34,7 +35,7 @@ const choices = computed(() => {
   const tabs = liveTabs()
   const rest = state.docs
     .filter((d) => !d.deletedAt && !tabs.includes(d.id))
-    .sort((a, b) => displayName(a.name).localeCompare(displayName(b.name)))
+    .sort((a, b) => collator().compare(displayName(a.name), displayName(b.name)))
   const label = (d) => (d.folder ? `${displayName(d.name)} — ${d.folder}` : displayName(d.name))
   return {
     tabs: tabs.map(getDoc).filter(Boolean).map((d) => ({ id: d.id, label: label(d) })),

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { SHORTCUTS, keyLabel, shortcut } from '../src/keys.js'
+import { SHORTCUTS, SHORTCUT_GROUPS, keyLabel, shortcut } from '../src/keys.js'
 
 test('key labels: Ctrl on Windows and Linux, symbols on a Mac', () => {
   assert.equal(keyLabel('Mod+Shift+P', false), 'Ctrl+Shift+P')
@@ -13,7 +13,7 @@ test('key labels: Ctrl on Windows and Linux, symbols on a Mac', () => {
 test('shortcut ids are unique and every entry has keys', () => {
   const ids = SHORTCUTS.map((s) => s.id)
   assert.equal(new Set(ids).size, ids.length)
-  for (const s of SHORTCUTS) assert.ok(s.keys.length && s.label && s.group, s.id)
+  for (const s of SHORTCUTS) assert.ok(s.keys.length && s.label && s.group in SHORTCUT_GROUPS, s.id)
   assert.deepEqual(shortcut('find'), ['Mod+F'])
   assert.deepEqual(shortcut('nope'), [])
 })

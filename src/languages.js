@@ -3,6 +3,7 @@
 // name; each one is downloaded only when a document needs it.
 import { LanguageDescription } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
+import { collator } from './locale.js'
 
 export const AUTO = 'auto'
 export const PLAIN = 'plain'
@@ -21,7 +22,7 @@ const BY_NAME = {
 }
 
 // Names for the language picker, A to Z.
-export const languageNames = languages.map((l) => l.name).sort((a, b) => a.localeCompare(b))
+export const languageNames = languages.map((l) => l.name).sort(collator().compare)
 
 const byName = (n) => languages.find((l) => l.name === n) ?? null
 

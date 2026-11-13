@@ -9,6 +9,7 @@ import { prefs } from '../prefs'
 import { showToast } from '../toast'
 import { unsavedToDisk } from '../fileaccess'
 import { saveAll } from '../saveall'
+import { compareNatural, formatNumber } from '../locale'
 
 // Search every document and the files in open folders; replace across them.
 const route = useRoute()
@@ -20,7 +21,6 @@ const error = computed(() => (search.query ? queryError(search.query, options.va
 
 // Results: [{ target, matches, collapsed }], filled in as files are searched.
 const results = shallowRef([])
-const byPath = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 const summary = ref(null) // what searchAll() resolved to
 const progress = ref(null) // { done, total } while searching
 let controller = null
@@ -43,7 +43,7 @@ async function run() {
       // Kept in path order as they arrive (documents and files on disk mixed).
       onResult: (r) => {
         const list = results.value
-        const at = list.findIndex((x) => byPath.compare(x.target.path, r.target.path) > 0)
+        const at = list.findIndex((x) => compareNatural(x.target.path, r.target.path) > 0)
         list.splice(at === -1 ? list.length : at, 0, { ...r, collapsed: false })
         triggerRef(results)
       },
@@ -73,20 +73,20 @@ const status = computed(() => {
   if (error.value) return error.value
   if (progress.value) {
     const { done, total } = progress.value
-    return total ? `Searching… ${done.toLocaleString()} of ${total.toLocaleString()} files` : 'Searching…'
+    return total ? `Searching… ${formatNumber(done)} of ${formatNumber(total)} files` : 'Searching…'
   }
   if (!summary.value) return ''
   const n = totalMatches.value
   if (!n) return 'No results'
   const files = results.value.length
-  return `${n.toLocaleString()} result${n === 1 ? '' : 's'} in ${files.toLocaleString()} file${files === 1 ? '' : 's'}`
+  return `${formatNumber(n)} result${n === 1 ? '' : 's'} in ${formatNumber(files)} file${files === 1 ? '' : 's'}`
 })
 const notes = computed(() => {
   const s = summary.value
   if (!s) return []
   const out = []
   if (s.truncated) out.push('Showing the first 10,000 results: narrow the search to see the rest.')
-  if (s.skipped) out.push(`${s.skipped} file${s.skipped === 1 ? ' was' : 's were'} skipped: not text, or over 2 MB.`)
+  if (s.skipped) out.push(`${formatNumber(s.skipped)} file${s.skipped === 1 ? ' was' : 's were'} skipped: not text, or over 2 MB.`)
   return out
 })
 const hasFolders = computed(() => prefs.workspaces.length > 0)
@@ -129,7 +129,7 @@ const toSave = computed(() => unsavedToDisk().length)
 
 function afterReplace({ files, count }) {
   if (!count) return showToast('Nothing to replace: the text changed since the search.')
-  const what = `Replaced ${count.toLocaleString()} match${count === 1 ? '' : 'es'} in ${files} file${files === 1 ? '' : 's'}.`
+  const what = `Replaced ${formatNumber(count)} match${count === 1 ? '' : 'es'} in ${formatNumber(files)} file${files === 1 ? '' : 's'}.`
   const save = toSave.value
   showToast(
     save ? `${what} Undo from each file's History. Changes aren't saved to the files on disk yet.` : `${what} Undo from each document's History.`,
@@ -142,7 +142,7 @@ async function onReplaceAll() {
   const n = totalMatches.value
   const files = results.value.length
   const shown = search.replace ? `“${search.replace}”` : 'nothing (delete them)'
-  if (!confirm(`Replace ${n.toLocaleString()} match${n === 1 ? '' : 'es'} in ${files} file${files === 1 ? '' : 's'} with ${shown}?`)) return
+  if (!confirm(`Replace ${formatNumber(n)} match${n === 1 ? '' : 'es'} in ${formatNumber(files)} file${files === 1 ? '' : 's'} with ${shown}?`)) return
   replacing.value = true
   try {
     afterReplace(await replaceAll(results.value.map((r) => r.target), search.query, options.value, search.replace))
