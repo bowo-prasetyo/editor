@@ -1,12 +1,20 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { prefs } from './prefs'
+import { NONE } from './folders'
 import AppToast from './components/AppToast.vue'
+import QuickOpen from './components/QuickOpen.vue'
 import { openFiles } from './openFiles'
 import { droppedHandles } from './fileaccess'
 
 // Drop files anywhere in the app to open them.
 const router = useRouter()
+const route = useRoute()
+// Files dropped on the document list go into the folder it shows.
+const dropFolder = () => (route.name === 'home' && prefs.folderView !== NONE ? prefs.folderView : '')
+const quickOpen = ref(null)
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
 const dragging = ref(false)
 let depth = 0
 const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files')
@@ -33,9 +41,13 @@ function onDrop(e) {
   // Handles (where offered) let Save write back to the dropped files. They
   // must be requested now, before the drop event is over.
   const handles = droppedHandles(e.dataTransfer)
-  if (!handles) return openFiles(files, router)
+  if (!handles) return openFiles(files, router, { folder: dropFolder() })
   handles.then((hs) =>
-    openFiles(files.map((file, i) => ({ file, handle: hs[i]?.kind === 'file' ? hs[i] : null })), router),
+    openFiles(
+      files.map((file, i) => ({ file, handle: hs[i]?.kind === 'file' ? hs[i] : null })),
+      router,
+      { folder: dropFolder() },
+    ),
   )
 }
 
@@ -47,7 +59,12 @@ onBeforeUnmount(() => Object.entries(events).forEach(([k, f]) => window.removeEv
 <template>
   <header class="topbar">
     <RouterLink to="/" class="brand">📝 Editor</RouterLink>
-    <span class="hint">Everything is saved in your browser</span>
+    <span class="topbar-right">
+      <span class="hint">Everything is saved in your browser</span>
+      <button class="quick-button" :title="`Go to a document (${isMac ? '⌘' : 'Ctrl+'}P)`" @click="quickOpen.show()">
+        Go to… <kbd>{{ isMac ? '⌘P' : 'Ctrl+P' }}</kbd>
+      </button>
+    </span>
   </header>
   <main>
     <RouterView />
@@ -55,5 +72,6 @@ onBeforeUnmount(() => Object.entries(events).forEach(([k, f]) => window.removeEv
   <div v-if="dragging" class="drop-overlay" aria-hidden="true">
     <div>Drop files to open them</div>
   </div>
+  <QuickOpen ref="quickOpen" />
   <AppToast />
 </template>

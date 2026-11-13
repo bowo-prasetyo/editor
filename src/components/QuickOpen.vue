@@ -1,0 +1,178 @@
+<script setup>
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { createDoc, moveToFolder, requestPersistence, state } from '../store'
+import { displayName } from '../naming'
+import { prefs } from '../prefs'
+import { fuzzyMatch, highlightRuns } from '../fuzzy'
+import { normalizeFolder } from '../folders'
+
+// Ctrl/Cmd+P: jump to any document by typing part of its name or folder.
+// With nothing typed, recently opened documents come first.
+const router = useRouter()
+const open = ref(false)
+const query = ref('')
+const active = ref(0)
+const input = ref(null)
+const list = ref(null)
+let returnFocus = null
+
+const MAX_SHOWN = 50
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+
+const docs = computed(() => state.docs.filter((d) => !d.deletedAt))
+
+const results = computed(() => {
+  const q = query.value.trim()
+  if (!q) {
+    const rank = new Map(prefs.recent.map((id, i) => [id, i]))
+    return [...docs.value]
+      .sort((a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity) || b.updatedAt - a.updatedAt)
+      .slice(0, MAX_SHOWN)
+      .map((doc) => ({ doc, name: displayName(doc.name), positions: [], folderPositions: [] }))
+  }
+  const out = []
+  for (const doc of docs.value) {
+    const name = displayName(doc.name)
+    const folder = doc.folder ? doc.folder + '/' : ''
+    const m = fuzzyMatch(q, folder + name, folder.length)
+    if (!m) continue
+    out.push({
+      doc,
+      name,
+      score: m.score,
+      positions: m.positions.filter((p) => p >= folder.length).map((p) => p - folder.length),
+      folderPositions: m.positions.filter((p) => p < folder.length),
+    })
+  }
+  return out.sort((a, b) => b.score - a.score || b.doc.updatedAt - a.doc.updatedAt).slice(0, MAX_SHOWN)
+})
+
+// "Work/todo.md" creates todo.md in the Work folder.
+const createLabel = computed(() => {
+  const q = query.value.trim()
+  if (!q || results.value.some((r) => r.doc.name.toLowerCase() === q.toLowerCase())) return ''
+  return q
+})
+const count = computed(() => results.value.length + (createLabel.value ? 1 : 0))
+
+watch(query, () => (active.value = 0))
+watch(active, async (i) => {
+  await nextTick()
+  list.value?.querySelector(`[data-index="${i}"]`)?.scrollIntoView({ block: 'nearest' })
+})
+
+async function show() {
+  returnFocus = document.activeElement
+  query.value = ''
+  active.value = 0
+  open.value = true
+  await nextTick()
+  input.value?.focus()
+}
+
+function hide(refocus = true) {
+  open.value = false
+  if (refocus) returnFocus?.focus?.()
+}
+
+function choose(i) {
+  if (i < results.value.length) {
+    hide(false)
+    router.push({ name: 'edit', params: { id: results.value[i].doc.id } })
+  } else if (createLabel.value) {
+    const path = normalizeFolder(createLabel.value)
+    const slash = path.lastIndexOf('/')
+    let name = path.slice(slash + 1)
+    if (!/\.[^.]+$/.test(name)) name += '.txt'
+    const doc = createDoc(name, '', { autoName: false })
+    if (slash > 0) moveToFolder(doc.id, path.slice(0, slash))
+    requestPersistence()
+    hide(false)
+    router.push({ name: 'edit', params: { id: doc.id } })
+  }
+}
+
+function onKey(e) {
+  if (e.key === 'ArrowDown') active.value = (active.value + 1) % Math.max(1, count.value)
+  else if (e.key === 'ArrowUp') active.value = (active.value - 1 + count.value) % Math.max(1, count.value)
+  else if (e.key === 'Enter') choose(active.value)
+  else if (e.key === 'Escape') hide()
+  else return
+  e.preventDefault()
+}
+
+// Ctrl+P (Cmd+P on a Mac), anywhere. Printing stays in the editor's toolbar.
+function onWindowKey(e) {
+  const mod = isMac ? e.metaKey : e.ctrlKey
+  if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'p') {
+    e.preventDefault()
+    e.stopPropagation()
+    open.value ? hide() : show()
+  }
+}
+onMounted(() => window.addEventListener('keydown', onWindowKey, true))
+onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKey, true))
+
+defineExpose({ show })
+const folderRuns = (r) => highlightRuns(r.doc.folder ?? '', r.folderPositions)
+const id = (i) => `quick-open-${i}`
+</script>
+
+<template>
+  <div v-if="open" class="quick-backdrop" @mousedown.self="hide()">
+    <div class="quick" role="dialog" aria-modal="true" aria-label="Go to document">
+      <input
+        ref="input"
+        v-model="query"
+        class="quick-input"
+        placeholder="Go to document… (type a name or folder)"
+        role="combobox"
+        aria-expanded="true"
+        aria-controls="quick-open-list"
+        :aria-activedescendant="count ? id(active) : undefined"
+        autocomplete="off"
+        spellcheck="false"
+        @keydown="onKey"
+      />
+      <ul id="quick-open-list" ref="list" class="quick-list" role="listbox">
+        <li
+          v-for="(r, i) in results"
+          :id="id(i)"
+          :key="r.doc.id"
+          :data-index="i"
+          role="option"
+          :aria-selected="i === active"
+          :class="{ active: i === active }"
+          @mousemove="active = i"
+          @click="choose(i)"
+        >
+          <span class="quick-name">
+            <template v-for="(run, k) in highlightRuns(r.name, r.positions)" :key="k">
+              <mark v-if="run.hit">{{ run.text }}</mark><template v-else>{{ run.text }}</template>
+            </template>
+          </span>
+          <span v-if="r.doc.folder" class="quick-folder">
+            <template v-for="(run, k) in folderRuns(r)" :key="k">
+              <mark v-if="run.hit">{{ run.text }}</mark><template v-else>{{ run.text }}</template>
+            </template>
+          </span>
+        </li>
+        <li
+          v-if="createLabel"
+          :id="id(results.length)"
+          :data-index="results.length"
+          role="option"
+          :aria-selected="active === results.length"
+          :class="{ active: active === results.length }"
+          class="quick-create"
+          @mousemove="active = results.length"
+          @click="choose(results.length)"
+        >
+          + Create “{{ createLabel }}”
+        </li>
+        <li v-if="!count" class="quick-empty">No documents yet</li>
+      </ul>
+    </div>
+  </div>
+</template>

@@ -190,16 +190,21 @@ const findHighlighter = ViewPlugin.fromClass(
 
 // --- The editor -----------------------------------------------------------
 
-// options: { parent, text, name, wrap, spellcheck, onChange(text), onSelection(info) }
+// Settings that change after creation. Shared by all editors, so a saved
+// editor state (see snapshot()) can be resumed by a new editor.
+const wrapping = new Compartment()
+const spelling = new Compartment()
+const language = new Compartment()
+const listening = new Compartment() // the page's change listener
+
+const spellAttrs = (on) => EditorView.contentAttributes.of({ spellcheck: on ? 'true' : 'false' })
+
+// options: { parent, text, name, wrap, spellcheck, onChange(text), onSelection(info), saved }
 // Returns a small API used by the editor page and the find bar. The language
 // is set separately with setLanguage(), since it loads asynchronously.
-export function createEditor({ parent, text, name, wrap, spellcheck, onChange, onSelection }) {
-  const wrapping = new Compartment()
-  const spelling = new Compartment()
-  const language = new Compartment()
-
-  const spellAttrs = (on) => EditorView.contentAttributes.of({ spellcheck: on ? 'true' : 'false' })
-
+// `saved` is a snapshot() of an earlier editor for the same document: it
+// brings back its undo history, selection and scroll position.
+export function createEditor({ parent, text, name, wrap, spellcheck, onChange, onSelection, saved }) {
   // The document text as last handed to or received from the page, so the
   // page can tell its own echo from a real outside change cheaply.
   let synced = text
@@ -217,9 +222,16 @@ export function createEditor({ parent, text, name, wrap, spellcheck, onChange, o
     })
   }
 
-  const view = new EditorView({
-    parent,
-    state: EditorState.create({
+  const listener = EditorView.updateListener.of((u) => {
+    if (u.docChanged) {
+      synced = u.state.doc.toString()
+      onChange?.(synced)
+    }
+    if (u.docChanged || u.selectionSet) report(u.state)
+  })
+
+  const fresh = () =>
+    EditorState.create({
       doc: text,
       extensions: [
         lineNumbers(),
@@ -250,22 +262,43 @@ export function createEditor({ parent, text, name, wrap, spellcheck, onChange, o
         findMatchesField,
         findHighlighter,
         EditorView.contentAttributes.of({ 'aria-label': 'Document text', autocapitalize: 'off' }),
-        EditorView.updateListener.of((u) => {
-          if (u.docChanged) {
-            synced = u.state.doc.toString()
-            onChange?.(synced)
-          }
-          if (u.docChanged || u.selectionSet) report(u.state)
-        }),
+        listening.of(listener),
       ],
-    }),
-  })
+    })
+
+  // A saved state, with this page's listener and current settings.
+  const resumed = () =>
+    saved.state.update({
+      effects: [
+        listening.reconfigure(listener),
+        wrapping.reconfigure(wrap ? EditorView.lineWrapping : []),
+        spelling.reconfigure(spellAttrs(spellcheck)),
+        setFindMatches.of([]),
+      ],
+    }).state
+
+  const view = new EditorView({ parent, state: saved ? resumed() : fresh() })
+  if (saved) {
+    // The document may have changed elsewhere since (another tab).
+    synced = view.state.doc.toString()
+    if (synced !== text) {
+      synced = text
+      const { from, to } = view.state.selection.main
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: text },
+        selection: EditorSelection.single(Math.min(from, text.length), Math.min(to, text.length)),
+      })
+    }
+    if (saved.scroll) view.dispatch({ effects: saved.scroll })
+  }
   report(view.state)
 
   const selection = () => view.state.selection.main
 
   return {
     view,
+    // Everything needed to resume this editor later (see `saved` above).
+    snapshot: () => ({ state: view.state, scroll: view.scrollSnapshot() }),
     focus: () => view.focus(),
     destroy: () => view.destroy(),
     hasFocus: () => view.hasFocus,

@@ -1,4 +1,4 @@
-import { importFile, BinaryFileError, requestPersistence } from './store'
+import { importFile, BinaryFileError, moveToFolder, requestPersistence } from './store'
 import { showToast } from './toast'
 
 // Text-ish files the picker offers (anything can still be dropped; binary
@@ -12,14 +12,16 @@ export const TEXT_ACCEPT = [
 
 // Import files as new documents and open the last one. Each entry is a File,
 // or { file, handle } when the browser gave us a handle to save back to.
-// Returns the docs.
-export async function openFiles(entries, router) {
+// `folder` puts them in that folder. Returns the docs.
+export async function openFiles(entries, router, { folder = '' } = {}) {
   const opened = []
   const refused = []
   for (const entry of entries) {
     const { file, handle } = entry instanceof Blob ? { file: entry, handle: null } : entry
     try {
-      opened.push(await importFile(file, handle?.kind === 'file' ? handle : null))
+      const doc = await importFile(file, handle?.kind === 'file' ? handle : null)
+      if (folder) moveToFolder(doc.id, folder)
+      opened.push(doc)
     } catch (e) {
       if (e instanceof BinaryFileError) refused.push(file.name)
       else throw e

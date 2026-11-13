@@ -3,6 +3,7 @@ import { decodeBytes, encodeText } from './textcodec.js'
 import { DEFAULT_NAME, nameFromContent } from './naming.js'
 import { extension } from './filetype.js'
 import { openBackend } from './backends.js'
+import { normalizeFolder, parentFolder, renamedFolder } from './folders.js'
 
 // Documents live in the browser: IndexedDB normally, localStorage where
 // IndexedDB isn't available (see backends.js). The list is kept in memory
@@ -230,7 +231,8 @@ export function hasUnsaved() {
 // extra: { autoName, eol, encoding, bom } and anything else to keep on the doc.
 // A new blank document is named from its first line until the user renames it.
 export function createDoc(name = DEFAULT_NAME, content = '', extra = { autoName: name === DEFAULT_NAME }) {
-  const doc = { id: crypto.randomUUID(), name, content, updatedAt: Date.now(), ...extra }
+  const now = Date.now()
+  const doc = { id: crypto.randomUUID(), name, content, createdAt: now, updatedAt: now, ...extra }
   state.docs.unshift(doc)
   schedule(doc.id)
   flush(doc.id)
@@ -272,6 +274,29 @@ export function setDocOptions(id, patch) {
   Object.assign(doc, patch)
   schedule(id)
 }
+
+// --- Folders (see folders.js) ------------------------------------------------
+
+// Moving isn't an edit: it doesn't change when the document was last edited.
+export function moveToFolder(id, folder) {
+  setDocOptions(id, { folder: normalizeFolder(folder) || undefined })
+}
+
+// Rename folder `from` to `to` (or move it inside another folder), taking its
+// documents and subfolders along. Returns how many documents moved.
+export function renameFolder(from, to) {
+  let n = 0
+  for (const d of state.docs) {
+    const next = renamedFolder(d.folder, from, normalizeFolder(to))
+    if (next === undefined) continue
+    moveToFolder(d.id, next)
+    n++
+  }
+  return n
+}
+
+// Remove a folder: its documents (and subfolders) move up to its parent.
+export const removeFolder = (path) => renameFolder(path, parentFolder(path))
 
 // --- Files on disk (see fileaccess.js) -------------------------------------
 

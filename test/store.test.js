@@ -322,3 +322,23 @@ test('indexedDB: an older rescue copy never replaces a newer saved version', asy
   assert.equal(s2.getDoc(d.id).content, 'new')
   assert.equal(localStorage.getItem('editor.rescue.' + d.id), null)
 })
+
+test('folders: moving keeps the edit time; renaming and removing carry subfolders', async () => {
+  const s = await load()
+  const a = s.createDoc('a.txt', 'a', { autoName: false })
+  const b = s.createDoc('b.txt', 'b', { autoName: false })
+  assert.ok(a.createdAt)
+  const edited = a.updatedAt
+  s.moveToFolder(a.id, ' Work / Clients ')
+  s.moveToFolder(b.id, 'Work')
+  assert.equal(s.getDoc(a.id).folder, 'Work/Clients')
+  assert.equal(s.getDoc(a.id).updatedAt, edited)
+  assert.equal(s.renameFolder('Work', 'Job'), 2)
+  assert.deepEqual([s.getDoc(a.id).folder, s.getDoc(b.id).folder], ['Job/Clients', 'Job'])
+  s.removeFolder('Job/Clients')
+  assert.equal(s.getDoc(a.id).folder, 'Job')
+  s.removeFolder('Job')
+  assert.equal(s.getDoc(a.id).folder, undefined)
+  await s.flushAll()
+  assert.equal('folder' in stored(a.id), false)
+})
