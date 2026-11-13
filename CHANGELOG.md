@@ -8,6 +8,13 @@ minor version (0.x) can change how things work.
 
 ### Added
 
+- **Plumb in Indonesian (Bahasa Indonesia).** Every message, including the
+  editor's own panels, with Indonesian number and date formats. A browser set
+  to Indonesian gets it from the first visit; **Settings → Language** picks
+  it anywhere. Native speakers' corrections are welcome: the words used are in
+  [Translating Plumb](docs/translating.md#indonesian).
+- **New drafts are named in the interface language** ("Untitled.md",
+  "Tanpa judul.md"), and so is a document without a name.
 - **Plumb can be translated.** Every word on screen (about 650 messages,
   including the editor's own panels) now comes from one catalog,
   `src/locales/en.json`, in the i18next JSON format translation tools use.

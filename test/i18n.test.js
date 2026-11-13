@@ -188,3 +188,29 @@ test('translations use the catalog’s keys and the same placeholders as English
     }
   }
 })
+
+// --- Indonesian -------------------------------------------------------------------
+
+const id = JSON.parse(readFileSync(new URL('../src/locales/id.json', import.meta.url)))
+
+test('Indonesian has every message (one plural form, so no _one keys)', () => {
+  const have = new Set(flatten(id).map(([key]) => baseKey(key)))
+  const missing = [...new Set(messages.map(([key]) => baseKey(key)))].filter((key) => !have.has(key))
+  assert.deepEqual(missing, [])
+  assert.deepEqual(flatten(id).filter(([key]) => /_(zero|one|two|few|many)$/.test(key)), [], 'Indonesian plurals are all "other"')
+})
+
+test('in Indonesian: its words, its plural, its numbers and dates', async () => {
+  registerCatalogs({ id: async () => id })
+  try {
+    assert.equal(await useLanguage('', ['id-ID']), 'id')
+    assert.equal(t('common.newDocument'), 'Dokumen baru')
+    assert.equal(t('editor.words', { count: 1 }), '1 kata')
+    assert.equal(t('editor.words', { count: 1234 }), '1.234 kata')
+    assert.equal(t('home.trashNote', { count: 30 }), 'Dokumen di Tempat Sampah dihapus selamanya setelah 30 hari.')
+    assert.equal(locale(), 'id')
+    assert.equal(languageName('id'), 'Bahasa Indonesia')
+  } finally {
+    await useLanguage('en')
+  }
+})

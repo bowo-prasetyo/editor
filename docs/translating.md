@@ -5,6 +5,45 @@ A translation is a copy of that file in another language, next to it. Once
 it's there, Plumb offers the language in Settings and picks it for people
 whose browser asks for it.
 
+## Languages
+
+| Language | File | State |
+|---|---|---|
+| English | `en.json` | The source |
+| Indonesian (Bahasa Indonesia) | `id.json` | Complete; needs review by native speakers |
+
+A test checks that Indonesian has every message, so a new English message
+must be translated before it can be merged. Send corrections as a pull request,
+or open an issue quoting the key (for example `home.welcome.drafts`).
+
+### Indonesian
+
+Indonesian has one plural form, so it has only the `_other` keys: "1 berkas",
+"3 berkas". Where English says something different for one and for many
+("delete it" and "delete them"), the Indonesian is written to fit both.
+Words used throughout:
+
+| English | Indonesian | Why |
+|---|---|---|
+| file | berkas | The standard term (KBBI), as in Firefox and GNOME |
+| folder | folder | What everyone says; "map" reads as a geographic map |
+| draft | draf | |
+| browser | peramban | The standard term, as in Firefox |
+| Trash | Tempat Sampah | |
+| save / download | Simpan / Unduh | |
+| undo / redo | Urungkan / Ulangi | |
+| open / go to | Buka / Lompat ke | Kept apart: "Buka…" for Go to would read as Open |
+| edit (noun) | suntingan | "perubahan" for changes in general |
+| wrap long lines | bungkus baris panjang | "Lipat" is fold, in the editor |
+| fold / unfold | lipat / buka lipatan | |
+| shortcut | pintasan | |
+| command palette | palet perintah | |
+| heading | judul bagian | "Judul" alone is a title |
+| match case | peka huruf besar/kecil | |
+| offline | luring / tanpa internet | "tanpa internet" in sentences, "Luring" in the header |
+
+The second person is the polite *Anda*, as in most Indonesian software.
+
 ## Adding a language
 
 1. **Copy** `src/locales/en.json` to `src/locales/<language>.json`, named by
