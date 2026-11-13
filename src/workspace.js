@@ -28,6 +28,7 @@ import {
 import { decodeBytes, fileFormat } from './textcodec.js'
 import { editorSettings, parseEditorConfig, propertiesFor } from './editorconfig.js'
 import { dropPrefix, markChanged } from './filecache.js'
+import { compareNatural } from './locale.js'
 
 export const canOpenFolder = () => typeof globalThis.showDirectoryPicker === 'function'
 
@@ -167,12 +168,10 @@ export async function closeFolder(id) {
 
 // --- Listing folders --------------------------------------------------------------
 
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
-
 // Folders first, then files, each in natural order.
 export const sortEntries = (entries) =>
   [...entries].sort(
-    (a, b) => (a.kind === b.kind ? 0 : a.kind === 'directory' ? -1 : 1) || collator.compare(a.name, b.name),
+    (a, b) => (a.kind === b.kind ? 0 : a.kind === 'directory' ? -1 : 1) || compareNatural(a.name, b.name),
   )
 
 export async function listDirectory(dir) {

@@ -120,30 +120,30 @@ async function onOpenFolder() {
 // Commands available everywhere (the editor adds its own while open).
 registerCommands([
   {
-    id: 'newDocument', title: 'New document', group: 'Documents',
+    id: 'newDocument', title: 'New document', group: 'documents',
     run: () => {
       const doc = createDoc()
       requestPersistence()
       router.push({ name: 'edit', params: { id: doc.id } })
     },
   },
-  { id: 'goToDocument', title: 'Go to document…', group: 'Documents', shortcut: 'quickOpen', run: () => quickOpen.value.show() },
+  { id: 'goToDocument', title: 'Go to document…', group: 'documents', shortcut: 'quickOpen', run: () => quickOpen.value.show() },
   // In a Markdown document: its headings in the quick switcher ("#").
-  { id: 'goToHeading', title: 'Go to heading…', group: 'Editor', when: () => (ui.headings?.() ?? []).length > 0, run: () => quickOpen.value.show('#') },
-  { id: 'allDocuments', title: 'Show all documents', group: 'Documents', run: () => router.push({ name: 'home' }) },
-  { id: 'settings', title: 'Open settings', group: 'Settings', shortcut: 'settings', run: () => router.push({ name: 'settings' }) },
-  { id: 'searchAll', title: 'Search in all documents and folders', group: 'Documents', shortcut: 'searchAll', run: openSearch },
-  { id: 'saveAll', title: 'Save all changed files', group: 'Files', shortcut: 'saveAll', when: () => unsavedToDisk().length > 0, run: saveAll },
-  { id: 'openFolder', title: 'Open folder…', group: 'Files', when: canOpenFolder, run: onOpenFolder },
+  { id: 'goToHeading', title: 'Go to heading…', group: 'editor', when: () => (ui.headings?.() ?? []).length > 0, run: () => quickOpen.value.show('#') },
+  { id: 'allDocuments', title: 'Show all documents', group: 'documents', run: () => router.push({ name: 'home' }) },
+  { id: 'settings', title: 'Open settings', group: 'settings', shortcut: 'settings', run: () => router.push({ name: 'settings' }) },
+  { id: 'searchAll', title: 'Search in all documents and folders', group: 'documents', shortcut: 'searchAll', run: openSearch },
+  { id: 'saveAll', title: 'Save all changed files', group: 'files', shortcut: 'saveAll', when: () => unsavedToDisk().length > 0, run: saveAll },
+  { id: 'openFolder', title: 'Open folder…', group: 'files', when: canOpenFolder, run: onOpenFolder },
   {
-    id: 'toggleSidebar', title: 'Show or hide the folder sidebar', group: 'Files', shortcut: 'sidebar',
+    id: 'toggleSidebar', title: 'Show or hide the folder sidebar', group: 'files', shortcut: 'sidebar',
     when: () => prefs.workspaces.length > 0, run: () => (prefs.sidebar = !prefs.sidebar),
   },
-  { id: 'refreshFolders', title: 'Read folders from disk again', group: 'Files', when: () => prefs.workspaces.length > 0, run: () => forgetListings() },
-  { id: 'exportBackup', title: 'Export all documents as a backup', group: 'Documents', run: downloadBackup },
-  { id: 'shortcuts', title: 'Show keyboard shortcuts', group: 'Help', shortcut: 'shortcuts', run: () => (ui.shortcutsOpen = true) },
-  { id: 'install', title: 'Install Plumb as an app', group: 'Help', when: () => pwa.canInstall, run: install },
-  { id: 'update', title: 'Reload to use the new version', group: 'Help', when: () => pwa.updateReady, run: applyUpdate },
+  { id: 'refreshFolders', title: 'Read folders from disk again', group: 'files', when: () => prefs.workspaces.length > 0, run: () => forgetListings() },
+  { id: 'exportBackup', title: 'Export all documents as a backup', group: 'documents', run: downloadBackup },
+  { id: 'shortcuts', title: 'Show keyboard shortcuts', group: 'help', shortcut: 'shortcuts', run: () => (ui.shortcutsOpen = true) },
+  { id: 'install', title: 'Install Plumb as an app', group: 'help', when: () => pwa.canInstall, run: install },
+  { id: 'update', title: 'Reload to use the new version', group: 'help', when: () => pwa.updateReady, run: applyUpdate },
 ])
 const dragging = ref(false)
 let depth = 0

@@ -16,6 +16,7 @@ import { EditorState } from '@codemirror/state'
 import { theme } from '../cm'
 import { displayName } from '../naming'
 import { showToast } from '../toast'
+import { formatDate, formatDateTime, formatNumber, formatRelative } from '../locale'
 
 // Earlier versions of a document: what changed since each one, and bringing
 // one back. The diff view (CodeMirror's merge package) loads on first use.
@@ -40,17 +41,10 @@ async function refresh() {
 
 // --- Labels ---------------------------------------------------------------------
 
-const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-function ago(t) {
-  const s = Math.round((t - Date.now()) / 1000)
-  if (Math.abs(s) < 60) return 'just now'
-  for (const [unit, n] of [['day', 86400], ['hour', 3600], ['minute', 60]]) {
-    if (Math.abs(s) >= n) return relative.format(Math.round(s / n), unit)
-  }
-}
-const when = (t) => new Date(t).toLocaleString()
+const ago = (t) => formatRelative(t)
+const when = (t) => formatDateTime(t)
 const describe = (v) => v.label || KINDS[v.kind] || v.kind
-const chars = (n) => `${n.toLocaleString()} chars`
+const chars = (n) => `${formatNumber(n)} chars`
 
 // --- The diff -------------------------------------------------------------------
 
@@ -142,7 +136,7 @@ async function saveVersion() {
 function openCopy() {
   const v = selected.value
   if (!v || selectedText.value == null) return
-  const base = displayName(props.doc.name).replace(/(\.[^.]+)?$/, (ext) => ` (${new Date(v.at).toLocaleDateString()})${ext}`)
+  const base = displayName(props.doc.name).replace(/(\.[^.]+)?$/, (ext) => ` (${formatDate(v.at)})${ext}`)
   const copy = createDoc(base, selectedText.value, { autoName: false })
   if (props.doc.folder) moveToFolder(copy.id, props.doc.folder)
   router.push({ name: 'edit', params: { id: copy.id } })

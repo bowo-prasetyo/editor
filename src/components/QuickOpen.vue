@@ -6,7 +6,7 @@ import { displayName } from '../naming'
 import { prefs } from '../prefs'
 import { fuzzyMatch, highlightRuns } from '../fuzzy'
 import { normalizeFolder } from '../folders'
-import { availableCommands, ui } from '../commands'
+import { availableCommands, groupName, ui } from '../commands'
 import { isMac, keyLabel, shortcut } from '../keys'
 import { BinaryFileError } from '../store'
 import { showToast } from '../toast'
@@ -284,7 +284,7 @@ const id = (i) => `quick-open-${i}`
                 <mark v-if="run.hit">{{ run.text }}</mark><template v-else>{{ run.text }}</template>
               </template>
             </span>
-            <span class="quick-folder">{{ r.recent ? 'Recently used' : r.command.group }}</span>
+            <span class="quick-folder">{{ r.recent ? 'Recently used' : groupName(r.command.group) }}</span>
             <kbd v-if="keysFor(r.command)" class="quick-keys">{{ keysFor(r.command) }}</kbd>
           </li>
           <li v-if="!commandResults.length" class="quick-empty">No matching commands</li>

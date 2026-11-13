@@ -36,6 +36,14 @@ minor version (0.x) can change how things work.
 
 ### Changed
 
+- **Groundwork for translating Plumb.** Numbers, dates, sizes and sorting all
+  use one locale, set in one place (`src/locale.js`). It is still the
+  browser's own, so nothing looks different, except that the status bar and
+  find counts now group digits (*1,206 words*) like the rest of the app, and
+  version history says *now* for a version made in the last minute. Command
+  groups, shortcut groups and a file's status are now kept as ids with the
+  words shown looked up separately, so a translated word can't change how Plumb
+  behaves.
 - **The docs are easier to follow.** The reference names the parts of the
   screen before using them, says plainly that drafts live in this browser
   only (and what deletes them), and has a new *Troubleshooting* section. Its
@@ -73,6 +81,16 @@ minor version (0.x) can change how things work.
 
 ### Fixed
 
+- **Words in Chinese, Japanese, Thai, Lao, Khmer and Burmese are counted.**
+  These languages don't put spaces between words, so a whole sentence counted
+  as one word. The browser's word breaker now splits them.
+- **A draft named after a long first line no longer ends in half an emoji**
+  (or a letter without its accent): the name is cut between characters as you
+  see them.
+- **The quick switcher matches accented letters however they're stored.**
+  Typing *café* finds a file whose name macOS stored as *cafe* plus a separate
+  accent, and the highlight covers the whole letter. Letters such as *İ*, which
+  turn into two characters when lowercased, no longer move the highlight.
 - **Contrast in dark mode:** primary buttons (white on light blue, 3.1:1) and
   *added* lines in History (3.7:1) now pass 4.5:1, and so do code comments on
   the current line in light mode (4.2:1). A test checks every text colour on

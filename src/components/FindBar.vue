@@ -5,6 +5,7 @@ const last = { query: '', replacement: '', matchCase: false, wholeWord: false, r
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { formatNumber } from '../locale'
 import {
   MAX_MATCHES,
   escapeRegExp,
@@ -63,7 +64,7 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
 
 const matches = computed(() => findMatches(searched.value, query.value, options.value, MAX_MATCHES))
 const total = computed(() => {
-  const n = matches.value.length.toLocaleString()
+  const n = formatNumber(matches.value.length)
   return matches.value.length >= MAX_MATCHES ? `${n}+` : n
 })
 
@@ -72,7 +73,7 @@ const count = computed(() => {
   if (!query.value) return ''
   if (error.value) return error.value
   if (!matches.value.length) return 'No results'
-  return current.value >= 0 ? `${(current.value + 1).toLocaleString()} of ${total.value}` : `${total.value} found`
+  return current.value >= 0 ? `${formatNumber(current.value + 1)} of ${formatNumber(total.value)}` : `${formatNumber(total.value)} found`
 })
 
 const selection = () => props.editor?.getSelection() ?? { from: 0, to: 0 }
@@ -153,7 +154,7 @@ async function replaceAll() {
   props.editor.replace(edit.from, edit.to, edit.insert)
   await nextTick()
   current.value = -1
-  message.value = `Replaced ${edit.count.toLocaleString()}`
+  message.value = `Replaced ${formatNumber(edit.count)}`
 }
 
 // Alt+C, Alt+W, Alt+R toggle match case, whole word and regex (by key

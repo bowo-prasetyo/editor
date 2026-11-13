@@ -27,6 +27,7 @@ import { togglePin } from '../drafts'
 import { forgetRecentFile, recentFiles } from '../recent'
 import { FOLDER_NOTE, downloadsNote, savesAsDownloads } from '../platform'
 import { keyLabel } from '../keys'
+import { formatBytes, formatDateTime, formatNumber } from '../locale'
 
 const router = useRouter()
 const fileInput = ref(null)
@@ -145,7 +146,7 @@ async function onBackup(e) {
   if (!file) return
   try {
     const { added, skipped } = importBackup(JSON.parse(await file.text()))
-    const docs = (n) => `${n} document${n === 1 ? '' : 's'}`
+    const docs = (n) => `${formatNumber(n)} document${n === 1 ? '' : 's'}`
     showToast(
       !added
         ? `Nothing to restore: ${skipped === 1 ? 'that document is' : `all ${docs(skipped)} are`} already here.`
@@ -170,19 +171,18 @@ function deleteForever(doc) {
 }
 function onEmptyTrash() {
   const n = trash.value.length
-  if (confirm(`Delete ${n} document${n === 1 ? '' : 's'} in the Trash forever? This can't be undone.`))
+  if (confirm(`Delete ${formatNumber(n)} document${n === 1 ? '' : 's'} in the Trash forever? This can't be undone.`))
     emptyTrash()
 }
 
 // Storage use, shown under the list so people know how much room is left.
 const usage = ref(null)
-const mb = (b) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.max(0.1, b / 1e6).toFixed(1)} MB`)
 onMounted(async () => {
   const est = await storageEstimate()
-  if (est?.quota) usage.value = `${mb(est.usage ?? 0)} used of ${mb(est.quota)} available`
+  if (est?.quota) usage.value = `${formatBytes(est.usage ?? 0)} used of ${formatBytes(est.quota)} available`
 })
 
-const fmt = (t) => new Date(t).toLocaleString()
+const fmt = (t) => formatDateTime(t)
 const daysLeft = (d) =>
   Math.max(0, Math.ceil(TRASH_DAYS - (Date.now() - d.deletedAt) / (24 * 60 * 60 * 1000)))
 </script>
@@ -322,7 +322,7 @@ const daysLeft = (d) =>
           <li v-for="doc in docs" :key="doc.id">
             <RouterLink :to="{ name: 'edit', params: { id: doc.id } }" class="doc-link">
               <strong :class="{ untitled: !doc.name?.trim() }">{{ displayName(doc.name) }}</strong>
-              <small>{{ fmt(doc.updatedAt) }} · {{ doc.content.length.toLocaleString() }} chars</small>
+              <small>{{ fmt(doc.updatedAt) }} · {{ formatNumber(doc.content.length) }} chars</small>
             </RouterLink>
             <span v-if="doc.folder" class="label-chip" :title="`Label: ${doc.folder}`">
               {{ doc.folder }}

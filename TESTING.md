@@ -168,6 +168,15 @@ Markdown and keep the editor focused; the status bar folds its controls
 behind a details button. Ctrl/Cmd+Shift+E shows and hides the sidebar in
 Markdown too (`markdown.spec.js`).
 
+Text in any language (`test/stats.test.js`, `test/naming.test.js`,
+`test/fuzzy.test.js`, `test/locale.test.js`): words are counted in scripts
+written without spaces (Japanese, Thai); names are never cut through an emoji
+or an accent; the quick switcher matches composed and decomposed accents and
+highlights whole letters; numbers, dates, sizes and sorting follow the one
+locale in `src/locale.js` (by default the browser's, identical to a bare
+`toLocaleString()`); and command groups are ids, so renaming one on screen
+doesn't change the palette's order (`test/commands.test.js`).
+
 The folder sidebar (`folders.spec.js`): each folder's tree holds only tree
 items (the folder first, at level 1); arrow keys still move, expand and
 collapse; Enter on the folder's buttons presses them.

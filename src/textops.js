@@ -3,6 +3,7 @@
 // They are plain CodeMirror state commands ({ state, dispatch } => boolean),
 // so they're easy to test, and each one is a single undoable edit.
 import { EditorSelection, EditorState } from '@codemirror/state'
+import { collator } from './locale.js'
 
 // --- Which lines a command works on ------------------------------------------
 
@@ -51,11 +52,9 @@ function mapLineBlocks({ state, dispatch }, fn, options) {
 
 // Natural order ("file2" before "file10"); case only breaks ties unless
 // `ignoreCase`.
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'variant' })
-const caseless = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
 export const sortLinesBy = (lines, { descending = false, ignoreCase = false } = {}) => {
-  const c = ignoreCase ? caseless : collator
+  const c = collator({ numeric: true, sensitivity: ignoreCase ? 'base' : 'variant' })
   const sorted = [...lines].sort((a, b) => c.compare(a, b))
   return descending ? sorted.reverse() : sorted
 }
