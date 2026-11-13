@@ -11,9 +11,11 @@ whose browser asks for it.
 |---|---|---|
 | English | `en.json` | The source |
 | Indonesian (Bahasa Indonesia) | `id.json` | Complete; needs review by native speakers |
+| Japanese (日本語) | `ja.json` | Complete; needs review by native speakers |
 
-A test checks that Indonesian has every message, so a new English message
-must be translated before it can be merged. Send corrections as a pull request,
+A test checks that every translation here has every message, in the plural
+forms its language uses, so a new English message must be translated before
+it can be merged. Send corrections as a pull request,
 or open an issue quoting the key (for example `home.welcome.drafts`).
 
 ### Indonesian
@@ -43,6 +45,34 @@ Words used throughout:
 | offline | luring / tanpa internet | "tanpa internet" in sentences, "Luring" in the header |
 
 The second person is the polite *Anda*, as in most Indonesian software.
+
+### Japanese
+
+Japanese has one plural form, so only the `_other` keys, with counters where
+Japanese uses them ("3 件のファイル", "スペース 2 個"). Messages and
+notifications are in です/ます; buttons and menu items are plain noun or verb
+phrases (保存, ファイルを開く…). Quotation marks are 「」, and names of
+buttons are put in 「」 rather than in italics, which Japanese fonts draw
+poorly. Words used throughout follow common Japanese software (VS Code,
+macOS):
+
+| English | Japanese | Note |
+|---|---|---|
+| file / folder | ファイル / フォルダー | Long vowel marks as in Microsoft's style guide |
+| draft | 下書き | |
+| browser | ブラウザー | |
+| Trash | ゴミ箱 | |
+| save / save as / download | 保存 / 名前を付けて保存 / ダウンロード | |
+| undo / redo | 元に戻す / やり直す | |
+| open / go to | 開く / 移動 | |
+| edit (noun) | 編集内容 | "変更" for changes in general |
+| wrap long lines | 長い行を折り返す | |
+| fold / unfold | 折りたたむ / 展開する | |
+| encoding / line endings | 文字コード / 改行コード | |
+| match case / whole word | 大文字と小文字を区別 / 単語単位 | |
+| heading | 見出し | |
+| version history | バージョン履歴 | |
+| word / character (counts) | 語 / 文字 | |
 
 ## Adding a language
 
