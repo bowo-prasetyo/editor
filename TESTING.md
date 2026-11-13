@@ -128,6 +128,14 @@ The scenarios follow the principles in [VISION.md](VISION.md#principles).
 | Pasting a URL over selected text makes a link; elsewhere it pastes as is | `markdown.spec.js` |
 | Go to heading: `#` in the quick switcher lists headings (not in code blocks; underlined ones too) and jumps to one; also from the palette | `markdown.spec.js`, `test/mdedit.test.js` |
 
+### Firefox and Safari ([VISION.md](VISION.md#the-firefox-and-safari-promise))
+
+| Scenario | Test |
+|---|---|
+| *Open folder…* is shown, disabled, with the reason; Chrome and Edge get no such notes | `platform.spec.js` |
+| A one-time note says Save downloads a copy, naming the browser; once dismissed it stays away | `platform.spec.js`, `test/platform.test.js` |
+| Save downloads a faithful copy (name, line endings) and says where it went | `platform.spec.js` |
+
 ### The editor screen
 
 Naming from the first line and renaming; find and replace all with a one-step
@@ -152,11 +160,13 @@ was fixed: see `src/lineends.js`.)
   without reloading once a folder is open, and reading a file's text after a
   reload is covered by unit tests (`test/workspace.test.js`).
 
-- **Firefox and Safari.** The end-to-end tests run in Chromium only. The
-  Firefox and Safari promise (drafts, single files saved as downloads; see
-  [VISION.md](VISION.md#the-firefox-and-safari-promise)) should get its own
-  run in those browsers once the interface explains the differences (next
-  step 5).
+- **Real Firefox and Safari.** The end-to-end tests run in Chromium only.
+  `platform.spec.js` checks the Firefox and Safari promise there by hiding
+  the File System Access API, as those browsers lack it: *Open folder…*
+  disabled with its reason, the one-time note, and faithful downloads that
+  say where they went. A run in Firefox and WebKit themselves would also
+  catch differences in their editing and storage; Playwright can add them as
+  projects.
 - **Two tabs editing the same document at the same moment.** The rule (keep
   both, the other tab's as a copy) is unit-tested in `test/store.test.js`; it
   is hard to time reliably end to end.

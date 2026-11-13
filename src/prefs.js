@@ -7,6 +7,7 @@ export const FONT_SIZES = [11, 12, 13, 14, 16, 18, 20, 24, 28]
 // tabs: open document ids; recent: recently opened, newest first; sort: how
 // the list is ordered.
 // labelView: the label the list of drafts is filtered by ('' = all).
+// downloadsNoteSeen: the one-time "Save downloads a copy" note was dismissed.
 // Editing helpers (for code): closeBrackets, autocomplete, indentGuides.
 // When saving to a file: trimOnSave (trailing spaces; never in Markdown,
 // where they mean a line break) and finalNewline.
@@ -18,6 +19,7 @@ const defaults = {
   recent: [],
   sort: 'updated',
   labelView: '',
+  downloadsNoteSeen: false,
   closeBrackets: true,
   autocomplete: true,
   indentGuides: true,

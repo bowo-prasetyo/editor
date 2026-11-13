@@ -1,6 +1,8 @@
 # Plumb
 
-Plumb is the private, zero-install editor for the text files on your own computer. It runs entirely in your browser, works offline, and needs no account or server: your text never leaves your machine. See [VISION.md](VISION.md) for where it's going. Built with Vue 3, Vue Router and Vite.
+Plumb is the private, zero-install editor for the text files on your own computer. It runs entirely in your browser, works offline, and needs no account or server: your text never leaves your machine.
+
+**Works best in Chrome and Edge.** There, Plumb opens folders, saves straight back to your files and follows changes made to them on disk. In **Firefox and Safari** you get drafts (kept in the browser, with Trash, history and backup) and single files: open one, edit it, and Save downloads a copy that keeps its name, encoding and line endings. Folders, saving in place and live reload need Chrome or Edge, and Plumb says so: *Open folder…* is greyed out with the reason, a one-time note explains Save, and each download says where it went. See [VISION.md](VISION.md) for where it's going. Built with Vue 3, Vue Router and Vite.
 
 - No server: documents are stored in your browser, in IndexedDB (hundreds of MB; falls back to `localStorage`, about 5 MB, where IndexedDB isn't available). Documents from earlier versions, which used `localStorage`, are moved over automatically. Saving happens shortly after you stop typing; the status bar shows *Saving… / Saved / Not saved*. If the page closes mid-save, a rescue copy is recovered on the next visit. The document list shows how much space is used, and the app asks the browser to keep its storage when you create or open a document.
 - Safe across tabs: documents created or edited in another tab show up live; if two tabs change the same document, the other tab's version is kept as a copy.

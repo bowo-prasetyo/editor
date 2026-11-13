@@ -10,6 +10,7 @@ import { effectiveIndent } from '../indentation'
 import { findLanguage, loadLanguage } from '../languages'
 import { displayName } from '../naming'
 import UnreadFile from './UnreadFile.vue'
+import { downloadedMessage } from '../platform'
 import { liveTabs } from '../session'
 import { saveDoc } from '../fileaccess'
 import { showToast } from '../toast'
@@ -142,6 +143,7 @@ async function onKeydown(e) {
       if (trim || finalNewline) current()?.apply(whitespaceFix({ trim, finalNewline }))
       const r = await saveDoc(getDoc(props.id), { saveAs: e.shiftKey })
       if (r.result === 'saved') showToast(`Saved to “${r.name}”.`, { timeout: 3000 })
+      if (r.result === 'downloaded') showToast(downloadedMessage(r.name), { timeout: 6000 })
     } catch (err) {
       showToast(`Couldn't save the file: ${err.message}`, { timeout: 10000 })
     } finally {

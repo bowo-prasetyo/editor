@@ -25,6 +25,7 @@ import { prefs } from '../prefs'
 import { SORTS, labelsOf, sortDocs } from '../folders'
 import { togglePin } from '../drafts'
 import { forgetRecentFile, recentFiles } from '../recent'
+import { FOLDER_NOTE, downloadsNote, savesAsDownloads } from '../platform'
 
 const router = useRouter()
 const fileInput = ref(null)
@@ -34,6 +35,12 @@ const query = ref('')
 // Drafts only: files from open folders are in the sidebar, not here
 // (see docs/files-and-drafts.md).
 const live = computed(() => state.docs.filter((d) => !d.deletedAt && d.kind !== 'file'))
+
+// What this browser can do (see platform.js): Firefox and Safari can't open
+// folders, and Save downloads a copy there. Said once, plainly.
+const canFolders = canOpenFolder()
+const showDownloadsNote = computed(() => savesAsDownloads() && !prefs.downloadsNoteSeen)
+const dismissDownloadsNote = () => (prefs.downloadsNoteSeen = true)
 
 // Files opened on their own, most recent first (see recent.js).
 const recent = computed(() => {
@@ -177,7 +184,13 @@ const daysLeft = (d) =>
     <div class="actions">
       <button class="primary" @click="newDoc">New document</button>
       <button @click="openPicker">Open files…</button>
-      <button v-if="canOpenFolder()" title="Open a folder from your computer and browse its files in the sidebar" @click="onOpenFolder">
+      <!-- Shown even where folders can't be opened, with the reason (see platform.js). -->
+      <button
+        :disabled="!canFolders"
+        :aria-describedby="canFolders ? undefined : 'folder-note'"
+        :title="canFolders ? 'Open a folder from your computer and browse its files in the sidebar' : FOLDER_NOTE"
+        @click="onOpenFolder"
+      >
         Open folder…
       </button>
       <input ref="fileInput" type="file" multiple :accept="TEXT_ACCEPT" hidden @change="onFiles" />
@@ -189,6 +202,14 @@ const daysLeft = (d) =>
         Import backup…
       </button>
       <input ref="backupInput" type="file" accept=".json,application/json" hidden @change="onBackup" />
+    </div>
+
+    <p v-if="!canFolders" id="folder-note" class="hint platform-note">{{ FOLDER_NOTE }}</p>
+    <div v-if="showDownloadsNote" class="banner info platform-banner" role="status">
+      <span>{{ downloadsNote() }}</span>
+      <span class="banner-actions">
+        <button @click="dismissDownloadsNote">OK</button>
+      </span>
     </div>
 
     <div class="home-body">

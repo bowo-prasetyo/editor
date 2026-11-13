@@ -1,7 +1,7 @@
 {
   "name": "Plumb",
   "short_name": "Plumb",
-  "description": "A private text and code editor that runs in your browser and works offline.",
+  "description": "A private text and code editor that runs in your browser and works offline. Works best in Chrome and Edge.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

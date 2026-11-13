@@ -268,7 +268,7 @@ In order:
    - ~~virtual folders become read-only labels; pinning and **Save to folder…** for drafts~~ (phase 3, done).
 4. ~~**Markdown first-class**~~ *(done: [docs/markdown.md](docs/markdown.md))*: `.md` drafts, the preview toggle, the writing
    conveniences, and moving the sidebar off Ctrl/Cmd+B.
-5. **Explain the platform differences**, as described in
+5. ~~**Explain the platform differences**~~ *(done)*, as described in
    [How Plumb says it](#how-plumb-says-it): greyed-out folder actions with a
    reason, a one-time note, where downloads went, and "Works best in Chrome and
    Edge" in the README and the app's description.
