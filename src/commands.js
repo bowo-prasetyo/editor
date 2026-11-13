@@ -15,7 +15,7 @@ export function registerCommands(list) {
 }
 
 // Groups in the order the palette lists them; others follow, A to Z.
-const GROUP_ORDER = ['Editor', 'Editing', 'Documents', 'Help']
+const GROUP_ORDER = ['Editor', 'Editing', 'Files', 'Documents', 'Settings', 'Help']
 const groupRank = (g) => {
   const i = GROUP_ORDER.indexOf(g)
   return i === -1 ? GROUP_ORDER.length : i

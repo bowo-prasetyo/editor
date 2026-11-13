@@ -37,11 +37,40 @@ import {
   toggleComment,
   undo,
 } from '@codemirror/commands'
-import { HighlightStyle, bracketMatching, indentUnit, syntaxHighlighting } from '@codemirror/language'
+import {
+  HighlightStyle,
+  bracketMatching,
+  codeFolding,
+  foldAll,
+  foldGutter,
+  foldKeymap,
+  unfoldAll,
+  indentUnit,
+  syntaxHighlighting,
+} from '@codemirror/language'
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completeAnyWord,
+  startCompletion,
+} from '@codemirror/autocomplete'
 import { tags as t } from '@lezer/highlight'
 import { highlightSelectionMatches, selectNextOccurrence, selectSelectionMatches } from '@codemirror/search'
 import { commentTokensFor } from './filetype.js'
 import { indentUnitString } from './indentation.js'
+import {
+  joinLines,
+  lowerCase,
+  removeDuplicateLines,
+  reverseLines,
+  sortLinesAscending,
+  sortLinesDescending,
+  sortLinesIgnoreCase,
+  titleCase,
+  trimTrailingWhitespace,
+  upperCase,
+} from './textops.js'
 
 export const INDENT = '  '
 
@@ -131,6 +160,93 @@ export const EDITOR_COMMANDS = {
   selectLine,
   undo,
   redo,
+  sortLinesAscending,
+  sortLinesDescending,
+  sortLinesIgnoreCase,
+  removeDuplicateLines,
+  reverseLines,
+  joinLines,
+  upperCase,
+  lowerCase,
+  titleCase,
+  trimTrailingWhitespace,
+  foldAll,
+  unfoldAll,
+  startCompletion,
+}
+
+// --- Helpers: completion, closing brackets, indentation guides ----------------
+
+// Words already in the document are offered alongside what the language
+// itself suggests (keywords, CSS properties, HTML tags…).
+// Word suggestions carry no type, so where the language suggests the same
+// name (with its kind: function, variable…) only the language's one shows.
+export function documentWords(context) {
+  const result = completeAnyWord(context)
+  return result && { ...result, options: result.options.map(({ label }) => ({ label })) }
+}
+const wordCompletion = EditorState.languageData.of(() => [{ autocomplete: documentWords }])
+
+// Thin vertical lines marking each indentation level, drawn behind the
+// spaces or tabs at the start of each line on screen. A tab is as wide as
+// the tab size, so one guide per tab size works for both.
+const guideMark = new Map()
+function guideFor(size) {
+  if (!guideMark.has(size)) {
+    guideMark.set(size, Decoration.mark({ class: 'cm-indentGuide', attributes: { style: `background-size: ${size}ch 100%` } }))
+  }
+  return guideMark.get(size)
+}
+
+export function indentGuideRanges(doc, from, to, size) {
+  const out = []
+  for (let pos = from; pos <= to; ) {
+    const line = doc.lineAt(pos)
+    const lead = /^[ \t]*/.exec(line.text)[0].length
+    // Only where the indentation reaches at least one level.
+    if (lead && line.text.length > lead) {
+      let width = 0
+      for (let i = 0; i < lead; i++) width += line.text[i] === '\t' ? size - (width % size) : 1
+      if (width >= size) out.push([line.from, line.from + lead])
+    }
+    pos = line.to + 1
+  }
+  return out
+}
+
+function buildGuides(view) {
+  const builder = new RangeSetBuilder()
+  const size = view.state.tabSize
+  for (const { from, to } of view.visibleRanges) {
+    for (const [s, e] of indentGuideRanges(view.state.doc, from, to, size)) builder.add(s, e, guideFor(size))
+  }
+  return builder.finish()
+}
+
+export const indentGuides = ViewPlugin.fromClass(
+  class {
+    constructor(view) {
+      this.decorations = buildGuides(view)
+    }
+    update(u) {
+      if (u.docChanged || u.viewportChanged || u.startState.tabSize !== u.state.tabSize) this.decorations = buildGuides(u.view)
+    }
+  },
+  { decorations: (v) => v.decorations },
+)
+
+// Which helpers are on. `code` is true when a programming language is
+// loaded: brackets and quotes close themselves, suggestions appear while
+// typing, and indentation guides show. In prose, suggestions only come with
+// Ctrl+Space and nothing closes itself (apostrophes stay apostrophes).
+// The other options turn single helpers off.
+export function helpers({ code = false, closeBrackets: close = true, autocomplete = true, guides = true } = {}) {
+  return [
+    wordCompletion,
+    autocomplete && code ? autocompletion() : autocompletion({ activateOnTyping: false }),
+    code && close ? [closeBrackets(), Prec.high(keymap.of(closeBracketsKeymap))] : [],
+    code && guides ? indentGuides : [],
+  ]
 }
 
 // --- Look ----------------------------------------------------------------
@@ -158,6 +274,26 @@ export const theme = EditorView.theme({
   '&.cm-focused .cm-nonmatchingBracket': {
     backgroundColor: 'color-mix(in srgb, var(--danger) 22%, transparent)',
   },
+  '.cm-indentGuide': {
+    backgroundImage: 'linear-gradient(to right, color-mix(in srgb, var(--fg) 14%, transparent) 1px, transparent 1px)',
+    backgroundRepeat: 'repeat-x',
+  },
+  '.cm-foldGutter .cm-gutterElement': { padding: '0 4px', cursor: 'pointer', color: 'var(--muted)' },
+  '.cm-foldPlaceholder': {
+    backgroundColor: 'var(--panel)',
+    border: '1px solid var(--border)',
+    color: 'var(--muted)',
+    padding: '0 4px',
+    margin: '0 2px',
+  },
+  '.cm-tooltip': { backgroundColor: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--fg)' },
+  '.cm-tooltip-autocomplete > ul': { fontFamily: 'var(--mono)', maxHeight: '16em' },
+  '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+    backgroundColor: 'color-mix(in srgb, var(--accent) 22%, var(--panel))',
+    color: 'var(--fg)',
+  },
+  '.cm-completionDetail': { color: 'var(--muted)', fontStyle: 'normal', marginLeft: '0.6em' },
+  '.cm-completionMatchedText': { textDecoration: 'none', fontWeight: 'bold' },
   '.cm-findMatch': {
     backgroundColor: 'color-mix(in srgb, #f5c400 40%, transparent)',
     outline: '1px solid color-mix(in srgb, #c99a00 70%, transparent)',
@@ -244,6 +380,14 @@ const findHighlighter = ViewPlugin.fromClass(
 
 // --- The editor -----------------------------------------------------------
 
+// Fold markers in the gutter: ▾ open, ▸ folded.
+function foldMarker(open) {
+  const span = document.createElement('span')
+  span.textContent = open ? '▾' : '▸'
+  span.title = open ? 'Fold' : 'Unfold'
+  return span
+}
+
 // Settings that change after creation. Shared by all editors, so a saved
 // editor state (see snapshot()) can be resumed by a new editor.
 const wrapping = new Compartment()
@@ -251,15 +395,17 @@ const spelling = new Compartment()
 const language = new Compartment()
 const listening = new Compartment() // the page's change listener
 const indenting = new Compartment()
+const helping = new Compartment() // see helpers()
 
 const spellAttrs = (on) => EditorView.contentAttributes.of({ spellcheck: on ? 'true' : 'false' })
 
-// options: { parent, text, name, wrap, spellcheck, indent, onChange(text), onSelection(info), saved }
+// options: { parent, text, name, wrap, spellcheck, indent, help, onChange(text), onSelection(info), saved }
+// `help` is the options for helpers().
 // Returns a small API used by the editor page and the find bar. The language
 // is set separately with setLanguage(), since it loads asynchronously.
 // `saved` is a snapshot() of an earlier editor for the same document: it
 // brings back its undo history, selection and scroll position.
-export function createEditor({ parent, text, name, wrap, spellcheck, indent, onChange, onSelection, saved }) {
+export function createEditor({ parent, text, name, wrap, spellcheck, indent, help, onChange, onSelection, saved }) {
   // The document text as last handed to or received from the page, so the
   // page can tell its own echo from a real outside change cheaply.
   let synced = text
@@ -290,6 +436,8 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, onC
       doc: text,
       extensions: [
         lineNumbers(),
+        foldGutter({ markerDOM: foldMarker }),
+        codeFolding({ placeholderText: '…' }),
         highlightActiveLineGutter(),
         highlightSpecialChars(),
         history(),
@@ -310,11 +458,13 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, onC
           { key: 'Mod-Shift-l', run: selectSelectionMatches, preventDefault: true },
           ...defaultKeymap,
           ...historyKeymap,
+          ...foldKeymap,
         ]),
         theme,
         wrapping.of(wrap ? EditorView.lineWrapping : []),
         spelling.of(spellAttrs(spellcheck)),
         language.of(commentData(name)),
+        helping.of(helpers(help)),
         findMatchesField,
         findHighlighter,
         EditorView.contentAttributes.of({ 'aria-label': 'Document text', autocapitalize: 'off' }),
@@ -330,6 +480,7 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, onC
         wrapping.reconfigure(wrap ? EditorView.lineWrapping : []),
         spelling.reconfigure(spellAttrs(spellcheck)),
         indenting.reconfigure(indentSettings(indent)),
+        helping.reconfigure(helpers(help)),
         setFindMatches.of([]),
       ],
     }).state
@@ -375,6 +526,12 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, onC
     setLanguage(n, support, { smart = false } = {}) {
       view.dispatch({ effects: language.reconfigure([commentData(n), support ?? [], smart ? smartEnter.of(true) : []]) })
     },
+    // Turn helpers on or off: the options for helpers().
+    setHelpers(options) {
+      view.dispatch({ effects: helping.reconfigure(helpers(options)) })
+    },
+    // Run a state command ({ state, dispatch }) without moving focus.
+    apply: (cmd) => cmd(view),
     setIndent(indent) {
       view.dispatch({ effects: indenting.reconfigure(indentSettings(indent)) })
     },

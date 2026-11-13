@@ -1,11 +1,13 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { prefs } from './prefs'
 import { NONE } from './folders'
 import AppToast from './components/AppToast.vue'
 import QuickOpen from './components/QuickOpen.vue'
 import ShortcutsDialog from './components/ShortcutsDialog.vue'
+import FileTree from './components/FileTree.vue'
+import { canOpenFolder, forgetListings, loadWorkspaces, openFolder } from './workspace'
 import { registerCommands, ui } from './commands'
 import { createDoc, downloadBackup, requestPersistence } from './store'
 import { applyUpdate, initPwa, install, pwa } from './pwa'
@@ -24,6 +26,12 @@ const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
 // F1 anywhere, or "?" when not typing, shows the keyboard shortcuts.
 const typing = (el) => el?.closest?.('input, textarea, select, [contenteditable="true"], .cm-editor')
 function onKey(e) {
+  // Ctrl/Cmd+B: show or hide the folder sidebar.
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'b' && prefs.workspaces.length) {
+    e.preventDefault()
+    prefs.sidebar = !prefs.sidebar
+    return
+  }
   if (e.key === 'F1' || (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target))) {
     e.preventDefault()
     ui.shortcutsOpen = !ui.shortcutsOpen
@@ -47,6 +55,17 @@ if ('launchQueue' in window) {
   })
 }
 
+// Folders opened from disk, shown in the sidebar (Chrome, Edge).
+loadWorkspaces()
+const showSidebar = computed(() => prefs.sidebar && prefs.workspaces.length > 0 && canOpenFolder())
+async function onOpenFolder() {
+  try {
+    await openFolder()
+  } catch (e) {
+    showToast(`Couldn't open the folder: ${e.message}`)
+  }
+}
+
 // Commands available everywhere (the editor adds its own while open).
 registerCommands([
   {
@@ -59,6 +78,12 @@ registerCommands([
   },
   { id: 'goToDocument', title: 'Go to document…', group: 'Documents', shortcut: 'quickOpen', run: () => quickOpen.value.show() },
   { id: 'allDocuments', title: 'Show all documents', group: 'Documents', run: () => router.push({ name: 'home' }) },
+  { id: 'openFolder', title: 'Open folder…', group: 'Files', when: canOpenFolder, run: onOpenFolder },
+  {
+    id: 'toggleSidebar', title: 'Show or hide the folder sidebar', group: 'Files', shortcut: 'sidebar',
+    when: () => prefs.workspaces.length > 0, run: () => (prefs.sidebar = !prefs.sidebar),
+  },
+  { id: 'refreshFolders', title: 'Read folders from disk again', group: 'Files', when: () => prefs.workspaces.length > 0, run: () => forgetListings() },
   { id: 'exportBackup', title: 'Export all documents as a backup', group: 'Documents', run: downloadBackup },
   { id: 'shortcuts', title: 'Show keyboard shortcuts', group: 'Help', shortcut: 'shortcuts', run: () => (ui.shortcutsOpen = true) },
   { id: 'install', title: 'Install the editor as an app', group: 'Help', when: () => pwa.canInstall, run: install },
@@ -122,7 +147,8 @@ onBeforeUnmount(() => Object.entries(events).forEach(([k, f]) => window.removeEv
     </span>
   </header>
   <main>
-    <RouterView />
+    <FileTree v-if="showSidebar" />
+    <div class="view"><RouterView /></div>
   </main>
   <div v-if="dragging" class="drop-overlay" aria-hidden="true">
     <div>Drop files to open them</div>

@@ -20,6 +20,7 @@ import {
 import { displayName } from '../naming'
 import { openFiles, TEXT_ACCEPT } from '../openFiles'
 import { canSaveInPlace, pickFiles } from '../fileaccess'
+import { canOpenFolder, openFolder } from '../workspace'
 import { showToast } from '../toast'
 import { prefs } from '../prefs'
 import { NONE, SORTS, folderTree, inFolder, normalizeFolder, parentFolder, renamedFolder, sortDocs } from '../folders'
@@ -142,6 +143,16 @@ async function openPicker() {
   }
 }
 
+// A folder from disk: its files show in the sidebar (Chrome, Edge).
+async function onOpenFolder() {
+  try {
+    const w = await openFolder()
+    if (w) showToast(`Opened “${w.name}”. Its files are in the sidebar (Ctrl/Cmd+B shows or hides it).`, { timeout: 5000 })
+  } catch (e) {
+    showToast(`Couldn't open the folder: ${e.message}`)
+  }
+}
+
 async function onFiles(e) {
   const files = [...e.target.files]
   e.target.value = ''
@@ -201,6 +212,9 @@ const daysLeft = (d) =>
     <div class="actions">
       <button class="primary" @click="newDoc">New document</button>
       <button @click="openPicker">Open files…</button>
+      <button v-if="canOpenFolder()" title="Open a folder from your computer and browse its files in the sidebar" @click="onOpenFolder">
+        Open folder…
+      </button>
       <input ref="fileInput" type="file" multiple :accept="TEXT_ACCEPT" hidden @change="onFiles" />
       <span class="spacer" />
       <button title="Download every document as one backup file" @click="downloadBackup">
