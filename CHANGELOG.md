@@ -13,6 +13,23 @@ minor version (0.x) can change how things work.
   browsers), the mark in the header, and a logo with a wordmark in the README.
   Regenerate the bitmaps with `npm run icons`.
 
+### Changed
+
+- **The save status is honest about files on disk.** The status bar used to
+  say "Saved ✓ · Not saved to file" for an edited file, and the header
+  "Everything is saved in your browser". Now a file's own state comes first,
+  the browser part reads *Edits kept in browser ✓* until you save, and the
+  header says edits are kept in your browser until you save them.
+
+### Fixed
+
+- **Dialogs keep the keyboard to themselves.** In the shortcuts list, the
+  quick switcher and command palette, *Save to folder* and *Close folder*,
+  Tab and Shift+Tab now stay inside the dialog, Escape closes it wherever
+  focus is, and focus goes back where it was when it closes. Before, Tab
+  could move focus to the page behind, where keys typed for the dialog
+  edited the document (`src/modal.js`).
+
 ## [0.2.0] – 2026-11-13
 
 The first release since the product review. The editor became **Plumb**,

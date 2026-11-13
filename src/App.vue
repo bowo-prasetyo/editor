@@ -12,7 +12,7 @@ import { checkOpenDocs, setReloadedHandler, startLiveReload } from './livereload
 import { displayName } from './naming'
 import { unsavedToDisk } from './fileaccess'
 import { registerCommands, ui } from './commands'
-import { createDoc, downloadBackup, requestPersistence } from './store'
+import { createDoc, downloadBackup, getDoc, requestPersistence } from './store'
 import { applyUpdate, initPwa, install, pwa } from './pwa'
 import { showToast } from './toast'
 import { openFiles } from './openFiles'
@@ -92,6 +92,15 @@ setReloadedHandler((doc) => {
   }
 })
 const onVisible = () => document.visibilityState === 'visible' && checkOpenDocs()
+// The reassurance in the header. For a file on disk it mustn't say
+// "saved": only Save writes the file; the browser keeps the edits until then.
+const savedHint = computed(() => {
+  const doc = route.name === 'edit' ? getDoc(route.params.id) : null
+  const text = doc?.linked
+    ? `Edits are kept in your browser until you save them (${isMac ? '⌘S' : 'Ctrl+S'})`
+    : 'Everything is saved in your browser'
+  return pwa.offline ? `Offline · ${text[0].toLowerCase()}${text.slice(1)}` : text
+})
 const showSidebar = computed(() => prefs.sidebar && prefs.workspaces.length > 0 && canOpenFolder())
 async function onOpenFolder() {
   try {
@@ -196,7 +205,7 @@ onBeforeUnmount(() => {
       Plumb
     </RouterLink>
     <span class="topbar-right">
-      <span class="hint">{{ pwa.offline ? 'Offline · everything is saved in your browser' : 'Everything is saved in your browser' }}</span>
+      <span class="hint">{{ savedHint }}</span>
       <button v-if="pwa.canInstall" class="quick-button" title="Install Plumb as an app that works offline" @click="install">
         Install
       </button>

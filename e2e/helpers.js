@@ -78,8 +78,9 @@ export const refocus = (page) => page.evaluate(() => window.dispatchEvent(new Ev
 // --- The editor screen ------------------------------------------------------------
 
 export const editor = (page) => page.locator('.editor .cm-content').first()
-export const saveStatus = (page) => page.locator('footer.status .save').first()
-export const fileStatus = (page) => page.locator('footer.status .save').nth(1)
+// Saving to the browser (every edit) and to the file on disk (Ctrl/Cmd+S).
+export const saveStatus = (page) => page.locator('footer.status .browser-status')
+export const fileStatus = (page) => page.locator('footer.status .file-status')
 export const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
 
 // The document's text as the editor shows it. CodeMirror only draws the
@@ -102,7 +103,9 @@ export async function openFromDisk(page, path) {
   await expect(fileStatus(page)).toHaveText('Saved to file')
 }
 
-export const expectSaved = (page) => expect(saveStatus(page)).toHaveText('Saved ✓')
+// Every edit is kept in the browser. (For a file the status bar says so in
+// other words, or not at all once the file is saved.)
+export const expectSaved = (page) => expect(saveStatus(page)).toHaveAttribute('data-state', 'saved')
 
 // Save with the keyboard shortcut and wait until the file is written. The
 // status may already say "Saved to file" before saving (an unedited file),

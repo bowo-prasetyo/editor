@@ -1,11 +1,14 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { SHORTCUTS, keyLabel } from '../keys'
+import { useModal } from '../modal'
 
 // Every keyboard shortcut, grouped, with a filter.
 const emit = defineEmits(['close'])
 const query = ref('')
 const input = ref(null)
+const root = ref(null)
+useModal(root, { onEscape: () => emit('close') })
 
 const groups = computed(() => {
   const q = query.value.trim().toLowerCase()
@@ -23,8 +26,8 @@ onMounted(() => input.value?.focus())
 </script>
 
 <template>
-  <div class="quick-backdrop" @mousedown.self="emit('close')" @keydown.esc.prevent="emit('close')">
-    <div class="quick shortcuts" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+  <div class="quick-backdrop" @mousedown.self="emit('close')">
+    <div ref="root" class="quick shortcuts" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
       <div class="shortcuts-head">
         <h2>Keyboard shortcuts</h2>
         <button class="icon" aria-label="Close" title="Close (Esc)" @click="emit('close')">✕</button>

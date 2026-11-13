@@ -146,6 +146,15 @@ Naming from the first line and renaming; find and replace all with a one-step
 undo; tabs keeping their own text and undo history; the quick switcher; the
 Markdown preview; word wrap remembered per document. (`editor.spec.js`)
 
+For a file on disk, the status bar and header never say "saved" while the
+file is out of date: *Not saved to file · Edits kept in browser ✓*, then
+*Saved to file*; drafts keep *Saved ✓*. (`files.spec.js`)
+
+Dialogs are modal from the keyboard: Tab and Shift+Tab stay inside, focus
+moved outside is brought back, Escape closes them wherever focus is, keys
+meant for a dialog never edit the document behind, and focus returns to the
+editor or the button that opened them. (`dialogs.spec.js`)
+
 ## Known gaps
 
 Problems the tests have found but that aren't fixed yet. Each is a

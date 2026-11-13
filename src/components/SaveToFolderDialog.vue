@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useModal } from '../modal'
 
 // "Save to folder…": where to save a draft, as a file in an open folder.
 const props = defineProps({
@@ -12,6 +13,8 @@ const emit = defineEmits(['submit', 'cancel'])
 const rootId = ref(props.folders[0]?.id ?? '')
 const path = ref(props.name)
 const input = ref(null)
+const root = ref(null)
+useModal(root, { onEscape: () => !props.busy && emit('cancel') })
 
 onMounted(() => {
   input.value?.focus()
@@ -22,8 +25,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="quick-backdrop" @mousedown.self="!busy && emit('cancel')" @keydown.esc.prevent="!busy && emit('cancel')">
+  <div class="quick-backdrop" @mousedown.self="!busy && emit('cancel')">
     <form
+      ref="root"
       class="quick dialog"
       role="dialog"
       aria-modal="true"
