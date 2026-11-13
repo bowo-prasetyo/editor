@@ -1,4 +1,5 @@
 import { importFile, BinaryFileError, requestPersistence } from './store'
+import { openSingleFile } from './recent'
 import { showToast } from './toast'
 
 // Text-ish files the picker offers (anything can still be dropped; binary
@@ -10,16 +11,17 @@ export const TEXT_ACCEPT = [
   '.sql', '.srt', '.tex', '.rst', '.org', '.adoc', '.env', '.gitignore',
 ].join(',')
 
-// Import files as new documents and open the last one. Each entry is a File,
-// or { file, handle } when the browser gave us a handle to save back to.
-// Returns the docs.
+// Open files and show the last one. Each entry is a File, or { file, handle }
+// when the browser gave us a handle to save back to. With a handle, the file
+// is a file (in Recent files, its text on disk; opening it again shows the
+// same one); without (Firefox, Safari), it becomes a draft. Returns the docs.
 export async function openFiles(entries, router) {
   const opened = []
   const refused = []
   for (const entry of entries) {
     const { file, handle } = entry instanceof Blob ? { file: entry, handle: null } : entry
     try {
-      const doc = await importFile(file, handle?.kind === 'file' ? handle : null)
+      const doc = handle?.kind === 'file' ? await openSingleFile(file, handle) : await importFile(file)
       opened.push(doc)
     } catch (e) {
       if (e instanceof BinaryFileError) refused.push(file.name)

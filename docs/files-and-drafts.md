@@ -1,9 +1,9 @@
 # Plan: Files and Drafts
 
-> **Status: accepted; phases 1–3 done.** This plans step 3 of
+> **Status: done.** This planned step 3 of
 > [VISION.md](../VISION.md#next-steps), the split between **Files** and
-> **Drafts**. The [decisions](#decisions) are recorded at the end.
-> [Phases 1–3](#phases) are built; phase 4 is next.
+> **Drafts**. The [decisions](#decisions) are recorded at the end, and all
+> four [phases](#phases) are built.
 
 ## Why
 
@@ -229,6 +229,30 @@ labels in `src/folders.js`). Details settled while building it:
   and dragging onto folders. Opened and dropped files no longer go into "the
   folder shown".
 
+**Phase 4 is done** (`src/recent.js`, Recent files on the start page).
+Details settled while building it:
+
+- **Which files:** files opened with a handle (*Open files…*, dropped,
+  *Open with*) become file records with no `source`. Without a handle
+  (Firefox, Safari) they stay drafts, as the vision promises there.
+- **The same file again:** opening a file already in the list finds its
+  record (handles compared with `isSameEntry`) and brings it up to date with
+  the disk, instead of making another.
+- **Saving a draft to a file** (Save on a new draft, Save as) makes it that
+  file, in Recent files. *Save as* on a folder's file makes it the new file,
+  outside the folder; before, it kept its old folder path.
+- **Order:** most recently opened first (`openedAt`, set when opened or
+  shown). The list keeps 20, plus any file with unsaved changes. Others
+  dropping off are removed with their history. ✕ takes a file off the list
+  when nothing is unsaved.
+- **Permission after a reload** is asked for the file itself (*Allow access*).
+- **Search** includes recent files, reading their text when it isn't loaded
+  yet (skipped if the browser needs permission first).
+- **Migration (schema 3):** single files that phase 1 kept as drafts become
+  recent files: the 20 most recently edited, and any with unsaved changes.
+  Older ones join the copies banner, whose wording is now general ("copies
+  of files on your disk").
+
 1. **Records and migration.**
    - Code: the `kind` field; file records stored without text when they have
      no unsaved changes; text read from disk when shown; the Drafts list
@@ -246,7 +270,7 @@ labels in `src/folders.js`). Details settled while building it:
      folder interface removed; *Save to folder…*.
    - Tests: pinning order; label filter and removal; *Save to folder…* never
      replacing a file, its Undo, and its history moving with it.
-4. **Files opened on their own.**
+4. **Files opened on their own** *(done)*.
    - Code: the **Recent files** list on the start page and its limit of 20,
      including *Open with* from the installed app.
    - Tests: the list, its limit, and that files with unsaved changes never

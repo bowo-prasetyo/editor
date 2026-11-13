@@ -2,6 +2,7 @@
 // API (Chrome, Edge and other Chromium browsers). Elsewhere, saving falls
 // back to a download.
 import { ENCODINGS } from './textcodec.js'
+import { pruneRecentFiles } from './recent.js'
 import { docBlob, downloadDoc, getDoc, getFileHandle, linkFile, recordVersion, setDocOptions, state } from './store.js'
 
 // (globalThis is window in a page.)
@@ -120,6 +121,15 @@ export async function saveDoc(doc, { saveAs = false, confirm: confirmFn = (m) =>
   }
   recordVersion(doc.id, 'saved')
   if (handle.name && handle.name !== doc.name) setDocOptions(doc.id, { name: handle.name, autoName: false })
+  // A draft saved to a file is that file now (in Recent files). A folder's
+  // file saved as another file is that other file, outside the folder.
+  if (doc.kind !== 'file') {
+    setDocOptions(doc.id, { kind: 'file', folder: undefined, pinned: undefined, origin: undefined, copyOf: undefined, openedAt: Date.now() })
+    await pruneRecentFiles()
+  } else if (saveAs && doc.source) {
+    setDocOptions(doc.id, { source: undefined, folder: undefined, openedAt: Date.now() })
+    await pruneRecentFiles()
+  }
   return { result: 'saved', name: handle.name }
 }
 

@@ -1,7 +1,7 @@
 // Open tabs, recently opened documents, and each open document's editor
 // state (undo history, selection, scroll), so switching tabs loses nothing.
 import { prefs } from './prefs.js'
-import { getDoc, state } from './store.js'
+import { getDoc, setDocOptions, state } from './store.js'
 import { neighborTab, touched, withTab, withoutTab } from './tabs.js'
 
 const snapshots = new Map() // doc id -> editor snapshot (memory only)
@@ -20,6 +20,8 @@ export function liveTabs() {
 // A document was opened: give it a tab (next to the one it was opened
 // from) and put it first among recent documents.
 export function opened(id, from = null) {
+  const d = getDoc(id)
+  if (d?.kind === 'file' && !d.source) setDocOptions(id, { openedAt: Date.now() }) // Recent files
   prefs.tabs = withTab(liveTabs(), id, from)
   prefs.recent = touched(prefs.recent.filter((r) => getDoc(r)), id)
 }

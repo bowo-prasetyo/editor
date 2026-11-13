@@ -24,6 +24,7 @@ import { showToast } from '../toast'
 import { prefs } from '../prefs'
 import { SORTS, labelsOf, sortDocs } from '../folders'
 import { togglePin } from '../drafts'
+import { forgetRecentFile, recentFiles } from '../recent'
 
 const router = useRouter()
 const fileInput = ref(null)
@@ -34,8 +35,17 @@ const query = ref('')
 // (see docs/files-and-drafts.md).
 const live = computed(() => state.docs.filter((d) => !d.deletedAt && d.kind !== 'file'))
 
-// Copies of files from folders closed before Plumb kept files and drafts
-// apart (see migrate.js): offered to the Trash once.
+// Files opened on their own, most recent first (see recent.js).
+const recent = computed(() => {
+  void state.docs.length // re-evaluate when documents come and go
+  return recentFiles()
+})
+async function forgetFile(f) {
+  if (await forgetRecentFile(f.id)) showToast(`Removed “${displayName(f.name)}” from Recent files. The file is still on your disk.`)
+}
+
+// Copies of files kept by Plumb before it kept files and drafts apart (see
+// migrate.js): offered to the Trash once.
 const copies = computed(() => live.value.filter((d) => d.copyOf))
 function trashCopies() {
   const list = copies.value.map((d) => d.id)
@@ -210,9 +220,9 @@ const daysLeft = (d) =>
       <div class="list-pane">
         <div v-if="copies.length" class="banner info" role="status">
           <span>
-            <strong v-if="copies.length === 1">1 draft is a copy of a file from a folder you closed.</strong>
-            <strong v-else>{{ copies.length }} drafts are copies of files from folders you closed.</strong>
-            The files are on your disk: Plumb no longer keeps copies of them.
+            <strong v-if="copies.length === 1">1 draft is a copy of a file on your disk.</strong>
+            <strong v-else>{{ copies.length }} drafts are copies of files on your disk.</strong>
+            Plumb no longer keeps copies of files: open them from disk instead.
           </span>
           <span class="banner-actions">
             <button class="primary" @click="trashCopies">Move them to the Trash</button>
@@ -220,6 +230,31 @@ const daysLeft = (d) =>
             <button title="Download every draft as one backup file first" @click="downloadBackup">Export a backup first</button>
           </span>
         </div>
+
+        <section v-if="recent.length" class="recent-files" aria-label="Recent files">
+          <h2 class="section-title">Recent files</h2>
+          <ul class="doc-list">
+            <li v-for="f in recent" :key="f.id">
+              <RouterLink :to="{ name: 'edit', params: { id: f.id } }" class="doc-link">
+                <strong>{{ displayName(f.name) }}</strong>
+                <small>
+                  <template v-if="f.diskDirty"><span class="unsaved-dot">●</span> Not saved to file · </template>
+                  Opened {{ fmt(f.openedAt ?? f.updatedAt) }}
+                </small>
+              </RouterLink>
+              <button
+                v-if="!f.diskDirty"
+                class="icon-button"
+                title="Remove from Recent files (the file stays on your disk)"
+                :aria-label="`Remove ${displayName(f.name)} from Recent files`"
+                @click="forgetFile(f)"
+              >
+                ✕
+              </button>
+            </li>
+          </ul>
+          <h2 class="section-title">Drafts</h2>
+        </section>
 
         <div v-if="live.length" class="list-tools">
           <input

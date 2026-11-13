@@ -550,12 +550,19 @@ export async function readFileText(id) {
   return (await takeText(id, file, handle)) ? 'ready' : 'missing'
 }
 
-async function takeText(id, file, handle) {
+export async function takeText(id, file, handle) {
   const decoded = decodeBytes(new Uint8Array(await file.arrayBuffer()))
   if (decoded.binary || !getDoc(id)?.unread) return !decoded.binary
   fillText(id, decoded.text, fileFormat(decoded))
   await linkFile(id, handle, file.lastModified)
   return true
+}
+
+// Ask for permission to read and write a file opened on its own again (after
+// a reload). Needs a click. For a file in a folder, see reconnect().
+export async function requestFileAccess(id) {
+  const handle = await getFileHandle(id).catch(() => null)
+  return !!handle && (await permission(handle, { ask: true })) === 'granted'
 }
 
 // --- New files and folders -----------------------------------------------------------

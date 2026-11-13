@@ -5,7 +5,7 @@
 // user's permission to read the folder again.
 import { computed, ref, watch } from 'vue'
 import { prefs } from '../prefs'
-import { readFileText, reconnect } from '../workspace'
+import { readFileText, reconnect, requestFileAccess } from '../workspace'
 import { displayName } from '../naming'
 
 const props = defineProps({ doc: { type: Object, required: true } })
@@ -21,9 +21,10 @@ async function read() {
 }
 watch(() => props.doc.id, read, { immediate: true })
 
+// A folder's file: permission for the folder. A file opened on its own: for the file.
 async function allow() {
   const root = props.doc.source?.root
-  if (root && (await reconnect(root))) read()
+  if (root ? await reconnect(root) : await requestFileAccess(props.doc.id)) read()
 }
 </script>
 
@@ -32,7 +33,7 @@ async function allow() {
     <p v-if="state === 'reading'">Reading “{{ name }}” from disk…</p>
     <template v-else-if="state === 'needs-access'">
       <p>
-        <strong>Plumb needs your permission to read “{{ folder }}” again.</strong>
+        <strong>Plumb needs your permission to read “{{ doc.source ? folder : name }}” again.</strong>
         Files with no unsaved changes aren’t kept in the browser: their text is read from disk.
       </p>
       <button class="primary" @click="allow">Allow access</button>

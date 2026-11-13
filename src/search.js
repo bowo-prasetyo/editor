@@ -11,7 +11,7 @@ import { MAX_FILE_BYTES, cacheSize, isCached, MAX_CACHE_CHARS, readText } from '
 import { displayName } from './naming.js'
 import { prefs } from './prefs.js'
 import { getDoc, recordVersion, state, updateDoc } from './store.js'
-import { ensureAllIndexes, fileIndex, findWorkspaceDoc, openWorkspaceFile, trustSince } from './workspace.js'
+import { ensureAllIndexes, fileIndex, findWorkspaceDoc, openWorkspaceFile, readFileText, trustSince } from './workspace.js'
 
 // Results stop after this many matches (a file's matches are all counted).
 export const MAX_RESULTS = 10_000
@@ -110,8 +110,9 @@ export async function searchTargets(scope = 'all') {
     const file = doc.kind === 'file'
     if (scope === 'folders' && !file) continue
     if (scope === 'documents' && file) continue
-    // A file with nothing unsaved is searched from disk, as a folder file below.
-    if (file && !doc.diskDirty) continue
+    // A folder's file with nothing unsaved is searched from disk, as a folder
+    // file below. (Files opened on their own are searched here.)
+    if (file && doc.source && !doc.diskDirty) continue
     targets.push({ key: doc.id, kind: 'doc', name: displayName(doc.name), folder: doc.folder ?? '', path: docPath(doc), doc })
   }
   if (scope === 'documents') return targets
@@ -141,7 +142,12 @@ export async function searchTargets(scope = 'all') {
 // The text of a target, or null if it can't be searched (binary, too big,
 // gone). Folder files come from the cache when they can (see filecache.js).
 export async function targetText(target) {
-  if (target.kind === 'doc') return getDoc(target.doc.id)?.content ?? null
+  if (target.kind === 'doc') {
+    // A file opened on its own whose text hasn't been read yet: read it now
+    // (skipped if the browser needs permission first).
+    if (getDoc(target.doc.id)?.unread && (await readFileText(target.doc.id)) !== 'ready') return null
+    return getDoc(target.doc.id)?.content ?? null
+  }
   const r = await readText(target.key, target.handle, { trustSince: trustSince(target.rootId) })
   return r.text ?? null
 }
