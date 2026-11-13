@@ -179,7 +179,22 @@ onBeforeUnmount(() => {
 
 <template>
   <header class="topbar">
-    <RouterLink to="/" class="brand">📝 Plumb</RouterLink>
+    <RouterLink to="/" class="brand">
+      <!-- The favicon's mark (public/favicon.svg): the text cursor as a plumb line. -->
+      <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="brand-tile" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#1f6fe0" />
+            <stop offset="1" stop-color="#0b3a8c" />
+          </linearGradient>
+        </defs>
+        <rect width="64" height="64" rx="14" fill="url(#brand-tile)" />
+        <rect x="28.5" y="7" width="7" height="27" rx="3.5" fill="#fff" />
+        <path d="M32 30c8 0 12 4.5 12 10 0 6-5 10.5-12 18-7-7.5-12-12-12-18 0-5.5 4-10 12-10z" fill="#f5c04a" />
+        <path d="M32 30c8 0 12 4.5 12 10 0 6-5 10.5-12 18z" fill="#dd9d2c" />
+      </svg>
+      Plumb
+    </RouterLink>
     <span class="topbar-right">
       <span class="hint">{{ pwa.offline ? 'Offline · everything is saved in your browser' : 'Everything is saved in your browser' }}</span>
       <button v-if="pwa.canInstall" class="quick-button" title="Install Plumb as an app that works offline" @click="install">

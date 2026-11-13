@@ -4,6 +4,15 @@ What changed in each version of Plumb, newest first. Versions follow
 [semantic versioning](https://semver.org/); while Plumb is below 1.0, a new
 minor version (0.x) can change how things work.
 
+## Unreleased
+
+### Added
+
+- **A logo and favicon.** The text cursor hangs true as a plumb line, ending in
+  a brass plumb bob. New app icons, a favicon (SVG, with a `.ico` for older
+  browsers), the mark in the header, and a logo with a wordmark in the README.
+  Regenerate the bitmaps with `npm run icons`.
+
 ## [0.2.0] – 2026-11-13
 
 The first release since the product review. The editor became **Plumb**,
