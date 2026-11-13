@@ -7,16 +7,15 @@
 // from before the replace is kept. "Save all" then writes them.
 import { reactive } from 'vue'
 import { findMatches, replaceAllEdit, searchRegExp } from './find.js'
-import { decodeBytes } from './textcodec.js'
+import { MAX_FILE_BYTES, cacheSize, isCached, MAX_CACHE_CHARS, readText } from './filecache.js'
 import { displayName } from './naming.js'
 import { prefs } from './prefs.js'
 import { getDoc, recordVersion, state, updateDoc } from './store.js'
-import { ensureAllIndexes, fileIndex, findWorkspaceDoc, openWorkspaceFile } from './workspace.js'
+import { ensureAllIndexes, fileIndex, findWorkspaceDoc, openWorkspaceFile, trustSince } from './workspace.js'
 
 // Results stop after this many matches (a file's matches are all counted).
 export const MAX_RESULTS = 10_000
-// Bigger files in folders are skipped (open them to search them).
-export const MAX_FILE_BYTES = 2_000_000
+export { MAX_FILE_BYTES }
 const PREVIEW = 120 // characters of context around a match
 
 // --- Which files: "*.js, src/, !test/" ----------------------------------------------
@@ -137,49 +136,94 @@ export async function searchTargets(scope = 'all') {
 }
 
 // The text of a target, or null if it can't be searched (binary, too big,
-// gone).
+// gone). Folder files come from the cache when they can (see filecache.js).
 export async function targetText(target) {
   if (target.kind === 'doc') return getDoc(target.doc.id)?.content ?? null
-  try {
-    const file = await target.handle.getFile()
-    if (file.size > MAX_FILE_BYTES) return null
-    const decoded = decodeBytes(new Uint8Array(await file.arrayBuffer()))
-    return decoded.binary ? null : decoded.text
-  } catch {
-    return null
-  }
+  const r = await readText(target.key, target.handle, { trustSince: trustSince(target.rootId) })
+  return r.text ?? null
 }
+
+// Let the page draw and take input: at most every FRAME ms of work.
+const FRAME = 12
+const yieldToPage = () =>
+  globalThis.scheduler?.yield
+    ? globalThis.scheduler.yield()
+    : new Promise((resolve) => {
+        const ch = new MessageChannel()
+        ch.port1.onmessage = () => {
+          ch.port1.close() // an open port keeps Node (tests) running
+          resolve()
+        }
+        ch.port2.postMessage(null)
+      })
 
 // Search everything in `scope`, calling onResult({ target, matches }) for
 // each file with matches as it's found, and onProgress(done, total).
 // Resolves to { files, matches, skipped, truncated, aborted }.
+// Documents and files whose text is in the cache are searched straight
+// away; the rest are read up to READ_AT_ONCE at a time.
 export async function searchAll(query, options = {}, { scope = 'all', files = '', signal, onResult, onProgress } = {}) {
   const summary = { files: 0, matches: 0, skipped: 0, truncated: false, aborted: false }
   if (!searchRegExp(query, options)) return summary // throws for an invalid pattern
   const keep = pathFilter(files)
   const targets = (await searchTargets(scope)).filter((t) => keep(t.path))
-  const BATCH = 16
-  for (let i = 0; i < targets.length; i += BATCH) {
+  const READ_AT_ONCE = 32
+  let done = 0
+  let last = performance.now()
+
+  const check = (target, text) => {
+    done++
+    if (text == null) return void (target.kind === 'file' && summary.skipped++)
+    if (summary.truncated) return
+    const matches = searchText(text, query, options, MAX_RESULTS - summary.matches)
+    if (!matches.length) return
+    summary.files++
+    summary.matches += matches.length
+    if (summary.matches >= MAX_RESULTS) summary.truncated = true
+    onResult?.({ target, matches })
+  }
+  const breathe = async () => {
+    if (performance.now() - last < FRAME) return
+    onProgress?.(done, targets.length)
+    await yieldToPage()
+    last = performance.now()
+  }
+
+  for (let i = 0; i < targets.length; ) {
     if (signal?.aborted) return { ...summary, aborted: true }
-    const batch = targets.slice(i, i + BATCH)
+    // Read a batch of files at once; documents and cached files are instant.
+    const batch = targets.slice(i, i + READ_AT_ONCE)
+    i += batch.length
     const texts = await Promise.all(batch.map(targetText))
     if (signal?.aborted) return { ...summary, aborted: true }
-    batch.forEach((target, k) => {
-      const text = texts[k]
-      if (text == null) return void (target.kind === 'file' && summary.skipped++)
-      if (summary.truncated) return
-      const matches = searchText(text, query, options, MAX_RESULTS - summary.matches)
-      if (!matches.length) return
-      summary.files++
-      summary.matches += matches.length
-      if (summary.matches >= MAX_RESULTS) summary.truncated = true
-      onResult?.({ target, matches })
-    })
-    onProgress?.(Math.min(i + BATCH, targets.length), targets.length)
-    // Let the page breathe between batches.
-    await new Promise((r) => setTimeout(r, 0))
+    batch.forEach((t, k) => check(t, texts[k]))
+    await breathe()
   }
+  onProgress?.(done, targets.length)
   return summary
+}
+
+// Read files in open folders into the cache in the background (when the
+// search page opens), so the first search is quick too. Stops when the
+// cache is nearly full, or when `signal` aborts.
+export async function warmCache({ signal, concurrency = 8 } = {}) {
+  await ensureAllIndexes()
+  const todo = []
+  for (const w of prefs.workspaces) {
+    for (const { path, handle } of fileIndex.get(w.id)?.files ?? []) {
+      const key = `${w.id}:${path}`
+      if (!isCached(key) && !findWorkspaceDoc(w.id, path)) todo.push({ key, handle, rootId: w.id })
+    }
+  }
+  let next = 0
+  const worker = async () => {
+    while (next < todo.length && !signal?.aborted && cacheSize().chars < MAX_CACHE_CHARS * 0.9) {
+      const { key, handle, rootId } = todo[next++]
+      await readText(key, handle, { trustSince: trustSince(rootId) })
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker))
+  return { read: Math.min(next, todo.length), of: todo.length }
 }
 
 // --- Replacing ----------------------------------------------------------------------------

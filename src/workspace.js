@@ -24,6 +24,7 @@ import {
 } from './store.js'
 import { decodeBytes } from './textcodec.js'
 import { editorSettings, parseEditorConfig, propertiesFor } from './editorconfig.js'
+import { dropPrefix, markChanged } from './filecache.js'
 
 export const canOpenFolder = () => typeof globalThis.showDirectoryPicker === 'function'
 
@@ -50,6 +51,7 @@ async function permission(handle, { ask = false } = {}) {
 function addRoot(id, handle, perm) {
   const root = reactive({ handle: markRaw(handle), permission: perm })
   roots.set(id, root)
+  if (perm === 'granted') watchRoot(id)
   return root
 }
 
@@ -68,7 +70,10 @@ export async function reconnect(id) {
   const root = roots.get(id)
   if (!root) return false
   root.permission = await permission(root.handle, { ask: true })
-  if (root.permission === 'granted') forgetListings(id)
+  if (root.permission === 'granted') {
+    forgetListings(id)
+    watchRoot(id)
+  }
   return root.permission === 'granted'
 }
 
@@ -89,6 +94,7 @@ export async function openFolder() {
     if (root && (await root.handle.isSameEntry?.(handle))) {
       root.permission = 'granted'
       forgetListings(w.id)
+      watchRoot(w.id)
       return w
     }
   }
@@ -105,6 +111,7 @@ export async function openFolder() {
 export async function closeFolder(id) {
   prefs.workspaces = prefs.workspaces.filter((w) => w.id !== id)
   delete prefs.expanded[id]
+  unwatchRoot(id)
   roots.delete(id)
   forgetListings(id)
   await storeHandle(handleKey(id), null)
@@ -143,11 +150,110 @@ export async function loadListing(rootId, path, dir) {
 }
 
 // Read folders again (all of a root's, or everything). The list of every
-// file goes too, and is made again when next needed.
+// file and the files' text kept for search go too, and are read again when
+// next needed.
 export function forgetListings(rootId = null) {
   for (const key of [...listings.keys()]) if (!rootId || key.startsWith(rootId + ':')) listings.delete(key)
   for (const key of [...editorConfigs.keys()]) if (!rootId || key.startsWith(rootId + ':')) editorConfigs.delete(key)
+  dropPrefix(rootId ? rootId + ':' : '')
   forgetIndex(rootId)
+}
+
+// --- Watching folders for changes ---------------------------------------------------------
+
+// Where the browser can (FileSystemObserver, Chrome and Edge 129+), each open
+// folder is watched: files changed, added, removed or moved on disk drop out
+// of the search cache, the list of files is made again when next needed,
+// and folders shown in the tree are read again. While a folder is watched,
+// the search cache is trusted without checking each file (see filecache.js).
+export const canWatch = () => typeof globalThis.FileSystemObserver === 'function'
+const watchers = new Map() // rootId -> { observer, since, healthy }
+
+// Chrome writes a file by way of a "name.crswap" copy: not a real file.
+const isSwap = (parts) => parts?.at(-1)?.endsWith('.crswap')
+const inIgnored = (parts) => parts.slice(0, -1).some((p) => IGNORED_DIRS.has(p))
+
+export async function watchRoot(rootId) {
+  unwatchRoot(rootId)
+  const root = roots.get(rootId)
+  if (!root || root.permission !== 'granted' || !canWatch()) return false
+  const w = { observer: null, since: Date.now(), healthy: false }
+  watchers.set(rootId, w)
+  try {
+    w.observer = new globalThis.FileSystemObserver((records) => onChanges(rootId, w, records))
+    await w.observer.observe(root.handle, { recursive: true })
+    if (watchers.get(rootId) !== w) return false // replaced or closed meanwhile
+    w.healthy = true
+    return true
+  } catch {
+    if (watchers.get(rootId) === w) watchers.delete(rootId)
+    return false
+  }
+}
+
+export function unwatchRoot(rootId) {
+  try {
+    watchers.get(rootId)?.observer?.disconnect()
+  } catch {
+    // already stopped
+  }
+  watchers.delete(rootId)
+}
+
+// When the folder started being watched, or null if it isn't (see
+// readText() in filecache.js).
+export const trustSince = (rootId) => {
+  const w = watchers.get(rootId)
+  return w?.healthy ? w.since : null
+}
+
+function onChanges(rootId, w, records) {
+  if (watchers.get(rootId) !== w) return
+  let structure = false // files added, removed or moved (outside tool folders)
+  const dirs = new Set() // folders whose contents changed
+  for (const r of records) {
+    if (r.type === 'errored' || r.type === 'unknown') {
+      // Changes may have been missed: forget what was kept, and watch again.
+      dropPrefix(rootId + ':')
+      forgetIndex(rootId)
+      if (r.type === 'errored') {
+        w.healthy = false
+        watchRoot(rootId)
+      } else w.since = Date.now()
+      continue
+    }
+    const to = r.relativePathComponents ?? []
+    const from = r.relativePathMovedFrom
+    // Writing a file through its swap copy is just a change to the file.
+    const type = r.type === 'moved' && isSwap(from) ? 'modified' : r.type
+    for (const parts of [to, type === 'moved' ? from : null]) {
+      if (!parts?.length || isSwap(parts)) continue
+      const path = parts.join('/')
+      markChanged(`${rootId}:${path}`)
+      dropPrefix(`${rootId}:${path}/`) // a folder: everything in it
+      const dir = parts.slice(0, -1).join('/')
+      if (parts.at(-1) === '.editorconfig') editorConfigs.delete(`${rootId}:${dir}`)
+      if (type !== 'modified') {
+        dirs.add(dir)
+        if (!inIgnored(parts)) structure = true
+      }
+    }
+  }
+  if (structure) forgetIndex(rootId)
+  for (const dir of dirs) if (listings.has(listingKey(rootId, dir))) relist(rootId, dir)
+}
+
+// Read a folder shown in the tree again, in place (no "Loading…").
+async function relist(rootId, dirPath) {
+  const root = roots.get(rootId)
+  if (!root) return
+  try {
+    let dir = root.handle
+    for (const part of dirPath ? dirPath.split('/') : []) dir = await dir.getDirectoryHandle(part)
+    listings.set(listingKey(rootId, dirPath), await listDirectory(dir))
+  } catch {
+    listings.delete(listingKey(rootId, dirPath)) // gone: its parent's listing shows that
+  }
 }
 
 // --- .editorconfig (see editorconfig.js) ------------------------------------------------
@@ -206,31 +312,46 @@ export const IGNORED_DIRS = new Set([
 ])
 export const MAX_INDEXED = 20_000
 
-// Every file under `dir`, as { path, handle }, folders first at each level,
-// skipping IGNORED_DIRS. Stops after `limit` files: { files, truncated }.
-export async function walkFiles(dir, { limit = MAX_INDEXED, ignore = IGNORED_DIRS, signal } = {}) {
+// Every file under `dir`, as { path, handle } sorted by path, skipping
+// IGNORED_DIRS. Several folders are read at once. Stops after `limit`
+// files: { files, truncated }.
+export async function walkFiles(dir, { limit = MAX_INDEXED, ignore = IGNORED_DIRS, signal, concurrency = 8 } = {}) {
   const files = []
   const queue = [['', dir]]
-  while (queue.length) {
-    if (signal?.aborted) break
-    const [path, handle] = queue.shift()
-    let entries
-    try {
-      entries = await listDirectory(handle)
-    } catch {
-      continue // unreadable: skip it
-    }
-    for (const e of entries) {
-      const p = joinPath(path, e.name)
-      if (e.kind === 'directory') {
-        if (!ignore.has(e.name)) queue.push([p, e])
-      } else {
-        files.push({ path: p, handle: e })
-        if (files.length >= limit) return { files, truncated: true }
+  let active = 0
+  let truncated = false
+  await new Promise((resolve) => {
+    const stopped = () => truncated || signal?.aborted
+    const pump = () => {
+      while (!stopped() && active < concurrency && queue.length) {
+        const [path, handle] = queue.shift()
+        active++
+        listDirectory(handle)
+          .then((entries) => {
+            for (const e of entries) {
+              const p = joinPath(path, e.name)
+              if (e.kind === 'directory') {
+                if (!ignore.has(e.name)) queue.push([p, e])
+              } else if (files.length < limit) {
+                files.push({ path: p, handle: e })
+              } else {
+                truncated = true
+                break
+              }
+            }
+          })
+          .catch(() => {}) // unreadable: skip it
+          .finally(() => {
+            active--
+            pump()
+          })
       }
+      if (!active && (stopped() || !queue.length)) resolve()
     }
-  }
-  return { files, truncated: false }
+    pump()
+  })
+  files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+  return { files, truncated }
 }
 
 // rootId -> { files: [{ path, handle }], truncated, ready } while being made

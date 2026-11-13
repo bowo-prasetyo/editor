@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, triggerRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { queryError } from '../find'
-import { SCOPES, replaceAll, replaceInTarget, search, searchAll } from '../search'
+import { SCOPES, replaceAll, replaceInTarget, search, searchAll, warmCache } from '../search'
 import { openWorkspaceFile } from '../workspace'
 import { BinaryFileError } from '../store'
 import { prefs } from '../prefs'
@@ -198,6 +198,8 @@ watch(() => route.query.q, (q) => q && focusQuery())
 onMounted(() => {
   focusQuery()
   run()
+  // Read the folders' files into memory meanwhile, so searches are quick.
+  warmCache().catch(() => {})
 })
 onBeforeUnmount(() => {
   controller?.abort()
