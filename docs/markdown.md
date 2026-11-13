@@ -176,7 +176,10 @@ Details settled while building it:
   file, there are no helpers. They sit above the default keymap, where
   Ctrl/Cmd+I would otherwise select the enclosing syntax.
 - **Ctrl/Cmd+B outside Markdown** works as before: `App.vue` toggles the
-  sidebar only when the editor hasn't handled the key.
+  sidebar only when the editor hasn't handled the key. Since then,
+  **Ctrl/Cmd+Shift+E** toggles it everywhere, Markdown included, and is the
+  shortcut the panel lists for the sidebar: one key that never changes
+  meaning, as the UI/UX audit asked, while Ctrl/Cmd+B keeps working.
 - **The Folders button** sits in the header, not next to the folder's name: a
   hidden sidebar couldn't show its own button. It appears while a folder is
   open and shows whether the sidebar is on (`aria-pressed`).

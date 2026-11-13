@@ -86,6 +86,17 @@ test.describe('with a folder open', () => {
     await expect.poll(() => editorText(page)).toBe('notes\n****')
     await expect(tree(page)).toBeVisible() // the sidebar stayed
   })
+
+  test('Ctrl/Cmd+Shift+E shows and hides the sidebar everywhere, Markdown included', async ({ page }) => {
+    await tree(page).getByRole('treeitem').filter({ hasText: 'notes.md' }).click()
+    await expect.poll(() => editorText(page)).toBe('notes\n')
+    await editor(page).click()
+    await page.keyboard.press(`${mod}+Shift+E`)
+    await expect(tree(page)).toHaveCount(0)
+    expect(await editorText(page)).toBe('notes\n') // nothing typed
+    await page.keyboard.press(`${mod}+Shift+E`)
+    await expect(tree(page)).toBeVisible()
+  })
 })
 
 // --- Phase 2: writing helpers --------------------------------------------------------

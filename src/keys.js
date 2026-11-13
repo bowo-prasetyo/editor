@@ -17,7 +17,7 @@ export const SHORTCUTS = [
   { id: 'saveAll', group: 'Documents', label: 'Save all changed files', keys: ['Mod+Alt+S'] },
   { id: 'settings', group: 'Documents', label: 'Settings', keys: ['Mod+,'] },
   { id: 'split', group: 'Documents', label: 'Split the editor / close the split', keys: ['Mod+\\'] },
-  { id: 'sidebar', group: 'Documents', label: 'Show / hide the folder sidebar (outside Markdown documents; or the Folders button)', keys: ['Mod+B'] },
+  { id: 'sidebar', group: 'Documents', label: 'Show / hide the folder sidebar (also the Folders button)', keys: ['Mod+Shift+E'] },
   // Find
   { id: 'find', group: 'Find', label: 'Find', keys: ['Mod+F'] },
   { id: 'replace', group: 'Find', label: 'Find and replace', keys: ['Mod+H'] },
@@ -35,7 +35,7 @@ export const SHORTCUTS = [
   { id: 'matchingBracket', group: 'Editing', label: 'Jump to the matching bracket', keys: ['Mod+Shift+\\'] },
   { id: 'undo', group: 'Editing', label: 'Undo / redo', keys: ['Mod+Z', isMac ? 'Mod+Shift+Z' : 'Mod+Y'] },
   { id: 'wrap', group: 'Editing', label: 'Word wrap on / off', keys: ['Alt+Z'] },
-  { id: 'bold', group: 'Editing', label: 'Bold / italic (Markdown documents)', keys: ['Mod+B', 'Mod+I'] },
+  { id: 'bold', group: 'Editing', label: 'Bold / italic (Markdown documents; elsewhere Ctrl/Cmd+B also shows or hides the sidebar)', keys: ['Mod+B', 'Mod+I'] },
   { id: 'complete', group: 'Editing', label: 'Show suggestions (Enter accepts, Escape closes)', keys: ['Ctrl+Space'] },
   { id: 'problems', group: 'Editing', label: 'Show problems (JSON, YAML)', keys: ['Mod+Shift+M'] },
   { id: 'nextProblem', group: 'Editing', label: 'Go to the next problem', keys: ['F8'] },

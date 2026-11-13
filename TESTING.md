@@ -155,6 +155,20 @@ moved outside is brought back, Escape closes them wherever focus is, keys
 meant for a dialog never edit the document behind, and focus returns to the
 editor or the button that opened them. (`dialogs.spec.js`)
 
+Finding and using things (`usability.spec.js`): the first visit explains
+files and drafts, without the storage warning; every screen has a top-level
+heading; the open documents are links (the current one marked) with their
+own close buttons, no control inside another; the status bar's controls and
+tab close buttons are at least 24×24 px; the text size buttons are named by
+their content; *Split* has a button that shows its state; the palette lists
+recently run commands first; closing a file's tab with unsaved changes says
+they're kept, and *Reopen* brings it back. On a phone (Pixel 5): the toolbar
+keeps the everyday buttons and the rest are in *More* (keyboard: ↓, Escape
+back to the button), which fits on screen; *Bold* and *Italic* buttons format
+Markdown and keep the editor focused; the status bar folds its controls
+behind a details button. Ctrl/Cmd+Shift+E shows and hides the sidebar in
+Markdown too (`markdown.spec.js`).
+
 ## Known gaps
 
 Problems the tests have found but that aren't fixed yet. Each is a

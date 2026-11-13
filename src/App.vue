@@ -50,8 +50,15 @@ function onKey(e) {
     e.preventDefault()
     return saveAll()
   }
-  // Ctrl/Cmd+B: show or hide the folder sidebar. (In a Markdown document
-  // the editor takes it first, for bold: see markdownKeys in cm.js.)
+  // Ctrl/Cmd+Shift+E: show or hide the folder sidebar, everywhere (as in
+  // VS Code's Explorer).
+  if (mod && e.shiftKey && !e.altKey && e.code === 'KeyE' && prefs.workspaces.length) {
+    e.preventDefault()
+    prefs.sidebar = !prefs.sidebar
+    return
+  }
+  // Ctrl/Cmd+B does too, as before, but only outside Markdown documents,
+  // where the editor takes it first for bold (markdownKeys in cm.js).
   if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'b' && !e.defaultPrevented && prefs.workspaces.length) {
     e.preventDefault()
     prefs.sidebar = !prefs.sidebar
@@ -213,7 +220,7 @@ onBeforeUnmount(() => {
         v-if="prefs.workspaces.length && canOpenFolder()"
         class="quick-button"
         :aria-pressed="!!prefs.sidebar"
-        :title="`Show or hide the folder sidebar (${isMac ? '⌘B' : 'Ctrl+B'} outside Markdown documents)`"
+        :title="`Show or hide the folder sidebar (${isMac ? '⌘⇧E' : 'Ctrl+Shift+E'})`"
         @click="prefs.sidebar = !prefs.sidebar"
       >
         Folders

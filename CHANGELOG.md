@@ -12,6 +12,21 @@ minor version (0.x) can change how things work.
   a brass plumb bob. New app icons, a favicon (SVG, with a `.ico` for older
   browsers), the mark in the header, and a logo with a wordmark in the README.
   Regenerate the bitmaps with `npm run icons`.
+- **A welcome on the first visit.** Until there's anything to list, the start
+  page explains files (on your disk; Save writes them back) and drafts (in
+  this browser), instead of one line and a storage warning.
+- **Ctrl/Cmd+Shift+E shows or hides the folder sidebar** in any document,
+  Markdown included. Ctrl/Cmd+B still does outside Markdown, where it isn't
+  bold.
+- **A Split button** in the editor's toolbar (it was only Ctrl/Cmd+\\ or the
+  palette).
+- **Recently used commands first** in the command palette.
+- **Closing the tab of a file with unsaved changes says they're kept**, with
+  *Reopen*.
+- **Phones and tablets:** on narrow screens the toolbar keeps *Preview*,
+  *Find* and *Save* and puts the rest under *More*, and the status bar folds
+  its controls behind **⋯**, which leaves about twice the room for text. On
+  touch screens, Markdown documents get **B** and *I* buttons.
 
 ### Changed
 
@@ -20,6 +35,21 @@ minor version (0.x) can change how things work.
   "Everything is saved in your browser". Now a file's own state comes first,
   the browser part reads *Edits kept in browser ✓* until you save, and the
   header says edits are kept in your browser until you save them.
+- **Easier to see and to hit:**
+  - The status bar's controls, the tab close buttons and the sidebar's folder
+    buttons are at least 24×24 px.
+  - Pressed toggles (*Wrap*, *Spelling*, *Preview*) and the current item in
+    lists use a darker blue, above 4.5:1 contrast in both themes.
+  - The file name has a faint border, so it reads as something you can
+    rename.
+  - Messages sit above the status bar instead of covering it.
+- **For screen readers and voice control:**
+  - The open documents are a list of links, the current one marked, each
+    with its own close button. Before, they were ARIA tabs with a button
+    inside.
+  - Every screen has a top-level heading.
+  - The text size buttons are named *Smaller text* and *Larger text* by their
+    content, not by a label that differs from what's on screen.
 
 ### Fixed
 
