@@ -5,8 +5,8 @@ import { reactive, watch } from 'vue'
 const KEY = 'editor.prefs.v1'
 export const FONT_SIZES = [11, 12, 13, 14, 16, 18, 20, 24, 28]
 // tabs: open document ids; recent: recently opened, newest first; sort: how
-// the list is ordered; folders: folders created while still empty.
-// folderView: the folder shown in the document list ('' = all).
+// the list is ordered.
+// labelView: the label the list of drafts is filtered by ('' = all).
 // Editing helpers (for code): closeBrackets, autocomplete, indentGuides.
 // When saving to a file: trimOnSave (trailing spaces; never in Markdown,
 // where they mean a line break) and finalNewline.
@@ -17,8 +17,7 @@ const defaults = {
   tabs: [],
   recent: [],
   sort: 'updated',
-  folders: [],
-  folderView: '',
+  labelView: '',
   closeBrackets: true,
   autocomplete: true,
   indentGuides: true,
@@ -44,7 +43,7 @@ function load() {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY)) ?? {}
     const lists = Object.fromEntries(
-      ['tabs', 'recent', 'folders', 'workspaces'].map((k) => [k, Array.isArray(saved[k]) ? saved[k] : []]),
+      ['tabs', 'recent', 'workspaces'].map((k) => [k, Array.isArray(saved[k]) ? saved[k] : []]),
     )
     const expanded = saved.expanded && typeof saved.expanded === 'object' ? saved.expanded : {}
     const indentDefault = ['spaces', 'tabs'].includes(saved.indentDefault?.type) && +saved.indentDefault.size > 0

@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { prefs } from './prefs'
-import { NONE } from './folders'
 import AppToast from './components/AppToast.vue'
 import QuickOpen from './components/QuickOpen.vue'
 import ShortcutsDialog from './components/ShortcutsDialog.vue'
@@ -22,8 +21,6 @@ import { droppedHandles } from './fileaccess'
 // Drop files anywhere in the app to open them.
 const router = useRouter()
 const route = useRoute()
-// Files dropped on the document list go into the folder it shows.
-const dropFolder = () => (route.name === 'home' && prefs.folderView !== NONE ? prefs.folderView : '')
 const quickOpen = ref(null)
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
 
@@ -155,12 +152,11 @@ function onDrop(e) {
   // Handles (where offered) let Save write back to the dropped files. They
   // must be requested now, before the drop event is over.
   const handles = droppedHandles(e.dataTransfer)
-  if (!handles) return openFiles(files, router, { folder: dropFolder() })
+  if (!handles) return openFiles(files, router)
   handles.then((hs) =>
     openFiles(
       files.map((file, i) => ({ file, handle: hs[i]?.kind === 'file' ? hs[i] : null })),
       router,
-      { folder: dropFolder() },
     ),
   )
 }

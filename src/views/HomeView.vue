@@ -5,8 +5,6 @@ import {
   state,
   createDoc,
   moveToFolder,
-  removeFolder,
-  renameFolder,
   requestPersistence,
   storageEstimate,
   deleteDoc,
@@ -24,8 +22,8 @@ import { canSaveInPlace, pickFiles } from '../fileaccess'
 import { canOpenFolder, openFolder } from '../workspace'
 import { showToast } from '../toast'
 import { prefs } from '../prefs'
-import { NONE, SORTS, folderTree, inFolder, parentFolder, renamedFolder, sortDocs } from '../folders'
-import FolderDialog from '../components/FolderDialog.vue'
+import { SORTS, labelsOf, sortDocs } from '../folders'
+import { togglePin } from '../drafts'
 
 const router = useRouter()
 const fileInput = ref(null)
@@ -50,18 +48,25 @@ function trashCopies() {
 }
 const forgetCopies = (ids = copies.value.map((d) => d.id)) => ids.forEach((id) => setDocOptions(id, { copyOf: undefined }))
 
-// --- Folders and sorting ------------------------------------------------------
+// --- Labels, pinning and sorting ------------------------------------------------
 
-const tree = computed(() => folderTree(live.value, prefs.folders))
-const folderPaths = computed(() => tree.value.map((f) => f.path))
-const folder = computed({
-  get: () => (prefs.folderView === NONE || folderPaths.value.includes(prefs.folderView) ? prefs.folderView : ''),
-  set: (v) => (prefs.folderView = v),
+// Labels: the folders drafts were filed in before Plumb kept files and
+// drafts apart. They can be filtered by and removed, not made (see folders.js).
+const labels = computed(() => labelsOf(live.value))
+const label = computed({
+  get: () => (labels.value.some((l) => l.label === prefs.labelView) ? prefs.labelView : ''),
+  set: (v) => (prefs.labelView = v),
 })
-const noFolderCount = computed(() => live.value.filter((d) => !d.folder).length)
-const inView = computed(() => live.value.filter((d) => inFolder(d, folder.value)))
+const inView = computed(() => (label.value ? live.value.filter((d) => d.folder === label.value) : live.value))
+function removeLabel(doc) {
+  const old = doc.folder
+  moveToFolder(doc.id, '')
+  showToast(`Removed the label “${old}” from “${displayName(doc.name)}”.`, {
+    action: { label: 'Undo', run: () => moveToFolder(doc.id, old) },
+  })
+}
 
-// Filter by name or content, ignoring case, within the folder shown.
+// Filter by name or content, ignoring case; pinned drafts first.
 const docs = computed(() => {
   const q = query.value.trim().toLowerCase()
   const list = q
@@ -70,80 +75,13 @@ const docs = computed(() => {
   return sortDocs(list, prefs.sort)
 })
 
-// Dialogs for New folder / Rename folder / Move to folder.
-const dialog = ref(null) // { kind, title, initial, confirm, doc? }
-function newFolder() {
-  const base = folder.value && folder.value !== NONE ? folder.value + '/' : ''
-  dialog.value = { kind: 'new', title: 'New folder', initial: base, confirm: 'Create' }
-}
-function renameCurrent() {
-  dialog.value = { kind: 'rename', title: `Rename “${folder.value}”`, initial: folder.value, confirm: 'Rename' }
-}
-function moveDoc(doc) {
-  dialog.value = {
-    kind: 'move',
-    title: `Move “${displayName(doc.name)}” to folder`,
-    initial: doc.folder ?? '',
-    confirm: 'Move',
-    doc,
-  }
-}
-function onDialog(path) {
-  const d = dialog.value
-  dialog.value = null
-  if (d.kind === 'new') {
-    if (!folderPaths.value.includes(path)) prefs.folders = [...prefs.folders, path]
-    folder.value = path
-  } else if (d.kind === 'rename') {
-    const from = folder.value
-    if (path === from) return
-    renameFolder(from, path)
-    // Empty folders created earlier move along too.
-    prefs.folders = prefs.folders.map((f) => renamedFolder(f, from, path) ?? f)
-    folder.value = path
-  } else if (d.kind === 'move') {
-    moveToFolder(d.doc.id, path)
-    if (path && !folderPaths.value.includes(path)) prefs.folders = [...prefs.folders, path]
-    showToast(path ? `Moved “${displayName(d.doc.name)}” to ${path}.` : `Moved “${displayName(d.doc.name)}” out of its folder.`)
-  }
-}
-// Removing a folder never deletes documents: they move up to its parent.
-function removeCurrent() {
-  const path = folder.value
-  const n = inView.value.length
-  const parent = parentFolder(path)
-  const where = parent ? `“${parent}”` : 'no folder'
-  if (n && !confirm(`Remove the folder “${path}”? Its ${n} document${n === 1 ? '' : 's'} will move to ${where}.`)) return
-  removeFolder(path)
-  prefs.folders = prefs.folders.filter((f) => renamedFolder(f, path, parent) === undefined)
-  folder.value = parent
-}
-
-// Drag a document onto a folder in the sidebar to move it there.
-const dragOver = ref(null)
-function onDocDragStart(e, doc) {
-  e.dataTransfer.setData('application/x-editor-doc', doc.id)
-  e.dataTransfer.effectAllowed = 'move'
-}
-function onFolderDrop(e, path) {
-  dragOver.value = null
-  const id = e.dataTransfer.getData('application/x-editor-doc')
-  if (!id) return
-  e.preventDefault()
-  moveToFolder(id, path === NONE ? '' : path)
-}
-const acceptsDoc = (e) => [...e.dataTransfer.types].includes('application/x-editor-doc')
 const trash = computed(() =>
   state.docs.filter((d) => d.deletedAt).sort((a, b) => b.deletedAt - a.deletedAt),
 )
 const showTrash = ref(false)
 
-// New and opened documents go into the folder shown.
-const targetFolder = () => (folder.value && folder.value !== NONE ? folder.value : '')
-
 function newDoc() {
   const doc = createDoc()
-  if (targetFolder()) moveToFolder(doc.id, targetFolder())
   requestPersistence()
   router.push({ name: 'edit', params: { id: doc.id } })
 }
@@ -154,7 +92,7 @@ async function openPicker() {
   if (!canSaveInPlace()) return fileInput.value.click()
   try {
     const picked = await pickFiles()
-    if (picked.length) await openFiles(picked, router, { folder: targetFolder() })
+    if (picked.length) await openFiles(picked, router)
   } catch (e) {
     showToast(`Couldn't open the files: ${e.message}`)
   }
@@ -173,7 +111,7 @@ async function onOpenFolder() {
 async function onFiles(e) {
   const files = [...e.target.files]
   e.target.value = ''
-  await openFiles(files, router, { folder: targetFolder() })
+  await openFiles(files, router)
 }
 
 async function onBackup(e) {
@@ -244,43 +182,29 @@ const daysLeft = (d) =>
     </div>
 
     <div class="home-body">
-      <nav class="folders" aria-label="Folders">
+      <nav class="folders" aria-label="Labels">
         <button
           class="folder-item"
-          :class="{ active: !folder, 'drop-target': dragOver === '' }"
-          :aria-current="!folder ? 'true' : undefined"
-          @click="folder = ''"
+          :class="{ active: !label }"
+          :aria-current="!label ? 'true' : undefined"
+          @click="label = ''"
         >
           <span>All drafts</span><span class="count">{{ live.length }}</span>
         </button>
-        <button
-          v-for="f in tree"
-          :key="f.path"
-          class="folder-item"
-          :class="{ active: folder === f.path, 'drop-target': dragOver === f.path }"
-          :style="{ paddingLeft: 10 + f.depth * 14 + 'px' }"
-          :title="f.path"
-          :aria-current="folder === f.path ? 'true' : undefined"
-          @click="folder = f.path"
-          @dragover="(e) => acceptsDoc(e) && (e.preventDefault(), (dragOver = f.path))"
-          @dragleave="dragOver = null"
-          @drop="(e) => onFolderDrop(e, f.path)"
-        >
-          <span class="folder-name">📁 {{ f.name }}</span><span class="count">{{ f.count }}</span>
-        </button>
-        <button
-          v-if="tree.length"
-          class="folder-item"
-          :class="{ active: folder === NONE, 'drop-target': dragOver === NONE }"
-          :aria-current="folder === NONE ? 'true' : undefined"
-          @click="folder = NONE"
-          @dragover="(e) => acceptsDoc(e) && (e.preventDefault(), (dragOver = NONE))"
-          @dragleave="dragOver = null"
-          @drop="(e) => onFolderDrop(e, NONE)"
-        >
-          <span>No folder</span><span class="count">{{ noFolderCount }}</span>
-        </button>
-        <button class="link new-folder" @click="newFolder">+ New folder</button>
+        <template v-if="labels.length">
+          <p class="hint labels-head">Labels</p>
+          <button
+            v-for="l in labels"
+            :key="l.label"
+            class="folder-item"
+            :class="{ active: label === l.label }"
+            :title="`Drafts labelled “${l.label}”`"
+            :aria-current="label === l.label ? 'true' : undefined"
+            @click="label = l.label"
+          >
+            <span class="folder-name">{{ l.label }}</span><span class="count">{{ l.count }}</span>
+          </button>
+        </template>
       </nav>
 
       <div class="list-pane">
@@ -296,24 +220,18 @@ const daysLeft = (d) =>
             <button title="Download every draft as one backup file first" @click="downloadBackup">Export a backup first</button>
           </span>
         </div>
-        <div v-if="folder && folder !== NONE" class="folder-head">
-          <strong>📁 {{ folder }}</strong>
-          <span class="spacer" />
-          <button @click="renameCurrent">Rename</button>
-          <button @click="removeCurrent">Remove folder</button>
-        </div>
 
         <div v-if="live.length" class="list-tools">
           <input
             v-model="query"
             class="filter"
             type="search"
-            placeholder="Filter documents"
-            aria-label="Filter documents by name or text"
+            placeholder="Filter drafts"
+            aria-label="Filter drafts by name or text"
           />
           <label class="sort">
             <span class="hint">Sort</span>
-            <select v-model="prefs.sort" aria-label="Sort documents by">
+            <select v-model="prefs.sort" aria-label="Sort drafts by">
               <option v-for="(s, key) in SORTS" :key="key" :value="key">{{ s.label }}</option>
             </select>
           </label>
@@ -323,31 +241,32 @@ const daysLeft = (d) =>
           No drafts yet. Create one, open a file, or drop files anywhere on this page.
         </p>
         <p v-else-if="!docs.length && query" class="empty">No drafts match “{{ query }}”.</p>
-        <p v-else-if="!docs.length" class="empty">
-          This folder is empty. New documents and opened files go into the folder shown, or drag a document onto a folder.
-        </p>
+        <p v-else-if="!docs.length" class="empty">No drafts have this label any more.</p>
 
         <ul v-else class="doc-list">
           <li v-for="doc in docs" :key="doc.id">
-            <RouterLink
-              :to="{ name: 'edit', params: { id: doc.id } }"
-              class="doc-link"
-              draggable="true"
-              @dragstart="(e) => onDocDragStart(e, doc)"
-            >
+            <RouterLink :to="{ name: 'edit', params: { id: doc.id } }" class="doc-link">
               <strong :class="{ untitled: !doc.name?.trim() }">{{ displayName(doc.name) }}</strong>
-              <small>
-                <template v-if="doc.folder && doc.folder !== folder">📁 {{ doc.folder }} · </template>
-                {{ fmt(doc.updatedAt) }} · {{ doc.content.length.toLocaleString() }} chars
-              </small>
+              <small>{{ fmt(doc.updatedAt) }} · {{ doc.content.length.toLocaleString() }} chars</small>
             </RouterLink>
+            <span v-if="doc.folder" class="label-chip" :title="`Label: ${doc.folder}`">
+              {{ doc.folder }}
+              <button
+                class="label-remove"
+                :aria-label="`Remove the label ${doc.folder} from ${displayName(doc.name)}`"
+                title="Remove this label"
+                @click="removeLabel(doc)"
+              >×</button>
+            </span>
             <button
-              class="icon-button"
-              :title="`Move ${displayName(doc.name)} to a folder`"
-              :aria-label="`Move ${displayName(doc.name)} to a folder`"
-              @click="moveDoc(doc)"
+              class="icon-button pin-button"
+              :class="{ pinned: doc.pinned }"
+              :aria-pressed="!!doc.pinned"
+              :title="doc.pinned ? 'Unpin' : 'Pin to the top of the list'"
+              :aria-label="`${doc.pinned ? 'Unpin' : 'Pin'} ${displayName(doc.name)}`"
+              @click="togglePin(doc.id)"
             >
-              📁
+              📌
             </button>
             <button
               class="danger"
@@ -392,15 +311,6 @@ const daysLeft = (d) =>
       </template>
     </div>
 
-    <FolderDialog
-      v-if="dialog"
-      :title="dialog.title"
-      :initial="dialog.initial"
-      :confirm="dialog.confirm"
-      :folders="folderPaths"
-      :allow-empty="dialog.kind === 'move'"
-      @submit="onDialog"
-      @cancel="dialog = null"
-    />
+
   </section>
 </template>
