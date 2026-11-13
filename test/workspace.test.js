@@ -168,3 +168,83 @@ test('paths and folders for the document list', () => {
   assert.equal(ws.docFolder('app', 'a.js'), 'app')
   assert.equal(ws.docFolder('app', 'src/x/a.js'), 'app/src/x')
 })
+
+// --- Files and drafts (docs/files-and-drafts.md) ------------------------------------
+
+test('a file opened from a folder is a file, not a draft', async () => {
+  const { w } = await openProject()
+  const { doc } = await ws.openWorkspaceFile(w.id, 'file2.txt', await project.getFileHandle('file2.txt'))
+  assert.equal(doc.kind, 'file')
+  assert.equal(store.isFile(doc), true)
+  assert.equal(store.createDoc().kind, 'draft')
+  await ws.closeFolder(w.id)
+})
+
+test('a file not read yet gets its text from disk, fresh, when shown', async () => {
+  const { w } = await openProject()
+  const handle = await project.getFileHandle('file10.txt')
+  const { doc } = await ws.openWorkspaceFile(w.id, 'file10.txt', handle)
+  // As loaded after a reload: stored without its text.
+  Object.assign(store.getDoc(doc.id), { content: '', unread: true })
+  handle.write('ten, changed while Plumb was closed')
+  assert.equal(await ws.readFileText(doc.id), 'ready')
+  const d = store.getDoc(doc.id)
+  assert.equal(d.content, 'ten, changed while Plumb was closed')
+  assert.equal(d.unread, undefined)
+  assert.equal(d.diskDirty, false, 'reading is not an edit')
+  assert.equal(await ws.readFileText(doc.id), 'ready', 'nothing to do once read')
+  await ws.closeFolder(w.id)
+})
+
+test('reading a file’s text needs the folder’s permission, and says when it’s gone', async () => {
+  const { w } = await openProject()
+  const handle = await project.getFileHandle('README.md')
+  const { doc } = await ws.openWorkspaceFile(w.id, 'README.md', handle)
+  Object.assign(store.getDoc(doc.id), { content: '', unread: true })
+  handle.queryPermission = async () => 'prompt'
+  assert.equal(await ws.readFileText(doc.id), 'needs-access')
+  assert.equal(store.getDoc(doc.id).unread, true)
+  handle.queryPermission = async () => 'granted'
+  handle.getFile = async () => { throw Object.assign(new Error('gone'), { name: 'NotFoundError' }) }
+  assert.equal(await ws.readFileText(doc.id), 'missing')
+  delete handle.getFile
+  await ws.closeFolder(w.id)
+})
+
+test('a file not read yet is never written: its placeholder would wipe the file', async () => {
+  const { w } = await openProject()
+  const handle = await project.getFileHandle('file2.txt')
+  const { doc } = await ws.openWorkspaceFile(w.id, 'file2.txt', handle)
+  Object.assign(store.getDoc(doc.id), { content: '', unread: true })
+  await assert.rejects(fa.saveDoc(store.getDoc(doc.id)), /hasn’t been read/)
+  assert.equal(handle.text(), 'two')
+  await ws.closeFolder(w.id)
+})
+
+test('opening a file not read yet reads it', async () => {
+  const { w } = await openProject()
+  const handle = await project.getFileHandle('file2.txt')
+  const { doc } = await ws.openWorkspaceFile(w.id, 'file2.txt', handle)
+  Object.assign(store.getDoc(doc.id), { content: '', unread: true })
+  const again = await ws.openWorkspaceFile(w.id, 'file2.txt', handle)
+  assert.equal(again.doc.id, doc.id)
+  assert.equal(store.getDoc(doc.id).content, 'two')
+  await ws.closeFolder(w.id)
+})
+
+test('closing a folder keeps files with unsaved changes as drafts and lets the others go', async () => {
+  const { w } = await openProject()
+  const clean = (await ws.openWorkspaceFile(w.id, 'file10.txt', await project.getFileHandle('file10.txt'))).doc
+  const edited = (await ws.openWorkspaceFile(w.id, 'README.md', await project.getFileHandle('README.md'))).doc
+  store.updateDoc(edited.id, { content: '# My app, edited\n' })
+  assert.equal(await ws.closeFolder(w.id), 1)
+
+  assert.equal(store.getDoc(clean.id), undefined, 'its text is on disk')
+  assert.deepEqual(await store.listVersions(clean.id), [], 'its history goes with it')
+  const kept = store.getDoc(edited.id)
+  assert.equal(kept.kind, 'draft')
+  assert.equal(kept.content, '# My app, edited\n')
+  assert.deepEqual(kept.origin, { folder: 'my-app', path: 'README.md' })
+  assert.equal(kept.source, undefined)
+  store.deleteDoc(edited.id)
+})

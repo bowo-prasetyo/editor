@@ -1,9 +1,9 @@
 # Plan: Files and Drafts
 
-> **Status: proposed.** This plans step 3 of [VISION.md](../VISION.md#next-steps),
-> the split between **Files** and **Drafts**. No code changes yet. The
-> [questions](#questions-for-the-maintainer) at the end need a decision before
-> phase 1 starts.
+> **Status: accepted; phase 1 done.** This plans step 3 of
+> [VISION.md](../VISION.md#next-steps), the split between **Files** and
+> **Drafts**. The [decisions](#decisions) are recorded at the end.
+> [Phase 1](#phases) is built; phases 2–4 are next.
 
 ## Why
 
@@ -53,9 +53,9 @@ The rule is that **the browser keeps only what isn't on disk**:
 
 - **When it has no unsaved changes**, a file record is stored **without its
   text**: id, `kind`, `source`, name, encoding, line endings, editor settings
-  and the date of the version on disk. It's a few hundred bytes. The backend
-  leaves `content` out when writing it; the change is in `backends.js`, so
-  everything above it is unchanged.
+  and the date of the version on disk. It's a few hundred bytes. The store's
+  save step leaves `content` out when writing it (`storedForm()` in
+  `src/store.js`), so everything else is unchanged.
 - **When it has unsaved changes** (`diskDirty`), it's stored in full, exactly as
   today, so autosave, the rescue copies and sync between tabs keep protecting
   the edits.
@@ -186,6 +186,18 @@ ordinary drafts and the banner doesn't come back.
 Each phase is one PR that ships on its own, with its tests, and leaves Plumb
 working.
 
+**Phase 1 is done**, with two adjustments to the plan above:
+
+- **Closing a folder already never loses unsaved edits**, without the dialog
+  yet. Once files with no unsaved changes have no stored text, leaving their
+  records behind would leave empty documents. So closing a folder now keeps
+  files with unsaved changes as drafts, with an `origin`, and removes the
+  others and their history. Phase 2 adds the dialog (*Save all to disk* /
+  *Keep as drafts* / *Cancel*) and putting the edits back on reopen.
+- **Files opened on their own stay as they are until phase 4.** Without the
+  Recent files list, turning them into file records would hide them, so the
+  migration keeps them as drafts for now.
+
 1. **Records and migration.**
    - Code: the `kind` field; file records stored without text when they have
      no unsaved changes; text read from disk when shown; the Drafts list
@@ -229,22 +241,16 @@ are updated in the phase that changes them.
   Safari only drafts and single-file downloads exist. This plan doesn't change
   that, apart from the Drafts name.
 
-## Questions for the maintainer
+## Decisions
 
-1. **History of a closed folder's files.** Recommended: remove it when the
-   folder is closed (after the dialog), since the files themselves are on disk.
-   The alternative is to keep it for 30 days and reattach it if the same folder
-   is opened again. That keeps more, but needs a "closed folders" store and a
-   cleanup.
-2. **Recent files for files opened on their own.** Recommended: yes, the 20
-   most recent, on the start page above Drafts. The alternative is to keep them
-   only while their tab is open, which is simpler, but reopening means the
-   picker again.
-3. **After a reload, a file with no unsaved changes needs *Allow access* before
-   its text shows.** Recommended: accept it. It's the honest result of keeping
-   no copies, it matches *Private by construction*, and unsaved edits still
-   show at once. The alternative is to keep a read-only copy for display only,
-   which brings back the copies this plan removes.
-4. **Copies from closed folders.** Recommended: the one-time banner offering to
-   move them to the Trash, as above. The alternative is to leave them as
-   ordinary drafts, which is safe but keeps the clutter.
+Settled by the maintainer, as recommended:
+
+1. **History of a closed folder's files** is removed when the folder is closed
+   (after the dialog), since the files themselves are on disk.
+2. **Recent files:** files opened on their own are listed on the start page
+   above Drafts, the 20 most recent (phase 4).
+3. **After a reload**, a file with no unsaved changes needs *Allow access*
+   before its text shows. It's the honest result of keeping no copies, it
+   matches *Private by construction*, and unsaved edits still show at once.
+4. **Copies from closed folders** get the one-time banner offering to move them
+   to the Trash.

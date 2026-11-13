@@ -10,7 +10,10 @@
 import { markRaw, reactive, shallowReactive } from 'vue'
 import { prefs } from './prefs.js'
 import {
+  deleteDoc,
+  fillText,
   getDoc,
+  getFileHandle,
   importFile,
   linkFile,
   moveToFolder,
@@ -106,15 +109,26 @@ export async function openFolder() {
   return w
 }
 
-// Take a folder out of the sidebar. Documents opened from it stay, still
-// linked to their files.
+// Take a folder out of the sidebar. Its files' records go: a file with
+// unsaved changes becomes a draft (remembering where it came from), so
+// nothing is lost; the others, and their history, are removed, since their
+// text is on disk. Returns how many files were kept as drafts.
 export async function closeFolder(id) {
+  const name = workspaceFor(id)?.name ?? ''
+  let kept = 0
+  for (const doc of state.docs.filter((d) => d.kind === 'file' && d.source?.root === id && !d.deletedAt)) {
+    if (doc.diskDirty) {
+      setDocOptions(doc.id, { kind: 'draft', origin: { folder: name, path: doc.source.path }, source: undefined })
+      kept++
+    } else await deleteDoc(doc.id)
+  }
   prefs.workspaces = prefs.workspaces.filter((w) => w.id !== id)
   delete prefs.expanded[id]
   unwatchRoot(id)
   roots.delete(id)
   forgetListings(id)
   await storeHandle(handleKey(id), null)
+  return kept
 }
 
 // --- Listing folders --------------------------------------------------------------
@@ -469,12 +483,45 @@ export async function refreshFromDisk(doc, file, handle) {
 export async function openWorkspaceFile(rootId, path, handle) {
   const file = await handle.getFile()
   const existing = findWorkspaceDoc(rootId, path)
+  if (existing?.unread) {
+    await takeText(existing.id, file, handle)
+    return { doc: getDoc(existing.id), refreshed: 'same' }
+  }
   if (existing) return { doc: existing, refreshed: await refreshFromDisk(existing, file, handle) }
-  const doc = await importFile(file, handle)
+  const doc = await importFile(file, handle, { kind: 'file' })
   setDocOptions(doc.id, { source: { root: rootId, path } })
   moveToFolder(doc.id, docFolder(workspaceFor(rootId)?.name ?? '', path))
   requestPersistence()
   return { doc: getDoc(doc.id), refreshed: 'same' }
+}
+
+// --- Reading a file's text when it's shown ----------------------------------------------
+
+// A file stored without its text (see isFile in store.js) gets it from disk
+// when it's shown. Returns 'ready', 'needs-access' (the browser needs the
+// user's permission for the folder again: see reconnect()), or 'missing'
+// (the file is gone or isn't text any more).
+export async function readFileText(id) {
+  const doc = getDoc(id)
+  if (!doc?.unread) return 'ready'
+  const handle = await getFileHandle(id).catch(() => null)
+  if (!handle) return 'missing'
+  if ((await permission(handle)) !== 'granted') return 'needs-access'
+  let file
+  try {
+    file = await handle.getFile()
+  } catch (e) {
+    return e?.name === 'NotFoundError' ? 'missing' : 'needs-access'
+  }
+  return (await takeText(id, file, handle)) ? 'ready' : 'missing'
+}
+
+async function takeText(id, file, handle) {
+  const decoded = decodeBytes(new Uint8Array(await file.arrayBuffer()))
+  if (decoded.binary || !getDoc(id)?.unread) return !decoded.binary
+  fillText(id, decoded.text, fileFormat(decoded))
+  await linkFile(id, handle, file.lastModified)
+  return true
 }
 
 // --- New files and folders -----------------------------------------------------------

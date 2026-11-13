@@ -95,6 +95,19 @@ The scenarios follow the principles in [VISION.md](VISION.md#principles).
 | Save on a new document asks where, then keeps saving there; Save as links to the new file | `files.spec.js` |
 | A folder's file opens, saves back, and shows when it has unsaved changes; opening it again shows the same document; changes from other programs and new files are picked up | `folders.spec.js` |
 
+### Files and drafts ([plan](docs/files-and-drafts.md))
+
+| Scenario | Test |
+|---|---|
+| A file from a folder is a file, never in the Drafts list | `folders.spec.js`, `test/workspace.test.js` |
+| A file with nothing unsaved is stored **without its text**; unsaved edits are stored in full | `folders.spec.js`, `test/filesdrafts.test.js` |
+| A file not read yet gets its text from disk when shown, fresh (changed while Plumb was closed), and asks for permission when the browser needs it | `test/workspace.test.js` |
+| A file not read yet is never written (its empty placeholder would wipe the file) | `test/workspace.test.js` |
+| Search reads files from disk, not stored copies | `folders.spec.js` |
+| Closing a folder keeps unsaved files as drafts; the others, and their history, go | `folders.spec.js`, `test/workspace.test.js` |
+| Backups hold drafts and unsaved file edits, not copies; rescue copies and other tabs never blank a file | `test/filesdrafts.test.js` |
+| Migration: each kind of old document becomes a draft or a file as planned, runs once, never deletes text; copies from closed folders are offered to the Trash (with Undo) or kept | `migration.spec.js`, `test/filesdrafts.test.js` |
+
 ### The editor screen
 
 Naming from the first line and renaming; find and replace all with a one-step
@@ -111,6 +124,13 @@ None right now. (The first one, mixed line endings being normalised on save,
 was fixed: see `src/lineends.js`.)
 
 ## Not covered (yet)
+
+- **A reload with a folder open, end to end.** In the headless Chromium the
+  tests use, reading a handle from the browser's private file system back out
+  of IndexedDB after a reload crashes the page. Real handles, from the
+  system's pickers, aren't affected. So end-to-end tests move between pages
+  without reloading once a folder is open, and reading a file's text after a
+  reload is covered by unit tests (`test/workspace.test.js`).
 
 - **Firefox and Safari.** The end-to-end tests run in Chromium only. The
   Firefox and Safari promise (drafts, single files saved as downloads; see

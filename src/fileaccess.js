@@ -73,6 +73,9 @@ export const isWriting = (id) => writing.has(id)
 // `saveAs` always asks where to save. Returns one of:
 //   { result: 'saved', name } | { result: 'downloaded', lossy } | { result: 'cancelled' }
 export async function saveDoc(doc, { saveAs = false, confirm: confirmFn = (m) => globalThis.confirm(m) } = {}) {
+  // A file whose text hasn't been read from disk yet has nothing to write:
+  // writing its empty placeholder would wipe the file.
+  if (doc.unread) throw new Error('Its text hasn’t been read from disk yet.')
   if (!canSaveInPlace()) return { result: 'downloaded', ...downloadDoc(doc) }
 
   let handle = saveAs ? null : await getFileHandle(doc.id)

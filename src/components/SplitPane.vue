@@ -9,6 +9,7 @@ import { viewSettings } from '../filetype'
 import { effectiveIndent } from '../indentation'
 import { findLanguage, loadLanguage } from '../languages'
 import { displayName } from '../naming'
+import UnreadFile from './UnreadFile.vue'
 import { liveTabs } from '../session'
 import { saveDoc } from '../fileaccess'
 import { showToast } from '../toast'
@@ -171,6 +172,7 @@ defineExpose({ focus: () => editor.value?.focus() })
       <span class="spacer" />
       <button class="mini" title="Close the split (Ctrl/Cmd+\)" aria-label="Close the split" @click="emit('close')">×</button>
     </div>
-    <div ref="host" class="source" />
+    <UnreadFile v-if="doc?.unread" :doc="doc" class="source" />
+    <div v-else ref="host" class="source" />
   </div>
 </template>
