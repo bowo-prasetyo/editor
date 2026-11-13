@@ -38,15 +38,15 @@ export function droppedHandles(dataTransfer) {
 }
 
 
-// Bytes to write, asking what to do if the text can't be written in the
-// file's encoding. Returns null if the user cancels.
+// What to write ({ blob, lineEnds }), asking what to do if the text can't be
+// written in the file's encoding. Returns null if the user cancels.
 function bytesFor(doc, confirmFn) {
-  let { blob, lossy } = docBlob(doc)
-  if (!lossy) return blob
+  const out = docBlob(doc)
+  if (!out.lossy) return out
   const name = ENCODINGS[doc.encoding] ?? doc.encoding
   if (!confirmFn(`Some characters can't be written as ${name}.\n\nSave the file as UTF-8 instead?`)) return null
   setDocOptions(doc.id, { encoding: 'utf-8', bom: false })
-  return docBlob(doc).blob
+  return docBlob(doc)
 }
 
 async function write(handle, blob) {
@@ -104,11 +104,13 @@ export async function saveDoc(doc, { saveAs = false, confirm: confirmFn = (m) =>
     }
   }
 
-  const blob = bytesFor(doc, confirmFn)
-  if (!blob) return { result: 'cancelled' }
+  const out = bytesFor(doc, confirmFn)
+  if (!out) return { result: 'cancelled' }
   writing.add(doc.id)
   try {
-    const lastModified = await write(handle, blob)
+    const lastModified = await write(handle, out.blob)
+    // A file that mixes line endings: remember them as now written.
+    setDocOptions(doc.id, { lineEnds: out.lineEnds })
     await linkFile(doc.id, handle, lastModified)
   } finally {
     writing.delete(doc.id)

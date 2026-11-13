@@ -22,7 +22,7 @@ import {
   storedHandle,
   updateDoc,
 } from './store.js'
-import { decodeBytes } from './textcodec.js'
+import { decodeBytes, fileFormat } from './textcodec.js'
 import { editorSettings, parseEditorConfig, propertiesFor } from './editorconfig.js'
 import { dropPrefix, markChanged } from './filecache.js'
 
@@ -447,6 +447,8 @@ export async function refreshFromDisk(doc, file, handle) {
   // The file now holds exactly this text (our own save, or the same edit
   // made elsewhere): nothing to reload, and nothing unsaved any more.
   if (decoded.text === doc.content) {
+    // Only the encoding or line endings may differ: take them.
+    setDocOptions(doc.id, fileFormat(decoded))
     await linkFile(doc.id, handle, file.lastModified)
     return 'same'
   }
@@ -455,7 +457,7 @@ export async function refreshFromDisk(doc, file, handle) {
     await recordVersion(doc.id, 'auto')
     updateDoc(doc.id, { content: decoded.text })
   }
-  setDocOptions(doc.id, { encoding: decoded.encoding, bom: decoded.bom, eol: decoded.eol })
+  setDocOptions(doc.id, fileFormat(decoded))
   await linkFile(doc.id, handle, file.lastModified)
   return 'reloaded'
 }

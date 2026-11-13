@@ -54,17 +54,59 @@ for (const [name, original] of Object.entries(ROUND_TRIPS)) {
   })
 }
 
-// KNOWN BUG (see TESTING.md, "Known gaps"): a file that mixes line endings is
-// saved with all of them changed to the most common one, even with no edits.
-// test.fail() keeps this running: it reports when the bug is fixed, so the
-// marker can be removed.
+// Files that mix line endings (see src/lineends.js).
+const MIXED = bytes('one\r\ntwo\nthree\r\nfour\r\n')
+const lineEndings = (page) => page.getByRole('combobox', { name: 'Line endings used when downloading' })
+
 test('saving without changes keeps the file byte for byte: mixed line endings', async ({ page }) => {
-  test.fail()
-  const original = bytes('one\r\ntwo\nthree\r\n')
-  await writeFile(page, 'mixed.txt', original)
+  await writeFile(page, 'mixed.txt', MIXED)
   await openFromDisk(page, 'mixed.txt')
+  await expect(lineEndings(page)).toHaveValue('mixed')
   await saveToFile(page)
-  expect(await readBytes(page, 'mixed.txt')).toEqual(original)
+  expect(await readBytes(page, 'mixed.txt')).toEqual(MIXED)
+})
+
+test('in a file with mixed line endings, untouched lines keep theirs and new lines get the main one', async ({ page }) => {
+  await writeFile(page, 'mixed.txt', MIXED)
+  await openFromDisk(page, 'mixed.txt')
+  await editor(page).click()
+  await page.keyboard.press(`${mod}+Home`)
+  await page.keyboard.press('ArrowDown') // line "two" (LF)
+  await page.keyboard.press('End')
+  await page.keyboard.type(' edited')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('new line')
+  await saveToFile(page)
+  expect(await readText(page, 'mixed.txt')).toBe('one\r\ntwo edited\nnew line\r\nthree\r\nfour\r\n')
+
+  // And again, from what was just written.
+  await toEnd(page)
+  await page.keyboard.type('five')
+  await saveToFile(page)
+  expect(await readText(page, 'mixed.txt')).toBe('one\r\ntwo edited\nnew line\r\nthree\r\nfour\r\nfive')
+})
+
+test('choosing one line ending converts a mixed file', async ({ page }) => {
+  await writeFile(page, 'mixed.txt', MIXED)
+  await openFromDisk(page, 'mixed.txt')
+  await lineEndings(page).selectOption({ label: 'LF' })
+  await expect(lineEndings(page)).toHaveValue('\n')
+  await expect(lineEndings(page).locator('option', { hasText: 'Mixed' })).toHaveCount(0)
+  await saveToFile(page)
+  expect(await readText(page, 'mixed.txt')).toBe('one\ntwo\nthree\nfour\n')
+})
+
+test('a change to only the line endings on disk is taken, not undone by the next save', async ({ page }) => {
+  await writeFile(page, 'crlf.txt', 'a\r\nb\r\n')
+  await openFromDisk(page, 'crlf.txt')
+  await tick(page)
+  await writeFile(page, 'crlf.txt', 'a\nb\n') // e.g. dos2unix
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(lineEndings(page)).toHaveValue('\n')
+  await toEnd(page)
+  await page.keyboard.type('c')
+  await saveToFile(page)
+  expect(await readText(page, 'crlf.txt')).toBe('a\nb\nc')
 })
 
 test('an edit is written in the file’s own encoding and line endings', async ({ page }) => {

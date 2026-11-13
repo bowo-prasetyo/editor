@@ -1,6 +1,7 @@
 // Reading and writing text files without silently changing them: detect the
 // encoding, byte-order mark and line endings on open, and write them back the
 // same way on save. The editor itself always works with "\n" line endings.
+import { applyLineEnds, recordLineEnds } from './lineends.js'
 
 export const ENCODINGS = {
   'utf-8': 'UTF-8',
@@ -11,8 +12,7 @@ export const ENCODINGS = {
 
 export const EOLS = { '\n': 'LF', '\r\n': 'CRLF', '\r': 'CR' }
 
-// Most common line ending in the text ("\n" when there are none).
-export function detectEol(text) {
+function countEols(text) {
   let crlf = 0, lf = 0, cr = 0
   for (let i = 0; i < text.length; i++) {
     const c = text[i]
@@ -20,10 +20,17 @@ export function detectEol(text) {
       if (text[i + 1] === '\n') { crlf++; i++ } else cr++
     } else if (c === '\n') lf++
   }
+  return { crlf, lf, cr }
+}
+
+function mainEol({ crlf, lf, cr }) {
   if (crlf > lf && crlf >= cr) return '\r\n'
   if (cr > lf && cr > crlf) return '\r'
   return '\n'
 }
+
+// Most common line ending in the text ("\n" when there are none).
+export const detectEol = (text) => mainEol(countEols(text))
 
 export const normalizeEol = (text) => text.replace(/\r\n?/g, '\n')
 
@@ -51,7 +58,9 @@ function sniffUtf16(bytes) {
   return null
 }
 
-// bytes: Uint8Array. Returns { text, encoding, bom, eol, binary }.
+// bytes: Uint8Array. Returns { text, encoding, bom, eol, lineEnds, binary }.
+// `eol` is the most common line ending. `lineEnds` is null, unless the file
+// mixes line endings: then it records each line's (see lineends.js).
 export function decodeBytes(bytes) {
   let encoding = null
   let bom = false
@@ -80,8 +89,26 @@ export function decodeBytes(bytes) {
       encoding = 'windows-1252'
     }
   }
-  return { text: normalizeEol(raw), encoding, bom, eol: detectEol(raw), binary: false }
+  const counts = countEols(raw)
+  const mixed = (counts.crlf > 0) + (counts.lf > 0) + (counts.cr > 0) > 1
+  return {
+    text: normalizeEol(raw),
+    encoding,
+    bom,
+    eol: mainEol(counts),
+    lineEnds: mixed ? recordLineEnds(raw) : null,
+    binary: false,
+  }
 }
+
+// How a decoded file is written back: kept on its document. A file with no
+// line breaks says nothing about its line endings, so `eol` is left out.
+export const fileFormat = (d) => ({
+  encoding: d.encoding,
+  bom: d.bom,
+  ...(d.text.includes('\n') ? { eol: d.eol } : {}),
+  lineEnds: d.lineEnds ?? null,
+})
 
 let cp1252 // char -> byte, for the 0x80–0x9F range that differs from Latin-1
 function cp1252Byte(code) {
@@ -94,18 +121,23 @@ function cp1252Byte(code) {
   return cp1252.get(code) ?? -1
 }
 
-// Returns { bytes, encoding, lossy }. If the text can't be represented in the
-// requested encoding, it is written as UTF-8 instead and `lossy` is true.
-export function encodeText(text, { encoding = 'utf-8', bom = false, eol = '\n' } = {}) {
-  const out = eol === '\n' ? text : text.replace(/\n/g, eol)
+// Returns { bytes, encoding, lossy, lineEnds }. If the text can't be
+// represented in the requested encoding, it is written as UTF-8 instead and
+// `lossy` is true. With `lineEnds` (a file that mixes line endings), each line
+// keeps its own ending where it can, and the returned `lineEnds` records what
+// was written; otherwise every line ends in `eol` and it's null.
+export function encodeText(text, { encoding = 'utf-8', bom = false, eol = '\n', lineEnds = null } = {}) {
+  let out = eol === '\n' ? text : text.replace(/\n/g, eol)
+  let written = null
+  if (lineEnds) ({ text: out, lineEnds: written } = applyLineEnds(text, lineEnds, eol))
   if (encoding === 'windows-1252') {
     const bytes = new Uint8Array(out.length)
     for (let i = 0; i < out.length; i++) {
       const b = cp1252Byte(out.charCodeAt(i))
-      if (b < 0) return { ...encodeText(text, { encoding: 'utf-8', bom, eol }), lossy: true }
+      if (b < 0) return { ...encodeText(text, { encoding: 'utf-8', bom, eol, lineEnds }), lossy: true }
       bytes[i] = b
     }
-    return { bytes, encoding, lossy: false }
+    return { bytes, encoding, lossy: false, lineEnds: written }
   }
   if (encoding === 'utf-16le' || encoding === 'utf-16be') {
     const le = encoding === 'utf-16le'
@@ -117,12 +149,12 @@ export function encodeText(text, { encoding = 'utf-8', bom = false, eol = '\n' }
       bytes[pre + 2 * i + (le ? 0 : 1)] = c & 0xff
       bytes[pre + 2 * i + (le ? 1 : 0)] = c >> 8
     }
-    return { bytes, encoding, lossy: false }
+    return { bytes, encoding, lossy: false, lineEnds: written }
   }
   const body = new TextEncoder().encode(out)
-  if (!bom) return { bytes: body, encoding: 'utf-8', lossy: false }
+  if (!bom) return { bytes: body, encoding: 'utf-8', lossy: false, lineEnds: written }
   const bytes = new Uint8Array(body.length + 3)
   bytes.set([0xef, 0xbb, 0xbf])
   bytes.set(body, 3)
-  return { bytes, encoding: 'utf-8', lossy: false }
+  return { bytes, encoding: 'utf-8', lossy: false, lineEnds: written }
 }

@@ -1,5 +1,5 @@
 import { reactive, toRaw } from 'vue'
-import { decodeBytes, encodeText } from './textcodec.js'
+import { decodeBytes, encodeText, fileFormat } from './textcodec.js'
 import { DEFAULT_NAME, nameFromContent } from './naming.js'
 import { extension } from './filetype.js'
 import { openBackend } from './backends.js'
@@ -476,8 +476,7 @@ export class BinaryFileError extends Error {
 export async function importFile(file, handle = null) {
   const decoded = decodeBytes(new Uint8Array(await file.arrayBuffer()))
   if (decoded.binary) throw new BinaryFileError(file.name)
-  const { text, encoding, bom, eol } = decoded
-  const doc = createDoc(file.name, text, { autoName: false, encoding, bom, eol })
+  const doc = createDoc(file.name, decoded.text, { autoName: false, ...fileFormat(decoded) })
   recordVersion(doc.id, 'opened')
   if (handle) {
     try {
@@ -500,9 +499,9 @@ export function download(name, blob) {
 // The document as the bytes of a file, in its encoding and line endings.
 export function docBlob(doc, encodingOverride) {
   const options = encodingOverride ? { ...plain(doc), encoding: encodingOverride, bom: false } : doc
-  const { bytes, encoding, lossy } = encodeText(doc.content, options)
+  const { bytes, encoding, lossy, lineEnds } = encodeText(doc.content, options)
   const charset = encoding === 'windows-1252' ? 'windows-1252' : encoding
-  return { blob: new Blob([bytes], { type: `text/plain;charset=${charset}` }), lossy }
+  return { blob: new Blob([bytes], { type: `text/plain;charset=${charset}` }), lossy, lineEnds }
 }
 
 // Save a document to the user's disk as a download. Returns { lossy: true }

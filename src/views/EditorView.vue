@@ -88,9 +88,12 @@ const encodingOptions = [
   ['utf-16be', 'UTF-16 BE'],
   ['windows-1252', 'Windows-1252'],
 ]
+// A file that mixes line endings shows "Mixed" (each line keeps its own;
+// new lines get the most common one). Picking one ending converts every line.
+const MIXED = 'mixed'
 const eol = computed({
-  get: () => doc.value?.eol ?? '\n',
-  set: (v) => setDocOptions(props.id, { eol: v, ...diskChange() }),
+  get: () => (doc.value?.lineEnds ? MIXED : doc.value?.eol ?? '\n'),
+  set: (v) => v !== MIXED && setDocOptions(props.id, { eol: v, lineEnds: null, ...diskChange() }),
 })
 
 // Save writes back to the file the document came from where the browser
@@ -754,6 +757,9 @@ onBeforeUnmount(() => {
           <option v-for="[v, label] in encodingOptions" :key="v" :value="v">{{ label }}</option>
         </select>
         <select v-model="eol" aria-label="Line endings used when downloading" title="Line endings">
+          <option v-if="doc.lineEnds" :value="MIXED" :title="`Each line keeps its own ending; new lines get ${EOLS[doc.eol ?? '\n']}`">
+            Mixed
+          </option>
           <option v-for="(label, v) in EOLS" :key="v" :value="v">{{ label }}</option>
         </select>
         <select

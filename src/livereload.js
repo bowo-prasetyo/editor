@@ -26,7 +26,7 @@ import {
   updateDoc,
 } from './store.js'
 import { isWriting } from './fileaccess.js'
-import { decodeBytes } from './textcodec.js'
+import { decodeBytes, fileFormat } from './textcodec.js'
 import { docFolder, findWorkspaceDoc, onFileEvent, refreshFromDisk, resolveFile } from './workspace.js'
 
 // Documents whose file changed or went away in a way that needs a choice:
@@ -65,6 +65,8 @@ export async function checkDoc(id) {
   if (!prefs.liveReload && !fresh.diskDirty && fresh.diskModified && file.lastModified > fresh.diskModified) {
     const decoded = decodeBytes(new Uint8Array(await file.arrayBuffer()))
     if (!decoded.binary && decoded.text === fresh.content) {
+      // Same text; the encoding or line endings may have changed.
+      setDocOptions(id, fileFormat(decoded))
       await linkFile(id, handle, file.lastModified)
       return 'same'
     }
@@ -110,7 +112,7 @@ export async function reloadFromDisk(id) {
   if (decoded.binary) return false
   await recordVersion(id, 'manual', 'Before reloading from disk')
   if (decoded.text !== doc.content) updateDoc(id, { content: decoded.text })
-  setDocOptions(id, { encoding: decoded.encoding, bom: decoded.bom, eol: decoded.eol })
+  setDocOptions(id, fileFormat(decoded))
   await linkFile(id, handle, file.lastModified)
   delete diskNotices[id]
   return true
