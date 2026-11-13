@@ -92,6 +92,11 @@ const sample = 'function hello(name) {\n\treturn `Hello, ${name}!` // 0O1lI|\n}'
       <label class="setting check"><input v-model="prefs.trimOnSave" type="checkbox" /> Trim trailing whitespace (not in Markdown)</label>
       <label class="setting check"><input v-model="prefs.finalNewline" type="checkbox" /> Add a final newline</label>
       <label class="setting check"><input v-model="prefs.editorConfig" type="checkbox" /> Follow the project's <code>.editorconfig</code></label>
+      <label class="setting check"><input v-model="prefs.liveReload" type="checkbox" /> Reload files changed on disk</label>
+      <p class="hint setting-note">
+        When a file changes outside the editor, its document takes the new text, unless you have changes not saved to it:
+        then you choose. Off: you're asked each time.
+      </p>
       <p class="hint setting-note">
         For files opened from a folder, <code>.editorconfig</code> files decide indentation, trailing whitespace and the final newline
         (<code>indent_style</code>, <code>indent_size</code>, <code>tab_width</code>, <code>trim_trailing_whitespace</code>,
