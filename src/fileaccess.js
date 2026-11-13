@@ -126,12 +126,13 @@ export async function saveDoc(doc, { saveAs = false, confirm: confirmFn = (m) =>
 // Documents linked to files that have changes not saved to them.
 export const unsavedToDisk = () => state.docs.filter((d) => d.linked && d.diskDirty && !d.deletedAt)
 
-// Save every document with changes not saved to its file, one after the
-// other (each may ask about a file changed on disk). `prepare(doc)` runs
-// first for each one (whitespace fixes). Returns { saved, cancelled, failed: [names] }.
-export async function saveAllToFiles({ prepare, confirm } = {}) {
+// Save every document with changes not saved to its file (or those that
+// pass `only(doc)`), one after the other (each may ask about a file changed
+// on disk). `prepare(doc)` runs first for each one (whitespace fixes).
+// Returns { saved, cancelled, failed: [names] }.
+export async function saveAllToFiles({ prepare, confirm, only = () => true } = {}) {
   const out = { saved: 0, cancelled: 0, failed: [] }
-  for (const { id } of unsavedToDisk()) {
+  for (const { id } of unsavedToDisk().filter(only)) {
     try {
       await prepare?.(getDoc(id))
       const r = await saveDoc(getDoc(id), confirm ? { confirm } : {})

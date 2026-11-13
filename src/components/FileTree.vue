@@ -17,6 +17,10 @@ import {
   roots,
   setExpanded,
 } from '../workspace'
+import { dismissReturning, putBack, returning, saveFolderFiles, unsavedIn } from '../closing'
+import { prepareForSave } from '../saveall'
+import { displayName } from '../naming'
+import CloseFolderDialog from './CloseFolderDialog.vue'
 
 // The folders opened from disk, as one tree. It's drawn as a flat list of
 // rows (folders are read only when expanded), and works like other file
@@ -194,16 +198,51 @@ async function onReconnect(rootId) {
   if (!(await reconnect(rootId))) showToast('The browser didn’t allow access to the folder.')
 }
 
-// Files with unsaved changes become drafts, so nothing is lost; the others
-// are on disk (see closeFolder).
+// Closing a folder. With files not saved to disk, ask first (see closing.js):
+// save them all, keep them as drafts, or cancel. Nothing unsaved is lost.
+const closing = ref(null) // { id, name, files, busy }
 async function onClose(w) {
+  const unsaved = unsavedIn(w.id)
+  if (!unsaved.length) {
+    await closeFolder(w.id)
+    return showToast(`Closed “${w.name}”.`, { timeout: 3000 })
+  }
+  closing.value = { ...w, files: unsaved.map((d) => displayName(d.name)), busy: false }
+}
+
+async function onCloseSave() {
+  const w = closing.value
+  w.busy = true
+  try {
+    const { saved, left } = await saveFolderFiles(w.id, { prepare: prepareForSave })
+    if (left.length) {
+      const names = left.map((d) => `“${displayName(d.name)}”`).join(', ')
+      return showToast(`“${w.name}” is still open: ${names} ${left.length === 1 ? 'wasn’t' : 'weren’t'} saved.`, { timeout: 10000 })
+    }
+    await closeFolder(w.id)
+    showToast(`Saved ${saved === 1 ? '1 file' : `${saved} files`} and closed “${w.name}”.`, { timeout: 4000 })
+  } finally {
+    closing.value = null
+  }
+}
+
+async function onCloseKeep() {
+  const w = closing.value
+  closing.value = null
   const kept = await closeFolder(w.id)
   showToast(
-    kept
-      ? `Closed “${w.name}”. ${kept === 1 ? '1 file with unsaved changes was kept as a draft' : `${kept} files with unsaved changes were kept as drafts`}.`
-      : `Closed “${w.name}”.`,
-    { timeout: kept ? 8000 : 3000 },
+    `Closed “${w.name}”. ${kept === 1 ? '1 file with unsaved changes was kept as a draft' : `${kept} files with unsaved changes were kept as drafts`}: open the folder again to put the edits back.`,
+    { timeout: 8000 },
   )
+}
+
+// Opening a folder again: offer to put kept drafts' edits back into their files.
+async function onPutBack(rootId) {
+  const { back, changed, missing } = await putBack(rootId)
+  const parts = [`Put back the edits to ${back === 1 ? '1 file' : `${back} files`}.`]
+  if (changed) parts.push(`${changed === 1 ? '1 file' : `${changed} files`} changed on disk meanwhile: check before saving.`)
+  if (missing) parts.push(`${missing === 1 ? '1 file isn’t' : `${missing} files aren’t`} in the folder any more and stayed ${missing === 1 ? 'a draft' : 'drafts'}.`)
+  showToast(parts.join(' '), { timeout: changed || missing ? 10000 : 4000 })
 }
 
 const refresh = (rootId) => forgetListings(rootId)
@@ -236,6 +275,12 @@ const refresh = (rootId) => forgetListings(rootId)
             </template>
             <button class="mini" :title="`Close ${row.name}`" :aria-label="`Close ${row.name}`" @click="onClose({ id: row.rootId, name: row.name })">×</button>
           </span>
+          <p v-if="returning[row.rootId]?.length" class="tree-note" role="status">
+            {{ returning[row.rootId].length === 1 ? '1 draft has' : `${returning[row.rootId].length} drafts have` }}
+            edits to files in this folder.
+            <button class="mini primary-mini" @click="onPutBack(row.rootId)">Put the edits back</button>
+            <button class="mini" @click="dismissReturning(row.rootId)">Not now</button>
+          </p>
           <p v-if="!row.root" class="tree-note">
             This folder isn’t available in this browser any more. Close it and open it again.
           </p>
@@ -272,4 +317,13 @@ const refresh = (rootId) => forgetListings(rootId)
       </template>
     </ul>
   </nav>
+  <CloseFolderDialog
+    v-if="closing"
+    :folder="closing.name"
+    :files="closing.files"
+    :busy="closing.busy"
+    @save="onCloseSave"
+    @keep="onCloseKeep"
+    @cancel="closing = null"
+  />
 </template>

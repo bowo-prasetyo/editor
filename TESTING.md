@@ -105,6 +105,8 @@ The scenarios follow the principles in [VISION.md](VISION.md#principles).
 | A file not read yet is never written (its empty placeholder would wipe the file) | `test/workspace.test.js` |
 | Search reads files from disk, not stored copies | `folders.spec.js` |
 | Closing a folder keeps unsaved files as drafts; the others, and their history, go | `folders.spec.js`, `test/workspace.test.js` |
+| Closing with unsaved files asks: *Save all to disk* (writes, then closes; stays open and says which file if one can't be saved), *Keep as drafts*, *Cancel*; with nothing unsaved it just closes | `closing.spec.js`, `test/closing.test.js` |
+| Opening the folder again offers to *Put the edits back*: unchanged files become files again with their unsaved edits; files changed meanwhile get the *changed on disk* banner and Save asks; files gone stay drafts; *Not now* leaves them; another folder with the same name isn't mistaken for it | `closing.spec.js`, `test/closing.test.js` |
 | Backups hold drafts and unsaved file edits, not copies; rescue copies and other tabs never blank a file | `test/filesdrafts.test.js` |
 | Migration: each kind of old document becomes a draft or a file as planned, runs once, never deletes text; copies from closed folders are offered to the Trash (with Undo) or kept | `migration.spec.js`, `test/filesdrafts.test.js` |
 
