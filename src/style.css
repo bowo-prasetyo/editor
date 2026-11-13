@@ -522,3 +522,8 @@ button.mini.problems { color: var(--danger); }
   margin-bottom: 12px;
   border-radius: 6px;
 }
+
+/* Recent files, above the drafts on the start page (see recent.js). */
+.section-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.recent-files .doc-list { margin-bottom: 20px; }
+.unsaved-dot { color: var(--accent); }

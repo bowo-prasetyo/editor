@@ -173,5 +173,5 @@ test('migration runs once, never deletes text, and stops storing copies of saved
   assert.equal(stored('c').content, 'unsaved edit')
   assert.equal(stored('d').content, 'copy', 'copies are offered to the Trash, never removed silently')
   assert.ok(s.getDoc('d').copyOf)
-  assert.equal(SCHEMA, 2)
+  assert.equal(SCHEMA, 3)
 })

@@ -39,7 +39,7 @@ test('old documents become drafts; copies of files from closed folders are offer
   const list = page.locator('.list-pane')
   for (const name of ['notes.txt', 'x.js', 'y.js', 'z.js']) await expect(list).toContainText(name)
 
-  const banner = page.getByRole('status').filter({ hasText: /from (a folder|folders) you closed/ })
+  const banner = page.getByRole('status').filter({ hasText: /on your disk./ })
   await expect(banner).toContainText('2 drafts are copies')
   await banner.getByRole('button', { name: 'Move them to the Trash' }).click()
   await expect(banner).toBeHidden()
@@ -55,12 +55,12 @@ test('old documents become drafts; copies of files from closed folders are offer
   // It ran once: a reload changes nothing.
   await page.reload()
   await expect(list).toContainText('y.js')
-  await expect(page.getByRole('status').filter({ hasText: /from (a folder|folders) you closed/ })).toHaveCount(0)
+  await expect(page.getByRole('status').filter({ hasText: /on your disk./ })).toHaveCount(0)
 })
 
 test('Keep them turns copies into ordinary drafts for good', async ({ page }) => {
   await seed(page, [old('c', 'y.js', 'just a copy', fromClosedFolder())])
-  const banner = page.getByRole('status').filter({ hasText: /from (a folder|folders) you closed/ })
+  const banner = page.getByRole('status').filter({ hasText: /on your disk./ })
   await expect(banner).toContainText('1 draft is a copy')
   await banner.getByRole('button', { name: 'Keep them' }).click()
   await expect(banner).toBeHidden()
