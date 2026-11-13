@@ -112,6 +112,8 @@ registerCommands([
     },
   },
   { id: 'goToDocument', title: 'Go to document…', group: 'Documents', shortcut: 'quickOpen', run: () => quickOpen.value.show() },
+  // In a Markdown document: its headings in the quick switcher ("#").
+  { id: 'goToHeading', title: 'Go to heading…', group: 'Editor', when: () => (ui.headings?.() ?? []).length > 0, run: () => quickOpen.value.show('#') },
   { id: 'allDocuments', title: 'Show all documents', group: 'Documents', run: () => router.push({ name: 'home' }) },
   { id: 'settings', title: 'Open settings', group: 'Settings', shortcut: 'settings', run: () => router.push({ name: 'settings' }) },
   { id: 'searchAll', title: 'Search in all documents and folders', group: 'Documents', shortcut: 'searchAll', run: openSearch },

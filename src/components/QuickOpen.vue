@@ -6,7 +6,7 @@ import { displayName } from '../naming'
 import { prefs } from '../prefs'
 import { fuzzyMatch, highlightRuns } from '../fuzzy'
 import { normalizeFolder } from '../folders'
-import { availableCommands } from '../commands'
+import { availableCommands, ui } from '../commands'
 import { isMac, keyLabel, shortcut } from '../keys'
 import { BinaryFileError } from '../store'
 import { showToast } from '../toast'
@@ -25,6 +25,19 @@ let returnFocus = null
 
 const MAX_SHOWN = 50
 const commandMode = computed(() => query.value.startsWith('>'))
+// "#": the open Markdown document's headings (see mdedit.js), to jump to.
+const headingMode = computed(() => query.value.startsWith('#'))
+const headingResults = computed(() => {
+  if (!headingMode.value) return []
+  const q = query.value.slice(1).trim()
+  const list = ui.headings?.() ?? []
+  if (!q) return list.map((h) => ({ heading: h, positions: [] }))
+  return list
+    .map((h) => ({ heading: h, m: fuzzyMatch(q, h.text) }))
+    .filter((r) => r.m)
+    .sort((a, b) => b.m.score - a.m.score)
+    .map((r) => ({ heading: r.heading, positions: r.m.positions }))
+})
 
 const commandResults = computed(() => {
   if (!commandMode.value) return []
@@ -73,6 +86,7 @@ function scored(q, name, folderPath) {
 }
 
 const results = computed(() => {
+  if (headingMode.value) return []
   if (commandMode.value) return []
   const q = query.value.trim()
   if (!q) {
@@ -98,12 +112,16 @@ const results = computed(() => {
 // "Work/todo.md" creates todo.md in the Work folder.
 const createLabel = computed(() => {
   const q = query.value.trim()
-  if (commandMode.value) return ''
+  if (commandMode.value || headingMode.value) return ''
   if (!q || results.value.some((r) => r.name.toLowerCase() === q.toLowerCase())) return ''
   return q
 })
 const count = computed(() =>
-  commandMode.value ? commandResults.value.length : results.value.length + (createLabel.value ? 1 : 0),
+  commandMode.value
+    ? commandResults.value.length
+    : headingMode.value
+      ? headingResults.value.length
+      : results.value.length + (createLabel.value ? 1 : 0),
 )
 
 watch(query, () => (active.value = 0))
@@ -129,6 +147,13 @@ function hide(refocus = true) {
 }
 
 function choose(i) {
+  if (headingMode.value) {
+    const h = headingResults.value[i]?.heading
+    if (!h) return
+    hide(false)
+    nextTick(() => ui.goTo?.(h.from))
+    return
+  }
   if (commandMode.value) {
     const c = commandResults.value[i]?.command
     if (!c) return
@@ -191,12 +216,12 @@ const id = (i) => `quick-open-${i}`
 
 <template>
   <div v-if="open" class="quick-backdrop" @mousedown.self="hide()">
-    <div class="quick" role="dialog" aria-modal="true" :aria-label="commandMode ? 'Run a command' : 'Go to document'">
+    <div class="quick" role="dialog" aria-modal="true" :aria-label="commandMode ? 'Run a command' : headingMode ? 'Go to heading' : 'Go to document'">
       <input
         ref="input"
         v-model="query"
         class="quick-input"
-        :placeholder="commandMode ? 'Run a command…' : prefs.workspaces.length ? 'Go to a document or file… (type > for commands)' : 'Go to document… (type > for commands)'"
+        :placeholder="commandMode ? 'Run a command…' : headingMode ? 'Go to a heading…' : prefs.workspaces.length ? 'Go to a document or file… (> for commands, # for headings)' : 'Go to document… (> for commands, # for headings)'"
         role="combobox"
         aria-expanded="true"
         aria-controls="quick-open-list"
@@ -206,7 +231,31 @@ const id = (i) => `quick-open-${i}`
         @keydown="onKey"
       />
       <ul id="quick-open-list" ref="list" class="quick-list" role="listbox">
-        <template v-if="commandMode">
+        <template v-if="headingMode">
+          <li
+            v-for="(r, i) in headingResults"
+            :id="id(i)"
+            :key="r.heading.from"
+            :data-index="i"
+            role="option"
+            :aria-selected="i === active"
+            :class="{ active: i === active }"
+            :style="{ paddingLeft: 12 + (r.heading.level - 1) * 14 + 'px' }"
+            @mousemove="active = i"
+            @click="choose(i)"
+          >
+            <span class="quick-name">
+              <template v-for="(run, k) in highlightRuns(r.heading.text, r.positions)" :key="k">
+                <mark v-if="run.hit">{{ run.text }}</mark><template v-else>{{ run.text }}</template>
+              </template>
+            </span>
+            <span class="quick-folder">H{{ r.heading.level }}</span>
+          </li>
+          <li v-if="!headingResults.length" class="quick-empty">
+            {{ ui.headings ? 'No matching headings' : 'Open a Markdown document to go to its headings' }}
+          </li>
+        </template>
+        <template v-else-if="commandMode">
           <li
             v-for="(r, i) in commandResults"
             :id="id(i)"

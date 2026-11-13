@@ -6,7 +6,7 @@ export const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(
 
 export const SHORTCUTS = [
   // Documents
-  { id: 'quickOpen', group: 'Documents', label: 'Go to a document (quick switcher)', keys: ['Mod+P'] },
+  { id: 'quickOpen', group: 'Documents', label: 'Go to a document (quick switcher; type > for commands, # for headings)', keys: ['Mod+P'] },
   { id: 'palette', group: 'Documents', label: 'Run a command (command palette)', keys: ['Mod+Shift+P'] },
   { id: 'save', group: 'Documents', label: 'Save (to the file, or download)', keys: ['Mod+S'] },
   { id: 'saveAs', group: 'Documents', label: 'Save as…', keys: ['Mod+Shift+S'] },

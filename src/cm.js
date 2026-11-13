@@ -2,7 +2,7 @@
 // syntax highlighting for the document's language (see languages.js). It
 // handles very large documents (only the visible lines are drawn), several
 // cursors, and the usual editing commands.
-import { toggleBold, toggleItalic } from './mdedit.js'
+import { continueList, toggleBold, toggleItalic } from './mdedit.js'
 import { Compartment, EditorSelection, EditorState, Facet, Prec, RangeSetBuilder, StateEffect, StateField, Transaction } from '@codemirror/state'
 import { diagnosticCount, lintGutter, lintKeymap, linter, nextDiagnostic, openLintPanel } from '@codemirror/lint'
 import {
@@ -143,8 +143,12 @@ export const smartEnter = Facet.define({ combine: (values) => values.some(Boolea
 // Writing helpers in Markdown documents (see docs/markdown.md). Above the
 // default keymap, where Mod-i selects the enclosing syntax. Ctrl/Cmd+B here
 // means bold; elsewhere it shows or hides the folder sidebar (App.vue).
+// Enter continues lists without renumbering: these keys are placed before
+// CodeMirror's Markdown support (same precedence, earlier wins), whose own
+// Enter would renumber the items after the cursor.
 export const markdownKeys = Prec.high(
   keymap.of([
+    { key: 'Enter', run: (view) => continueList(view) || enter(view) }, // never CodeMirror's renumbering Enter
     { key: 'Mod-b', run: toggleBold, preventDefault: true },
     { key: 'Mod-i', run: toggleItalic, preventDefault: true },
   ]),
@@ -583,7 +587,7 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, hel
     // Markdown documents also get their writing helpers (see mdedit.js).
     setLanguage(n, support, { smart = false } = {}) {
       const markdown = support?.language?.name === 'markdown' ? markdownKeys : []
-      view.dispatch({ effects: language.reconfigure([commentData(n), support ?? [], smart ? smartEnter.of(true) : [], markdown]) })
+      view.dispatch({ effects: language.reconfigure([markdown, commentData(n), support ?? [], smart ? smartEnter.of(true) : []]) })
     },
     // Turn helpers on or off: the options for helpers().
     setHelpers(options) {

@@ -28,6 +28,7 @@ import GoToBar from '../components/GoToBar.vue'
 import TabBar from '../components/TabBar.vue'
 import SaveToFolderDialog from '../components/SaveToFolderDialog.vue'
 import { saveDraftToFolder, saveTargets, togglePin, undoSaveToFolder } from '../drafts'
+import { headings } from '../mdedit'
 import IndentMenu from '../components/IndentMenu.vue'
 import HistoryPanel from '../components/HistoryPanel.vue'
 import UnreadFile from '../components/UnreadFile.vue'
@@ -612,6 +613,14 @@ const editorCommands = [
 onMounted(() => {
   unregister = registerCommands(editorCommands)
   ui.selectedText = () => current()?.selectedText() ?? ''
+  // Go to heading (Markdown): the quick switcher's "#" lists these.
+  ui.headings = () => (isMarkdown.value && current() ? headings(current().view.state) : [])
+  ui.goTo = (pos) => {
+    const ed = current()
+    if (!ed) return
+    ed.select(pos, pos, { focus: true })
+    ed.view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: 'start', yMargin: 40 }) })
+  }
   window.addEventListener('keydown', onWindowKeydown)
   window.addEventListener('beforeprint', beforePrint)
   window.addEventListener('afterprint', afterPrint)
@@ -619,6 +628,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   unregister()
   ui.selectedText = null
+  ui.headings = null
+  ui.goTo = null
   window.removeEventListener('keydown', onWindowKeydown)
   window.removeEventListener('beforeprint', beforePrint)
   window.removeEventListener('afterprint', afterPrint)

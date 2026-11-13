@@ -87,3 +87,66 @@ test.describe('with a folder open', () => {
     await expect(tree(page)).toBeVisible() // the sidebar stayed
   })
 })
+
+// --- Phase 2: writing helpers --------------------------------------------------------
+
+// Paste text into the editor, as the clipboard would.
+const paste = (page, text) =>
+  editor(page).evaluate((el, t) => {
+    const dt = new DataTransfer()
+    dt.setData('text/plain', t)
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+  }, text)
+
+test('lists continue on Enter, and an ordered list isn’t renumbered', async ({ page }) => {
+  await newDocument(page)
+  await page.keyboard.type('1. a\nb\nc')
+  await expect.poll(() => editorText(page)).toBe('1. a\n2. b\n3. c')
+  // Add an item after the first: only the new line is written.
+  await page.keyboard.press('Control+Home')
+  await page.keyboard.press('End')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('new')
+  await expect.poll(() => editorText(page)).toBe('1. a\n2. new\n2. b\n3. c')
+})
+
+test('checklists continue unchecked, and Enter on an empty item ends the list', async ({ page }) => {
+  await newDocument(page)
+  await page.keyboard.type('- [x] done\ntodo\n')
+  await expect.poll(() => editorText(page)).toBe('- [x] done\n- [ ] todo\n- [ ] ')
+  await page.keyboard.press('Enter') // empty item: the list ends
+  await page.keyboard.type('after the list')
+  await expect.poll(() => editorText(page)).toBe('- [x] done\n- [ ] todo\nafter the list')
+})
+
+test('pasting a URL over selected text makes a link; elsewhere it pastes as is', async ({ page }) => {
+  await newDocument(page)
+  await page.keyboard.type('see the report')
+  await page.keyboard.press('Shift+Control+ArrowLeft')
+  await paste(page, 'https://example.com/r')
+  await expect.poll(() => editorText(page)).toBe('see the [report](https://example.com/r)')
+  await page.keyboard.press('End')
+  await page.keyboard.type(' ')
+  await paste(page, 'https://example.com/plain')
+  await expect.poll(() => editorText(page)).toBe('see the [report](https://example.com/r) https://example.com/plain')
+})
+
+test('Go to heading: “#” in the quick switcher lists the headings, and jumps to one', async ({ page }) => {
+  await newDocument(page)
+  await page.keyboard.type('# Title\n\nintro\n\n## Part one\n\ntext\n\n## Part two\n\nmore')
+  await expectSaved(page)
+  await page.keyboard.press(`${mod}+p`)
+  await page.keyboard.type('#')
+  const dialog = page.getByRole('dialog', { name: 'Go to heading' })
+  await expect(dialog.getByRole('option')).toHaveText(['TitleH1', 'Part oneH2', 'Part twoH2'])
+  await page.keyboard.type('two')
+  await page.keyboard.press('Enter')
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator('footer.status .position').first()).toHaveText('Ln 9, Col 1')
+
+  // And from the command palette.
+  await page.keyboard.press(`${mod}+Shift+p`)
+  await page.keyboard.type('go to heading')
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('dialog', { name: 'Go to heading' })).toBeVisible()
+})
