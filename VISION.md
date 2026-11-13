@@ -272,8 +272,8 @@ In order:
    [How Plumb says it](#how-plumb-says-it): greyed-out folder actions with a
    reason, a one-time note, where downloads went, and "Works best in Chrome and
    Edge" in the README and the app's description.
-6. **Rewrite the README** as a short user guide, and move the full feature list
-   to a separate reference page.
+6. ~~**Rewrite the README** as a short user guide, and move the full feature list
+   to a separate reference page~~ *(done: [docs/reference.md](docs/reference.md))*.
 7. **Releases and a changelog**, starting at `0.2.0`.
 
 ## Open questions
