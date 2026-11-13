@@ -6,9 +6,12 @@ import { displayName } from '../naming'
 import { prefs } from '../prefs'
 import { fuzzyMatch, highlightRuns } from '../fuzzy'
 import { normalizeFolder } from '../folders'
+import { availableCommands } from '../commands'
+import { isMac, keyLabel, shortcut } from '../keys'
 
 // Ctrl/Cmd+P: jump to any document by typing part of its name or folder.
 // With nothing typed, recently opened documents come first.
+// Starting with ">" (or Ctrl/Cmd+Shift+P) lists commands instead.
 const router = useRouter()
 const open = ref(false)
 const query = ref('')
@@ -18,11 +21,25 @@ const list = ref(null)
 let returnFocus = null
 
 const MAX_SHOWN = 50
-const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+const commandMode = computed(() => query.value.startsWith('>'))
+
+const commandResults = computed(() => {
+  if (!commandMode.value) return []
+  const q = query.value.slice(1).trim()
+  const list = availableCommands()
+  if (!q) return list.map((c) => ({ command: c, positions: [] }))
+  return list
+    .map((c) => ({ command: c, m: fuzzyMatch(q, c.title) }))
+    .filter((r) => r.m)
+    .sort((a, b) => b.m.score - a.m.score)
+    .map((r) => ({ command: r.command, positions: r.m.positions }))
+})
+const keysFor = (c) => shortcut(c.shortcut).map((k) => keyLabel(k)).join(' / ')
 
 const docs = computed(() => state.docs.filter((d) => !d.deletedAt))
 
 const results = computed(() => {
+  if (commandMode.value) return []
   const q = query.value.trim()
   if (!q) {
     const rank = new Map(prefs.recent.map((id, i) => [id, i]))
@@ -51,10 +68,13 @@ const results = computed(() => {
 // "Work/todo.md" creates todo.md in the Work folder.
 const createLabel = computed(() => {
   const q = query.value.trim()
+  if (commandMode.value) return ''
   if (!q || results.value.some((r) => r.doc.name.toLowerCase() === q.toLowerCase())) return ''
   return q
 })
-const count = computed(() => results.value.length + (createLabel.value ? 1 : 0))
+const count = computed(() =>
+  commandMode.value ? commandResults.value.length : results.value.length + (createLabel.value ? 1 : 0),
+)
 
 watch(query, () => (active.value = 0))
 watch(active, async (i) => {
@@ -62,9 +82,9 @@ watch(active, async (i) => {
   list.value?.querySelector(`[data-index="${i}"]`)?.scrollIntoView({ block: 'nearest' })
 })
 
-async function show() {
+async function show(prefix = '') {
   returnFocus = document.activeElement
-  query.value = ''
+  query.value = prefix
   active.value = 0
   open.value = true
   await nextTick()
@@ -77,6 +97,14 @@ function hide(refocus = true) {
 }
 
 function choose(i) {
+  if (commandMode.value) {
+    const c = commandResults.value[i]?.command
+    if (!c) return
+    hide()
+    // After the dialog is gone, so the command can move focus itself.
+    nextTick(() => c.run())
+    return
+  }
   if (i < results.value.length) {
     hide(false)
     router.push({ name: 'edit', params: { id: results.value[i].doc.id } })
@@ -102,13 +130,17 @@ function onKey(e) {
   e.preventDefault()
 }
 
-// Ctrl+P (Cmd+P on a Mac), anywhere. Printing stays in the editor's toolbar.
+// Ctrl+P (Cmd+P on a Mac) for documents, with Shift for commands, anywhere.
+// Printing stays in the editor's toolbar.
 function onWindowKey(e) {
   const mod = isMac ? e.metaKey : e.ctrlKey
-  if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'p') {
+  if (mod && !e.altKey && e.key.toLowerCase() === 'p') {
     e.preventDefault()
     e.stopPropagation()
-    open.value ? hide() : show()
+    const prefix = e.shiftKey ? '>' : ''
+    if (open.value && commandMode.value === e.shiftKey) hide()
+    else if (open.value) query.value = prefix
+    else show(prefix)
   }
 }
 onMounted(() => window.addEventListener('keydown', onWindowKey, true))
@@ -121,12 +153,12 @@ const id = (i) => `quick-open-${i}`
 
 <template>
   <div v-if="open" class="quick-backdrop" @mousedown.self="hide()">
-    <div class="quick" role="dialog" aria-modal="true" aria-label="Go to document">
+    <div class="quick" role="dialog" aria-modal="true" :aria-label="commandMode ? 'Run a command' : 'Go to document'">
       <input
         ref="input"
         v-model="query"
         class="quick-input"
-        placeholder="Go to document… (type a name or folder)"
+        :placeholder="commandMode ? 'Run a command…' : 'Go to document… (type > for commands)'"
         role="combobox"
         aria-expanded="true"
         aria-controls="quick-open-list"
@@ -136,6 +168,29 @@ const id = (i) => `quick-open-${i}`
         @keydown="onKey"
       />
       <ul id="quick-open-list" ref="list" class="quick-list" role="listbox">
+        <template v-if="commandMode">
+          <li
+            v-for="(r, i) in commandResults"
+            :id="id(i)"
+            :key="r.command.id"
+            :data-index="i"
+            role="option"
+            :aria-selected="i === active"
+            :class="{ active: i === active }"
+            @mousemove="active = i"
+            @click="choose(i)"
+          >
+            <span class="quick-name">
+              <template v-for="(run, k) in highlightRuns(r.command.title, r.positions)" :key="k">
+                <mark v-if="run.hit">{{ run.text }}</mark><template v-else>{{ run.text }}</template>
+              </template>
+            </span>
+            <span class="quick-folder">{{ r.command.group }}</span>
+            <kbd v-if="keysFor(r.command)" class="quick-keys">{{ keysFor(r.command) }}</kbd>
+          </li>
+          <li v-if="!commandResults.length" class="quick-empty">No matching commands</li>
+        </template>
+        <template v-else>
         <li
           v-for="(r, i) in results"
           :id="id(i)"
@@ -172,6 +227,7 @@ const id = (i) => `quick-open-${i}`
           + Create “{{ createLabel }}”
         </li>
         <li v-if="!count" class="quick-empty">No documents yet</li>
+        </template>
       </ul>
     </div>
   </div>

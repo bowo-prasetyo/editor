@@ -379,3 +379,17 @@ button.icon-button:hover { opacity: 1; border-color: var(--border); }
   .toolbar .folder-button + .name { flex: 1 1 60%; }
   .status-controls { margin-right: 0; }
 }
+.quick-keys { margin-left: auto; flex: none; color: var(--muted); }
+
+/* Keyboard shortcuts panel */
+.shortcuts { width: min(720px, 100%); max-height: 80vh; }
+.shortcuts-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 0; }
+.shortcuts-head h2 { font-size: 16px; margin: 0; }
+.shortcuts .quick-input { margin: 10px 14px 0; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; padding: 6px 10px; }
+.shortcuts-body { overflow-y: auto; padding: 4px 14px 14px; columns: 2 300px; column-gap: 28px; }
+.shortcuts-body section { break-inside: avoid; }
+.shortcuts-body h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 14px 0 6px; }
+.shortcuts-body dl { display: grid; grid-template-columns: 1fr auto; gap: 5px 12px; margin: 0; font-size: 13px; }
+.shortcuts-body dd { margin: 0; text-align: right; white-space: nowrap; }
+.shortcuts-body kbd { font: 12px var(--mono); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--panel); }
+.shortcuts-body > .hint { column-span: all; margin-top: 14px; }

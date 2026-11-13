@@ -27,7 +27,8 @@ import IndentMenu from '../components/IndentMenu.vue'
 import HistoryPanel from '../components/HistoryPanel.vue'
 import { convertIndentation, detectIndent, effectiveIndent } from '../indentation'
 import { folderTree } from '../folders'
-import { liveTabs, opened, saveSnapshot, takeSnapshot } from '../session'
+import { closeTab, liveTabs, opened, saveSnapshot, takeSnapshot } from '../session'
+import { registerCommands } from '../commands'
 import { cycleTab } from '../tabs'
 import { useRouter } from 'vue-router'
 
@@ -363,20 +364,86 @@ function onWindowKeydown(e) {
   } else if (e.altKey && !mod && (e.key === 'PageUp' || e.key === 'PageDown')) {
     // Alt+PageUp / Alt+PageDown: previous / next tab.
     e.preventDefault()
-    const next = cycleTab(liveTabs(), props.id, e.key === 'PageUp' ? -1 : 1)
-    if (next && next !== props.id) router.push({ name: 'edit', params: { id: next } })
+    goToTab(e.key === 'PageUp' ? -1 : 1)
   } else if (e.altKey && !mod && e.code === 'KeyZ') {
     e.preventDefault()
     toggle('wrap')
   }
 }
 
+// --- Commands (for the command palette) -------------------------------------
+
+const nameInput = ref(null)
+const edit = (name) => () => current()?.run(name)
+function goToTab(step) {
+  const next = cycleTab(liveTabs(), props.id, step)
+  if (next && next !== props.id) router.push({ name: 'edit', params: { id: next } })
+}
+async function saveNamedVersion() {
+  const label = prompt('Name this version (optional):', '')
+  if (label === null) return
+  await recordVersion(props.id, 'manual', label.trim())
+  showToast('Version saved.')
+}
+const G = 'Editor'
+const E = 'Editing'
+let unregister = () => {}
+const editorCommands = [
+  { id: 'find', title: 'Find', group: G, shortcut: 'find', run: () => openFind(false) },
+  { id: 'replace', title: 'Find and replace', group: G, shortcut: 'replace', run: () => openFind(true) },
+  { id: 'goToLine', title: 'Go to line…', group: G, shortcut: 'goToLine', run: () => openGoTo() },
+  { id: 'save', title: inPlace ? 'Save' : 'Download', group: G, shortcut: 'save', run: () => save(false) },
+  { id: 'saveAs', title: 'Save as…', group: G, shortcut: 'saveAs', run: () => save(true), when: () => inPlace },
+  { id: 'print', title: 'Print', group: G, run: () => print() },
+  { id: 'rename', title: 'Rename document', group: G, run: () => nameInput.value?.select() },
+  { id: 'move', title: 'Move to folder…', group: G, run: () => (moving.value = true) },
+  { id: 'wrap', title: 'Toggle word wrap', group: G, shortcut: 'wrap', run: () => toggle('wrap') },
+  { id: 'spelling', title: 'Toggle spell check', group: G, run: () => toggle('spellcheck') },
+  { id: 'preview', title: 'Toggle Markdown preview', group: G, when: () => isMarkdown.value, run: () => setDocOptions(props.id, { preview: !doc.value.preview }) },
+  { id: 'history', title: 'Show version history', group: G, run: () => (historyOpen.value = true) },
+  { id: 'saveVersion', title: 'Save a version now…', group: G, run: saveNamedVersion },
+  { id: 'detectIndent', title: 'Indentation: detect from the file', group: G, run: () => setIndent(null) },
+  { id: 'indentSpaces2', title: 'Indentation: 2 spaces', group: G, run: () => setIndent({ type: 'spaces', size: 2 }) },
+  { id: 'indentSpaces4', title: 'Indentation: 4 spaces', group: G, run: () => setIndent({ type: 'spaces', size: 4 }) },
+  { id: 'indentTabs', title: 'Indentation: tabs', group: G, run: () => setIndent({ type: 'tabs', size: indent.value.size }) },
+  { id: 'convertSpaces', title: 'Convert indentation to spaces', group: G, run: () => convertTo('spaces') },
+  { id: 'convertTabs', title: 'Convert indentation to tabs', group: G, run: () => convertTo('tabs') },
+  { id: 'biggerText', title: 'Larger text', group: G, run: () => stepFontSize(1) },
+  { id: 'smallerText', title: 'Smaller text', group: G, run: () => stepFontSize(-1) },
+  { id: 'nextTab', title: 'Next tab', group: G, shortcut: 'nextTab', run: () => goToTab(1) },
+  { id: 'prevTab', title: 'Previous tab', group: G, shortcut: 'prevTab', run: () => goToTab(-1) },
+  {
+    id: 'closeTab', title: 'Close tab', group: G,
+    run: () => {
+      const next = closeTab(props.id)
+      router.push(next ? { name: 'edit', params: { id: next } } : { name: 'home' })
+    },
+  },
+  { id: 'toggleComment', title: 'Comment or uncomment lines', group: E, shortcut: 'toggleComment', run: edit('toggleComment') },
+  { id: 'moveLineUp', title: 'Move lines up', group: E, shortcut: 'moveLineUp', run: edit('moveLineUp') },
+  { id: 'moveLineDown', title: 'Move lines down', group: E, run: edit('moveLineDown') },
+  { id: 'copyLineDown', title: 'Duplicate lines', group: E, shortcut: 'copyLineDown', run: edit('copyLineDown') },
+  { id: 'deleteLine', title: 'Delete lines', group: E, shortcut: 'deleteLine', run: edit('deleteLine') },
+  { id: 'selectNext', title: 'Add next occurrence to selection', group: E, shortcut: 'selectNext', run: edit('selectNextOccurrence') },
+  { id: 'selectAll', title: 'Select all occurrences', group: E, shortcut: 'selectAll', run: edit('selectSelectionMatches') },
+  { id: 'addCursorAbove', title: 'Add cursor above', group: E, run: edit('addCursorAbove') },
+  { id: 'addCursorBelow', title: 'Add cursor below', group: E, run: edit('addCursorBelow') },
+  { id: 'matchingBracket', title: 'Go to matching bracket', group: E, shortcut: 'matchingBracket', run: edit('cursorMatchingBracket') },
+  { id: 'selectLine', title: 'Select line', group: E, shortcut: 'selectLine', run: edit('selectLine') },
+  { id: 'indentLines', title: 'Indent lines', group: E, run: edit('indentMore') },
+  { id: 'outdentLines', title: 'Outdent lines', group: E, run: edit('indentLess') },
+  { id: 'undo', title: 'Undo', group: E, shortcut: 'undo', run: edit('undo') },
+  { id: 'redo', title: 'Redo', group: E, run: edit('redo') },
+]
+
 onMounted(() => {
+  unregister = registerCommands(editorCommands)
   window.addEventListener('keydown', onWindowKeydown)
   window.addEventListener('beforeprint', beforePrint)
   window.addEventListener('afterprint', afterPrint)
 })
 onBeforeUnmount(() => {
+  unregister()
   window.removeEventListener('keydown', onWindowKeydown)
   window.removeEventListener('beforeprint', beforePrint)
   window.removeEventListener('afterprint', afterPrint)
@@ -399,7 +466,7 @@ onBeforeUnmount(() => {
       >
         📁<span v-if="doc.folder" class="folder-path">{{ doc.folder }}</span>
       </button>
-      <input v-model="name" class="name" spellcheck="false" aria-label="File name" />
+      <input ref="nameInput" v-model="name" class="name" spellcheck="false" aria-label="File name" />
       <button
         class="toggle"
         :aria-pressed="view.wrap"
