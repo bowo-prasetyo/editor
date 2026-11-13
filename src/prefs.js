@@ -1,6 +1,7 @@
 import { reactive, watch } from 'vue'
 
 // App-wide preferences (per browser), separate from documents.
+// Predates the name Plumb; renaming it would reset everyone's preferences.
 const KEY = 'editor.prefs.v1'
 export const FONT_SIZES = [11, 12, 13, 14, 16, 18, 20, 24, 28]
 // tabs: open document ids; recent: recently opened, newest first; sort: how

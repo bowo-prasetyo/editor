@@ -94,7 +94,7 @@ const sample = 'function hello(name) {\n\treturn `Hello, ${name}!` // 0O1lI|\n}'
       <label class="setting check"><input v-model="prefs.editorConfig" type="checkbox" /> Follow the project's <code>.editorconfig</code></label>
       <label class="setting check"><input v-model="prefs.liveReload" type="checkbox" /> Reload files changed on disk</label>
       <p class="hint setting-note">
-        When a file changes outside the editor, its document takes the new text, unless you have changes not saved to it:
+        When a file changes outside Plumb, its document takes the new text, unless you have changes not saved to it:
         then you choose. Off: you're asked each time.
       </p>
       <p class="hint setting-note">

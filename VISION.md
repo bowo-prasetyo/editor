@@ -1,8 +1,8 @@
 # Vision
 
-> **Status: draft.** This proposes a direction for Plumb. Nothing here is
-> built yet unless it says so. Sections marked **Open question** need a decision
-> from the maintainer before work starts.
+> **Status: accepted.** This sets the direction for Plumb. Nothing here is
+> built yet unless it says so. The [decisions](#decisions) section records what
+> has been settled; one [open question](#open-questions) remains.
 
 ## The name
 
@@ -29,7 +29,7 @@ Editing a text file today usually means one of two compromises:
 
 The browser can now read and write local files directly. That makes a third
 option possible: an editor that is **as easy to reach as a web page and as
-trustworthy as a desktop app**. That gap is what this project fills.
+trustworthy as a desktop app**. That gap is what Plumb fills.
 
 ## Who it's for
 
@@ -71,17 +71,68 @@ When features compete, these decide, in this order.
 |---|---|---|
 | What | Files and folders on your disk, opened through the browser | Text that isn't a file yet: new documents, pasted text, notes |
 | Where the text lives | On disk. The browser keeps only unsaved edits and version history | In the browser (IndexedDB) |
-| Organised by | The real folder tree | A simple list, with optional labels |
-| Leaving | Closing a folder clears its unsaved edits (after a warning) and its cached copies | Trash, then deleted after 30 days. Export as a backup |
+| Format | Whatever the file is | Markdown (`.md`) by default |
+| Organised by | The real folder tree | A flat list: search, sort and pin |
+| Leaving | Closing a folder never loses unsaved edits: save them to disk or keep them as drafts. Cached copies are cleared | Trash, then deleted after 30 days. Export as a backup, or **Save to folder…** to make it a file |
 
-One word, one meaning: a **folder** is always a folder on disk. Grouping drafts
-uses something else, such as labels.
+One word, one meaning: a **folder** is always a folder on disk. Drafts have no
+folders of their own. Once something is worth organising, its home is a folder
+on disk, and **Save to folder…** gets it there.
 
 > **This changes current behaviour.** Today, every file opened from a folder
 > becomes a permanent browser document filed under a fake folder path
 > (`src/workspace.js`, `openWorkspaceFile`). Copies pile up in "All documents"
-> and stay after the folder is closed. Moving to this model is the first big
-> piece of work this vision implies.
+> and stay after the folder is closed. Drafts can also be filed in virtual
+> folders. Moving to this model is the first big piece of work this vision
+> implies.
+
+## Decisions
+
+### Closing a folder never loses unsaved edits
+
+Closing a folder that has unsaved edits asks first:
+
+- **Save all to disk**: writes every changed file (with the usual check for
+  files changed on disk meanwhile).
+- **Keep as drafts**: each changed file becomes a draft that **remembers which
+  file it came from**. When that folder is opened again, Plumb offers to put the
+  edits back into those files.
+- **Cancel**: the folder stays open.
+
+Closing a folder with nothing unsaved just closes it.
+
+### Drafts are a flat list, not a filing system
+
+- Drafts are organised by **search, sorting and pinning**, not by folders or labels.
+- **Save to folder…** turns a draft into a real file in an open folder (or
+  anywhere, with Save as).
+- **Migration, so nothing is lost:** each existing virtual folder name becomes a
+  read-only **label** on its documents. Labels can be used to filter the list,
+  but no new ones can be made.
+- If users ask for grouping later, labels can grow from there. Starting without
+  them is easy to reverse; taking them away later would not be.
+
+### Markdown is first-class, within limits
+
+**Do:**
+
+- New drafts are named **`.md`**, not `.txt`. Plain text is valid Markdown, so
+  nothing breaks, and the preview and highlighting are there from the start.
+- The Markdown **preview is a toggle**, side by side on wide screens.
+- A few writing conveniences in Markdown files: Enter continues a list or
+  checklist; shortcuts for **bold** and *italic*; pasting a URL over selected
+  text makes a link; an outline of the headings.
+
+**Don't:**
+
+- No WYSIWYG mode.
+- No syntax beyond standard Markdown: no wiki links, embeds or front-matter
+  features. A file written in Plumb must read the same in any other tool.
+- Never reformat someone's Markdown (see *Faithful to the file*).
+
+**Shortcut clash to fix:** Ctrl/Cmd+B shows or hides the folder sidebar today.
+In Markdown files it should mean **bold**, as it does almost everywhere, and the
+sidebar needs a shortcut that doesn't clash.
 
 ## Scope
 
@@ -92,7 +143,8 @@ uses something else, such as labels.
 - Version history for both.
 - Find and replace in a file, and search across an open folder.
 - Comfortable editing of code and prose: highlighting, multiple cursors,
-  indentation that follows the file, Markdown preview, word wrap, spell check.
+  indentation that follows the file, word wrap, spell check.
+- Markdown as described in [Decisions](#markdown-is-first-class-within-limits).
 - Keyboard first: command palette, quick switcher, optional Vim keys.
 - Works offline and installs as an app that can open files from the operating system.
 
@@ -103,10 +155,11 @@ uses something else, such as labels.
 - **Extensions or plugins.**
 - **Accounts, cloud sync, sharing, real-time collaboration.**
 - **Any server-side component**, including telemetry.
+- **A filing system for drafts** (folders, nested labels). Folders on disk do that job.
 
 These are good features. They belong to other products. Each one would break a
 principle (private, calm, ready in a second) or start a race with full IDEs
-that this project can't win and doesn't need to.
+that Plumb can't win and doesn't need to.
 
 ### Grey zone: decide case by case
 
@@ -138,9 +191,6 @@ If the feature is right but the page is wrong, change the page in the same PR.
 - **Phones and tablets**: reading and light editing of Drafts. Not a goal to go
   further for now.
 
-> **Open question:** Is "Drafts mode" on Firefox and Safari good enough to
-> promise, or should the product say plainly that it works best in Chromium browsers?
-
 ## What "good shape" looks like
 
 There's no telemetry, by design, so success is judged by things we can check:
@@ -158,27 +208,26 @@ There's no telemetry, by design, so success is judged by things we can check:
 
 In order:
 
-1. **Agree on this document.** Settle the open questions. *(The name is decided:
-   **Plumb**. A plumb line shows what is exactly true, as the file stays true
-   to itself.)*
+1. ~~**Agree on this document.**~~ Done: the name (**Plumb**), closing folders,
+   drafts and Markdown are decided above.
 2. **A stabilisation round, with no new features:**
    - End-to-end tests (Playwright) for saving, reloading, conflicts, the page
      closing mid-save, and byte-for-byte file round-trips.
    - Linting in CI.
    - Tests for the screens, starting with `EditorView.vue`.
-3. **The Files / Drafts split** described above, including a one-time cleanup of
-   documents that are copies of folder files.
-4. **Explain the platform differences** in the interface.
-5. **Rewrite the README** as a short user guide, and move the full feature list
+3. **The Files / Drafts split** described above:
+   - files from folders become temporary, with only unsaved edits and history kept;
+   - a one-time cleanup of documents that are copies of folder files;
+   - closing a folder with unsaved edits, as decided;
+   - virtual folders become read-only labels; pinning and **Save to folder…** for drafts.
+4. **Markdown first-class**: `.md` drafts, the preview toggle, the writing
+   conveniences, and moving the sidebar off Ctrl/Cmd+B.
+5. **Explain the platform differences** in the interface.
+6. **Rewrite the README** as a short user guide, and move the full feature list
    to a separate reference page.
-6. **Releases and a changelog**, starting at `0.2.0`.
+7. **Releases and a changelog**, starting at `0.2.0`.
 
 ## Open questions
 
-- **Drafts and labels.** Do drafts need grouping at all, or is search plus a
-  sorted list enough? Today's virtual folders would become labels, or go away.
-- **Closing a folder with unsaved edits.** Offer to save them, keep them as
-  drafts, or both?
-- **Markdown.** Should Markdown be a first-class kind of document (a draft
-  starting with `#` is named `.md`, with preview), given that writers are part
-  of the audience?
+- **Firefox and Safari.** Is "Drafts mode" there good enough to promise, or
+  should Plumb say plainly that it works best in Chromium browsers?
