@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 290" role="img" aria-label="Plumb">
+  <!-- The Plumb logo: the icon and the wordmark, whose "l" is a plumb line. -->
+  <style>
+    .ink { stroke: #1f2328; }
+    @media (prefers-color-scheme: dark) { .ink { stroke: #e6edf3; } }
+  </style>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f6fe0"/>
+      <stop offset="1" stop-color="#0b3a8c"/>
+    </linearGradient>
+  </defs>
+  <svg x="0" y="45" width="200" height="200" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="112" fill="url(#tile)"/>
+    <rect x="96" y="120" width="164" height="26" rx="13" fill="#fff" opacity=".45"/>
+    <rect x="96" y="176" width="112" height="26" rx="13" fill="#fff" opacity=".45"/>
+    <rect x="284" y="84" width="24" height="180" rx="12" fill="#fff"/>
+    <rect x="278" y="250" width="36" height="22" rx="7" fill="#c98a1e"/>
+    <path d="M296 266c46 0 66 26 66 58 0 36-32 66-66 120-34-54-66-84-66-120 0-32 20-58 66-58z" fill="#f5c04a"/>
+    <path d="M296 266c46 0 66 26 66 58 0 36-32 66-66 120z" fill="#dd9d2c"/>
+  </svg>
+  <g transform="translate(250 -10)" fill="none" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <!-- p -->
+    <path class="ink" d="M30 100v160"/>
+    <circle class="ink" cx="80" cy="150" r="50"/>
+    <!-- l: a plumb line with its bob resting on the baseline -->
+    <path class="ink" d="M178 40v92"/>
+    <path d="M178 132c17 0 25 10 25 22 0 13-12 24-25 46-13-22-25-33-25-46 0-12 8-22 25-22z" fill="#f5c04a" stroke="none"/>
+    <path d="M178 132c17 0 25 10 25 22 0 13-12 24-25 46z" fill="#dd9d2c" stroke="none"/>
+    <!-- u -->
+    <path class="ink" d="M234 100v50a50 50 0 0 0 100 0M334 100v100"/>
+    <!-- m -->
+    <path class="ink" d="M378 200V100M378 135a35 35 0 0 1 70 0v65M448 135a35 35 0 0 1 70 0v65"/>
+    <!-- b -->
+    <path class="ink" d="M562 40v160"/>
+    <circle class="ink" cx="612" cy="150" r="50"/>
+  </g>
+</svg>

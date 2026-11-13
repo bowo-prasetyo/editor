@@ -109,7 +109,8 @@ button.danger { color: var(--danger); background: transparent; border-color: tra
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--panel);
 }
-.brand { font-weight: 600; color: var(--fg); text-decoration: none; }
+.brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--fg); text-decoration: none; }
+.brand-mark { width: 22px; height: 22px; flex: none; }
 .hint { color: var(--muted); font-size: 13px; }
 
 .home { width: 100%; max-width: 760px; margin: 0 auto; padding: 24px 16px; }

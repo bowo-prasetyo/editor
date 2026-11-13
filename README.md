@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.svg" alt="Plumb" width="360"></p>
+
 # Plumb
 
 **The private, zero-install editor for the text files on your own computer.**
