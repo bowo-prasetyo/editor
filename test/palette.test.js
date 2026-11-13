@@ -147,3 +147,17 @@ test('no hard-coded colours outside the palette, except white on primary buttons
   const cm = read('src/cm.js')
   assert.deepEqual(cm.match(/#[0-9a-f]{6}\b/gi), null, 'cm.js uses the palette variables')
 })
+
+test('docs/palette.svg is up to date with style.css (run npm run palette)', async () => {
+  const { paletteSvg } = await import('../build/palette.js')
+  assert.equal(read('docs/palette.svg'), paletteSvg(css))
+})
+
+test('the images the README and the brand note show exist', () => {
+  const linked = [
+    ...[...read('README.md').matchAll(/(?:src|srcset)="([^"]+\.(?:png|svg))"/g)].map((m) => m[1]),
+    ...[...read('docs/brand.md').matchAll(/(?:src="|\]\()([\w./-]+\.(?:png|svg))/g)].map((m) => 'docs/' + m[1]),
+  ].map((p) => p.replace(/^docs\/\.\.\//, ''))
+  assert.ok(linked.includes('docs/screenshots/plumb-light.png') && linked.includes('docs/screenshots/plumb-dark.png'))
+  for (const path of linked) assert.ok(readFileSync(new URL('../' + path, import.meta.url)).length > 0, path)
+})

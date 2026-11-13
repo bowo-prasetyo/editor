@@ -9,6 +9,11 @@ or a folder, edit it, and save it back. There's no account and no server, it
 works offline, and your text never leaves your machine. Your file comes back
 exactly as it went in, apart from the changes you made.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/plumb-dark.png">
+  <img src="docs/screenshots/plumb-light.png" alt="Plumb with a folder open in the sidebar, a Markdown file beside its preview, and a second file with unsaved changes marked by a brass dot">
+</picture>
+
 **Works best in Chrome and Edge.** In Firefox and Safari you get drafts, and
 single files that Save downloads as a copy; Plumb tells you what's missing
 there.
@@ -68,6 +73,7 @@ Everything, with all the details: **[the reference](docs/reference.md)**.
 - [Changelog](CHANGELOG.md): what changed in each version
 - [Vision](VISION.md): what Plumb is for, its principles, and what's next
 - [Testing](TESTING.md): how Plumb is tested
+- [Brand](docs/brand.md): the name, the logo, the colours and what they mean, and how Plumb talks
 
 ## Develop
 

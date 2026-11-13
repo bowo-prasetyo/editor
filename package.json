@@ -10,7 +10,9 @@
     "test": "node --test",
     "test:e2e": "playwright test",
     "lint": "eslint .",
-    "icons": "node build/icons.js"
+    "icons": "node build/icons.js",
+    "palette": "node build/palette.js",
+    "screenshots": "vite build && node build/screenshots.js"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",

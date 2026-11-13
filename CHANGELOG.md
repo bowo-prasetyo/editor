@@ -8,6 +8,12 @@ minor version (0.x) can change how things work.
 
 ### Added
 
+- **Screenshots in the README**, in light and dark (GitHub shows the one that
+  matches your theme), and a **brand note**, [docs/brand.md](docs/brand.md):
+  the name, the logo and how to use it, the palette and what each colour
+  means, type, and how Plumb talks. `npm run screenshots` and
+  `npm run palette` redraw the pictures, and a test fails if the palette
+  picture falls out of date.
 - **A logo and favicon.** The text cursor hangs true as a plumb line, ending in
   a brass plumb bob. New app icons, a favicon (SVG, with a `.ico` for older
   browsers), the mark in the header, and a logo with a wordmark in the README.
