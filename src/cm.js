@@ -2,7 +2,7 @@
 // syntax highlighting for the document's language (see languages.js). It
 // handles very large documents (only the visible lines are drawn), several
 // cursors, and the usual editing commands.
-import { Compartment, EditorSelection, EditorState, Prec, RangeSetBuilder, StateEffect, StateField } from '@codemirror/state'
+import { Compartment, EditorSelection, EditorState, Facet, Prec, RangeSetBuilder, StateEffect, StateField } from '@codemirror/state'
 import {
   EditorView,
   Decoration,
@@ -17,11 +17,12 @@ import {
   lineNumbers,
   rectangularSelection,
 } from '@codemirror/view'
-import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap, indentLess, indentMore, insertNewlineAndIndent } from '@codemirror/commands'
 import { HighlightStyle, bracketMatching, indentUnit, syntaxHighlighting } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
 import { highlightSelectionMatches, selectNextOccurrence, selectSelectionMatches } from '@codemirror/search'
 import { commentTokensFor } from './filetype.js'
+import { indentUnitString } from './indentation.js'
 
 export const INDENT = '  '
 
@@ -73,16 +74,30 @@ export const commentData = (name) =>
 
 // Editing behaviour that doesn't need a page: several cursors, two-space
 // indents. (Exported for tests.)
-export const editingSetup = () => [
+export const editingSetup = (indent = { type: 'spaces', size: INDENT.length }) => [
   EditorState.allowMultipleSelections.of(true),
-  indentUnit.of(INDENT),
-  EditorState.tabSize.of(INDENT.length),
+  indentSettings(indent),
 ]
+
+// The indent unit Tab inserts ("\t" or spaces) and how wide a tab is drawn.
+export const indentSettings = (indent) => [
+  indentUnit.of(indentUnitString(indent)),
+  EditorState.tabSize.of(indent.size),
+]
+
+// True when a code language is loaded: Enter then indents by the language's
+// rules (an extra level after "{", "(" or ":"). Otherwise Enter copies the
+// current line's indentation.
+export const smartEnter = Facet.define({ combine: (values) => values.some(Boolean) })
+
+export function enter(target) {
+  return target.state.facet(smartEnter) ? insertNewlineAndIndent(target) : newlineKeepIndent(target)
+}
 
 // --- Look ----------------------------------------------------------------
 
 // Colours come from the page's CSS variables, so light and dark both work.
-const theme = EditorView.theme({
+export const theme = EditorView.theme({
   '&': { height: '100%', color: 'var(--fg)', backgroundColor: 'var(--bg)', fontSize: 'inherit' },
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': { fontFamily: 'var(--mono)', lineHeight: '1.6' },
@@ -196,15 +211,16 @@ const wrapping = new Compartment()
 const spelling = new Compartment()
 const language = new Compartment()
 const listening = new Compartment() // the page's change listener
+const indenting = new Compartment()
 
 const spellAttrs = (on) => EditorView.contentAttributes.of({ spellcheck: on ? 'true' : 'false' })
 
-// options: { parent, text, name, wrap, spellcheck, onChange(text), onSelection(info), saved }
+// options: { parent, text, name, wrap, spellcheck, indent, onChange(text), onSelection(info), saved }
 // Returns a small API used by the editor page and the find bar. The language
 // is set separately with setLanguage(), since it loads asynchronously.
 // `saved` is a snapshot() of an earlier editor for the same document: it
 // brings back its undo history, selection and scroll position.
-export function createEditor({ parent, text, name, wrap, spellcheck, onChange, onSelection, saved }) {
+export function createEditor({ parent, text, name, wrap, spellcheck, indent, onChange, onSelection, saved }) {
   // The document text as last handed to or received from the page, so the
   // page can tell its own echo from a real outside change cheaply.
   let synced = text
@@ -240,7 +256,8 @@ export function createEditor({ parent, text, name, wrap, spellcheck, onChange, o
         history(),
         drawSelection(),
         dropCursor(),
-        editingSetup(),
+        EditorState.allowMultipleSelections.of(true),
+        indenting.of(indentSettings(indent)),
         rectangularSelection(), // Alt+drag: block selection
         crosshairCursor(),
         highlightActiveLine(),
@@ -248,7 +265,7 @@ export function createEditor({ parent, text, name, wrap, spellcheck, onChange, o
         syntaxHighlighting(highlightStyle),
         bracketMatching(),
         keymap.of([
-          { key: 'Enter', run: newlineKeepIndent },
+          { key: 'Enter', run: enter },
           { key: 'Tab', run: indentOrInsert, shift: indentLess },
           { key: 'Mod-d', run: selectNextOccurrence, preventDefault: true },
           { key: 'Mod-Shift-l', run: selectSelectionMatches, preventDefault: true },
@@ -273,6 +290,7 @@ export function createEditor({ parent, text, name, wrap, spellcheck, onChange, o
         listening.reconfigure(listener),
         wrapping.reconfigure(wrap ? EditorView.lineWrapping : []),
         spelling.reconfigure(spellAttrs(spellcheck)),
+        indenting.reconfigure(indentSettings(indent)),
         setFindMatches.of([]),
       ],
     }).state
@@ -307,8 +325,12 @@ export function createEditor({ parent, text, name, wrap, spellcheck, onChange, o
     setSpellcheck: (on) => view.dispatch({ effects: spelling.reconfigure(spellAttrs(on)) }),
     // Highlight as `support` (a loaded LanguageSupport, or null for plain
     // text); `name` picks the fallback comment syntax.
-    setLanguage(n, support) {
-      view.dispatch({ effects: language.reconfigure([commentData(n), support ?? []]) })
+    // `smart`: indent new lines by the language's rules.
+    setLanguage(n, support, { smart = false } = {}) {
+      view.dispatch({ effects: language.reconfigure([commentData(n), support ?? [], smart ? smartEnter.of(true) : []]) })
+    },
+    setIndent(indent) {
+      view.dispatch({ effects: indenting.reconfigure(indentSettings(indent)) })
     },
 
     // Replace the whole text after a change made elsewhere (another tab, a

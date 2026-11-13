@@ -11,6 +11,8 @@ A minimal, client-only text editor that runs entirely in the browser. Built with
 - **Quick switcher** (Ctrl/Cmd+P, or *Go to…* in the header): type part of a document's name or folder (letters in order, e.g. `wcl` finds `Work/Clients/…`). With nothing typed it lists recently opened documents. If nothing matches, it offers to create the document, e.g. `Work/todo.md` creates `todo.md` in the Work folder.
 - **Folders**, nested with `/` (e.g. `Work/Clients`). The sidebar shows each folder with how many documents it holds; pick one to see its documents and subfolders. Create, rename and remove folders (removing one never deletes documents: they move up a level). Move a document with its 📁 button, the folder button in the editor, or by dragging it onto a folder. New documents and opened or dropped files go into the folder shown.
 - **Sort** the list by last edited, name, date created or size.
+- **Version history** (*History* in the editor): a version is kept when you open a file, every few minutes while you edit (if the text changed), each time you save to a file, before you restore an older version, and whenever you press *Save version…* (optionally with a name). Pick a version to see what changed since then, restore it (undoable, and the text it replaces is kept as a version), or open it as a copy. Older automatic versions thin out: all from the last hour, then one per hour for a day and one per day for 30 days; named and saved-to-file versions are kept longer. Deleting a document forever deletes its history.
+- **Indentation**, per document: tabs or spaces, 2, 4 or 8 wide, detected from the file (defaults: 4 spaces for Python and similar, tabs for Go and Makefiles, 2 spaces otherwise). Change it, or convert the whole file between tabs and spaces, from the menu in the status bar. In code, Enter indents by the language's rules (a level deeper after `{`, `(` or `:`); in plain text and Markdown it keeps the current line's indentation.
 - Export all documents (Trash included) as one backup file, and import it again; importing never overwrites existing documents.
 - Markdown preview for `.md` files (side by side on wide screens), adjustable text size, and printing of the whole document.
 - Syntax highlighting for 140+ languages, picked from the file name (`.js`, `.py`, `Dockerfile`, `.yaml`…). Each language is downloaded only when a document needs it. Pick another language, or plain text, in the status bar; the choice is kept per document. Files over 5 million characters start as plain text. Matching brackets are highlighted (mismatched ones in red); Ctrl/Cmd+Shift+\\ jumps to the matching bracket.
@@ -25,8 +27,8 @@ Ctrl means Cmd on a Mac.
 
 | Keys | What it does |
 |---|---|
-| Enter | New line, indented like the current one (tabs stay tabs) |
-| Tab / Shift+Tab | Indent at the cursor, or indent / outdent the selected lines |
+| Enter | New line: in code, indented by the language's rules; in text, like the current line |
+| Tab / Shift+Tab | Indent at the cursor (a tab or spaces, per the document's setting), or indent / outdent the selected lines |
 | Ctrl+/ | Comment or uncomment the lines, in the file type's syntax (`//`, `#`, `--`, `<!-- -->`…) |
 | Alt+↑ / Alt+↓ | Move the line(s) up or down |
 | Shift+Alt+↑ / Shift+Alt+↓ | Duplicate the line(s) above or below |
