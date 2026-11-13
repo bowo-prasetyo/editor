@@ -36,6 +36,12 @@ minor version (0.x) can change how things work.
 
 ### Changed
 
+- **The docs are easier to follow.** The reference names the parts of the
+  screen before using them, says plainly that drafts live in this browser
+  only (and what deletes them), and has a new *Troubleshooting* section. Its
+  keyboard shortcuts are grouped as in the F1 list, with the missing ones
+  added (next and previous match, replace all, select the line) and the Mac
+  and redo keys corrected.
 - **Plumb's own colours.** The interface takes the logo's ink blue, with greys
   that lean towards it, in place of GitHub's palette. **Brass** now means
   "notice this, nothing is lost": changes not yet saved to a file (the dot on

@@ -1,19 +1,44 @@
 # Plumb reference
 
 Everything Plumb does, by topic. For a short introduction, see the
-[README](../README.md). Ctrl means Cmd on a Mac throughout.
+[README](../README.md). Ctrl means Cmd, and Alt means Option, on a Mac, except
+where a shortcut says otherwise.
 
+- [The screen](#the-screen): the names used in this guide
 - [Drafts](#drafts)
 - [Files](#files): opening files, Recent files, folders, closing a folder, saving, encodings and line endings, live reload
 - [Editing](#editing): the editor, Markdown, code, indentation, find and replace, line commands
 - [Finding your way](#finding-your-way): tabs, the quick switcher, the command palette, search and replace across files, split editor
-- [Never losing text](#never-losing-text): autosave, other tabs, version history, Trash, backup
+- [Never losing text](#never-losing-text): autosave, other tabs, version history, Trash, backup, where your text is kept
 - [Settings](#settings)
 - [Offline and installing](#offline-and-installing)
 - [Browsers](#browsers)
 - [Limits](#limits)
 - [Keyboard shortcuts](#keyboard-shortcuts)
+- [Troubleshooting](#troubleshooting)
 - [Technical notes](#technical-notes)
+
+## The screen
+
+The names this guide uses for the parts of Plumb:
+
+- **Start page:** what you see first. It has *New document*, *Open files…*
+  and *Open folder…*, your Recent files and your drafts, and *Export all* and
+  *Import backup…*. The Plumb logo at the top left brings you back to it.
+- **Header:** the bar across the top. It holds *Go to…* (the quick switcher),
+  *Search*, *Folders*, `?` (the shortcuts), ⚙ (Settings) and, when the browser
+  offers it, *Install*.
+- **Tabs:** one for each document you have open, under the header.
+- **Toolbar:** the buttons above the text: the file name, *Save*, *Find*,
+  *Preview*, *Split*, *History* and others. On a narrow screen, most of them
+  are under *More*.
+- **Status bar:** the line under the text. It shows the cursor position, the
+  word count and whether the document is saved, and has the menus for the
+  language, indentation, encoding, line endings and text size.
+- **Sidebar:** the tree of an open folder's files, on the left.
+- **Quick switcher** (Ctrl+P) and **command palette** (Ctrl+Shift+P): boxes
+  that open over the page. Type to find a document or run any command by
+  name. If you don't know where something is, look for it there.
 
 ## Drafts
 
@@ -27,9 +52,6 @@ They're kept in your browser.
   sort it by last edited, name, date created or size.
 - **Pin** a draft (📌, or *Pin this draft* in the command palette) to keep it at
   the top. Pinned drafts stay first whatever the sort order.
-- **Labels.** Drafts that earlier versions filed in folders show that folder as
-  a label. Filter the list by a label, or remove one with ×. New labels aren't
-  made: once something is worth organising, its home is a folder on disk.
 - **Save to folder…** turns a draft into a file in an open folder. It's in the
   editor, and only appears while a folder is open.
   - Subfolders are created as needed, and an existing file is never replaced.
@@ -40,8 +62,14 @@ They're kept in your browser.
   that file. It moves to Recent files.
 - **The quick switcher** creates a draft from whatever you typed when nothing
   matches.
-- **Copies of files.** Copies of files kept by earlier versions of Plumb are
-  offered to the Trash once, in a banner on the start page.
+- **From earlier versions of Plumb.** You only see these if you used Plumb
+  before version 0.2:
+  - **Labels.** Drafts that earlier versions filed in folders show that folder
+    as a label. Filter the list by a label, or remove one with ×. New labels
+    aren't made: once something is worth organising, its home is a folder on
+    disk.
+  - **Copies of files** that earlier versions kept are offered to the Trash
+    once, in a banner on the start page.
 
 ## Files
 
@@ -364,6 +392,27 @@ deletes them.
   - *Import backup…* adds them back, and never overwrites existing documents.
   - Files with no unsaved changes aren't in the backup: their text is on disk.
 
+### Where your text is kept, and what can remove it
+
+Your files are on your disk, and nothing in Plumb deletes them. Everything
+else (drafts, unsaved edits to files, version history and the Trash) is kept
+**in this browser only**. That has some consequences worth knowing:
+
+- **It isn't synced.** Another browser, another browser profile or another
+  computer has its own, separate Plumb. To move your drafts, use *Export all*
+  on one and *Import backup…* on the other.
+- **Clearing the browser's data for the site deletes it.** "Clear browsing
+  data" with cookies and site data, or removing the site's data in the
+  browser's settings, deletes your drafts, unsaved edits, history and Trash.
+  Save or export first.
+- **Private and incognito windows** keep nothing once the window closes.
+- **The browser may clear it to free disk space**, unless it agreed to keep
+  Plumb's storage. When it hasn't agreed, the start page says so under your
+  drafts.
+
+**Export a backup now and then** (*Export all* on the start page), and save
+anything that matters to a file.
+
 ## Settings
 
 Open them with ⚙ in the header, or Ctrl+,. They're kept in this browser and
@@ -444,43 +493,116 @@ rest under *More*; the status bar shows the position and save status, with
 
 ## Keyboard shortcuts
 
-Ctrl means Cmd on a Mac. F1 in Plumb lists them all, searchable.
+Ctrl means Cmd, and Alt means Option, on a Mac, unless a row says otherwise.
+F1 in Plumb lists them all, searchable, in the same groups as here, with the
+Mac's ⌘ ⌥ ⇧ symbols on a Mac.
+
+### Documents
+
+| Keys | What it does |
+|---|---|
+| Ctrl+P | Quick switcher: go to any document, or create one (`>` for commands, `#` for headings) |
+| Ctrl+Shift+P | Command palette: run any action by name |
+| Ctrl+S / Ctrl+Shift+S | Save (to the file, or as a download in Firefox and Safari) / save as |
+| Ctrl+Alt+S | Save all changed files |
+| Alt+PageUp / Alt+PageDown | Previous / next tab |
+| Ctrl+Shift+F | Search (and replace) in all drafts and folders |
+| Ctrl+\\ | Split the editor, or close the split |
+| Ctrl+Shift+E | Show or hide the folder sidebar, in any document (also the *Folders* button) |
+| Ctrl+, | Settings |
+| F1, or ? | Show all keyboard shortcuts (`?` only when you aren't typing in a document) |
+
+### Find
+
+| Keys | What it does |
+|---|---|
+| Ctrl+F / Ctrl+H | Find / find and replace (every match is highlighted) |
+| Enter / Shift+Enter | In the find box: next / previous match |
+| Ctrl+Enter | In the replace box: replace all |
+| Alt+C / Alt+W / Alt+R | In the find bar: match case / whole word / regular expression |
+| Ctrl+G | Go to a line, or `line:column` (or click the position in the status bar) |
+
+### Editing
 
 | Keys | What it does |
 |---|---|
 | Enter | New line: in code, indented by the language's rules; in text, like the current line; in Markdown lists, the next item |
 | Tab / Shift+Tab | Indent at the cursor (a tab or spaces, per the document's setting), or indent / outdent the selected lines |
+| Ctrl+] / Ctrl+[ | Indent / outdent the lines |
 | Ctrl+/ | Comment or uncomment the lines, in the file type's syntax (`//`, `#`, `--`, `<!-- -->`…) |
 | Alt+↑ / Alt+↓ | Move the line(s) up or down |
 | Shift+Alt+↑ / Shift+Alt+↓ | Duplicate the line(s) above or below |
 | Ctrl+Shift+K | Delete the line(s) |
-| Ctrl+Space | Show suggestions (Enter accepts, Escape closes) |
-| Ctrl+Shift+[ / Ctrl+Shift+] | Fold / unfold the block at the cursor (Cmd+Alt+[ / ] on a Mac) |
-| Ctrl+Alt+[ / Ctrl+Alt+] | Fold all / unfold all |
-| Ctrl+B / Ctrl+I | In Markdown documents: bold / italic. Elsewhere, Ctrl+B also shows or hides the folder sidebar |
-| Ctrl+Shift+E | Show or hide the folder sidebar, in any document (also the *Folders* button in the header) |
-| Ctrl+Shift+F | Search (and replace) in all drafts and folders |
-| Ctrl+Alt+S | Save all changed files |
-| Ctrl+, | Settings |
-| Ctrl+\\ | Split the editor, or close the split |
+| Ctrl+Shift+\\ | Jump to the matching bracket |
+| Ctrl+Z | Undo |
+| Ctrl+Y | Redo (Cmd+Shift+Z on a Mac; Ctrl+Shift+Z also works on Linux) |
+| Alt+Z | Word wrap on or off |
+| Ctrl+B / Ctrl+I | In Markdown documents: bold / italic. Elsewhere, Ctrl+B shows or hides the folder sidebar |
+| Ctrl+Space | Show suggestions (Enter accepts, Escape closes). Ctrl on a Mac too |
 | Ctrl+Shift+M / F8 | Show the problems in JSON and YAML / go to the next one |
+
+### Folding
+
+| Keys | What it does |
+|---|---|
+| Ctrl+Shift+[ / Ctrl+Shift+] | Fold / unfold the block at the cursor (Cmd+Option+[ / ] on a Mac) |
+| Ctrl+Alt+[ / Ctrl+Alt+] | Fold all / unfold all. Ctrl on a Mac too |
+
+### Cursors and selection
+
+| Keys | What it does |
+|---|---|
 | Ctrl+D | Select the next occurrence of the selection (add a cursor there) |
 | Ctrl+Shift+L | Select every occurrence of the selection |
 | Ctrl+Alt+↑ / Ctrl+Alt+↓ | Add a cursor on the line above or below |
 | Ctrl+click / Alt+drag | Add a cursor / select a rectangular block |
+| Alt+L | Select the line (Ctrl+L on a Mac) |
 | Escape | Back to a single cursor |
-| Ctrl+P | Quick switcher: go to any document, or create one (`>` for commands, `#` for headings) |
-| Ctrl+Shift+P | Command palette: run any action by name |
-| F1 or ? | Show all keyboard shortcuts |
-| Alt+PageUp / Alt+PageDown | Previous / next tab |
-| Ctrl+G | Go to a line, or `line:column` (or click the position in the status bar) |
-| Ctrl+[ / Ctrl+] | Outdent / indent the lines |
-| Ctrl+Shift+\\ | Jump to the matching bracket |
-| Ctrl+F / Ctrl+H | Find / find and replace (every match is highlighted) |
-| Alt+C / Alt+W / Alt+R | In the find bar: match case / whole word / regular expression |
-| Ctrl+Z / Ctrl+Shift+Z (Ctrl+Y) | Undo / redo |
-| Ctrl+S / Ctrl+Shift+S | Save / save as |
-| Alt+Z | Word wrap on or off |
+
+## Troubleshooting
+
+**_Open folder…_ is greyed out, or Save downloads a copy instead of writing
+the file.** You're in a browser without the File System Access API, such as
+Firefox or Safari. Open Plumb in Chrome or Edge for folders and saving back to
+files (see [Browsers](#browsers)).
+
+**A file shows _Allow access_ instead of its text.** After a reload, or when
+you come back later, the browser asks again before Plumb may read your files.
+Press *Allow access* and accept the browser's prompt. Unsaved edits show even
+before you do.
+
+**My drafts aren't there in another browser or on another computer.** Drafts
+are kept in each browser separately and aren't synced. Use *Export all* where
+they are, and *Import backup…* where you want them (see
+[Where your text is kept](#where-your-text-is-kept-and-what-can-remove-it)).
+
+**The start page says the browser may clear my documents.** The browser
+hasn't agreed to keep Plumb's storage, so it may delete it when the disk gets
+full. Export a backup now and then, and save important text to files.
+Installing Plumb as an app often makes the browser agree.
+
+**A banner says the text couldn't be saved in the browser.** The browser's
+storage is full or unavailable. Save the text to a file from the banner, free
+some disk space, then press *Try again*. Your text stays on screen meanwhile.
+
+**A file shows _changed on disk_.** Another program changed it while you had
+unsaved edits. *Reload from disk* takes the file's text and keeps yours in
+History; *Keep mine* keeps yours, and Save asks before replacing the file (see
+[Live reload](#live-reload)).
+
+**Ctrl+B adds stars instead of showing the sidebar.** In Markdown documents,
+Ctrl+B means bold. Use Ctrl+Shift+E or the *Folders* button.
+
+**`?` types a question mark instead of showing the shortcuts.** It only opens
+the list when you aren't typing in a document. Press F1 instead.
+
+**A file has no colours.** Files over 5 million characters start as plain
+text, and some files have no recognised language. Pick a language in the
+status bar.
+
+**There's no _Install_ button.** It only appears in browsers that can install
+Plumb as an app (Chrome and Edge on the desktop), and not once it's
+installed.
 
 ## Technical notes
 

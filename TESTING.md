@@ -141,7 +141,6 @@ The scenarios follow the principles in [VISION.md](VISION.md#principles).
 Settings shows the version from `package.json`, with a link to the changelog.
 (`editor.spec.js`)
 
-
 Naming from the first line and renaming; find and replace all with a one-step
 undo; tabs keeping their own text and undo history; the quick switcher; the
 Markdown preview; word wrap remembered per document. (`editor.spec.js`)
