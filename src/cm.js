@@ -2,7 +2,8 @@
 // syntax highlighting for the document's language (see languages.js). It
 // handles very large documents (only the visible lines are drawn), several
 // cursors, and the usual editing commands.
-import { Compartment, EditorSelection, EditorState, Facet, Prec, RangeSetBuilder, StateEffect, StateField } from '@codemirror/state'
+import { Compartment, EditorSelection, EditorState, Facet, Prec, RangeSetBuilder, StateEffect, StateField, Transaction } from '@codemirror/state'
+import { diagnosticCount, lintGutter, lintKeymap, linter, nextDiagnostic, openLintPanel } from '@codemirror/lint'
 import {
   EditorView,
   Decoration,
@@ -173,6 +174,8 @@ export const EDITOR_COMMANDS = {
   foldAll,
   unfoldAll,
   startCompletion,
+  openLintPanel,
+  nextDiagnostic,
 }
 
 // --- Helpers: completion, closing brackets, indentation guides ----------------
@@ -240,8 +243,10 @@ export const indentGuides = ViewPlugin.fromClass(
 // typing, and indentation guides show. In prose, suggestions only come with
 // Ctrl+Space and nothing closes itself (apostrophes stay apostrophes).
 // The other options turn single helpers off.
-export function helpers({ code = false, closeBrackets: close = true, autocomplete = true, guides = true } = {}) {
+// `lint` is a lint source (see lint.js) to check the text with, or null.
+export function helpers({ code = false, closeBrackets: close = true, autocomplete = true, guides = true, lint = null } = {}) {
   return [
+    lint ? [linter(lint, { delay: 400 }), lintGutter()] : [],
     wordCompletion,
     autocomplete && code ? autocompletion() : autocompletion({ activateOnTyping: false }),
     code && close ? [closeBrackets(), Prec.high(keymap.of(closeBracketsKeymap))] : [],
@@ -286,6 +291,12 @@ export const theme = EditorView.theme({
     padding: '0 4px',
     margin: '0 2px',
   },
+  '.cm-panels': { backgroundColor: 'var(--panel)', color: 'var(--fg)', borderColor: 'var(--border)' },
+  '.cm-panel input, .cm-panel button, .cm-textfield': {
+    font: 'inherit', fontSize: '13px', color: 'var(--fg)', backgroundColor: 'var(--bg)',
+    border: '1px solid var(--border)', borderRadius: '4px', padding: '1px 6px',
+  },
+  '.cm-panel.cm-search label': { fontSize: '13px' },
   '.cm-tooltip': { backgroundColor: 'var(--panel)', border: '1px solid var(--border)', color: 'var(--fg)' },
   '.cm-tooltip-autocomplete > ul': { fontFamily: 'var(--mono)', maxHeight: '16em' },
   '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
@@ -380,6 +391,28 @@ const findHighlighter = ViewPlugin.fromClass(
 
 // --- The editor -----------------------------------------------------------
 
+// The smallest single change turning `a` into `b`: { from, to, insert }, or
+// null if they're the same. (Same start and end are kept.)
+export function textDiff(a, b) {
+  if (a === b) return null
+  let start = 0
+  const max = Math.min(a.length, b.length)
+  while (start < max && a.charCodeAt(start) === b.charCodeAt(start)) start++
+  let endA = a.length
+  let endB = b.length
+  while (endA > start && endB > start && a.charCodeAt(endA - 1) === b.charCodeAt(endB - 1)) {
+    endA--
+    endB--
+  }
+  // Don't split a surrogate pair.
+  if (start > 0 && /[\uD800-\uDBFF]/.test(a[start - 1])) start--
+  if (endA < a.length && /[\uDC00-\uDFFF]/.test(a[endA])) {
+    endA++
+    endB++
+  }
+  return { from: start, to: endA, insert: b.slice(start, endB) }
+}
+
 // Fold markers in the gutter: ▾ open, ▸ folded.
 function foldMarker(open) {
   const span = document.createElement('span')
@@ -396,16 +429,19 @@ const language = new Compartment()
 const listening = new Compartment() // the page's change listener
 const indenting = new Compartment()
 const helping = new Compartment() // see helpers()
+const keyboard = new Compartment() // another keyboard mode (Vim), or none
 
 const spellAttrs = (on) => EditorView.contentAttributes.of({ spellcheck: on ? 'true' : 'false' })
 
-// options: { parent, text, name, wrap, spellcheck, indent, help, onChange(text), onSelection(info), saved }
-// `help` is the options for helpers().
+// options: { parent, text, name, wrap, spellcheck, indent, help, keys, extra, onChange(text), onSelection(info), saved }
+// `help` is the options for helpers(); `keys` an extension for another
+// keyboard mode (Vim), which takes keys before everything else; `extra`
+// more extensions (the split pane's own search panel).
 // Returns a small API used by the editor page and the find bar. The language
 // is set separately with setLanguage(), since it loads asynchronously.
 // `saved` is a snapshot() of an earlier editor for the same document: it
 // brings back its undo history, selection and scroll position.
-export function createEditor({ parent, text, name, wrap, spellcheck, indent, help, onChange, onSelection, saved }) {
+export function createEditor({ parent, text, name, wrap, spellcheck, indent, help, keys, extra = [], onChange, onSelection, saved }) {
   // The document text as last handed to or received from the page, so the
   // page can tell its own echo from a real outside change cheaply.
   let synced = text
@@ -420,21 +456,28 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, hel
       cursors: ranges.length,
       selected: ranges.reduce((n, r) => n + r.to - r.from, 0),
       lines: state.doc.lines,
+      problems: diagnosticCount(state),
     })
   }
+  let problems = 0
 
   const listener = EditorView.updateListener.of((u) => {
     if (u.docChanged) {
       synced = u.state.doc.toString()
       onChange?.(synced)
     }
-    if (u.docChanged || u.selectionSet) report(u.state)
+    const count = diagnosticCount(u.state)
+    if (u.docChanged || u.selectionSet || count !== problems) {
+      problems = count
+      report(u.state)
+    }
   })
 
   const fresh = () =>
     EditorState.create({
       doc: text,
       extensions: [
+        Prec.highest(keyboard.of(keys ?? [])),
         lineNumbers(),
         foldGutter({ markerDOM: foldMarker }),
         codeFolding({ placeholderText: '…' }),
@@ -459,6 +502,7 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, hel
           ...defaultKeymap,
           ...historyKeymap,
           ...foldKeymap,
+          ...lintKeymap,
         ]),
         theme,
         wrapping.of(wrap ? EditorView.lineWrapping : []),
@@ -469,6 +513,7 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, hel
         findHighlighter,
         EditorView.contentAttributes.of({ 'aria-label': 'Document text', autocapitalize: 'off' }),
         listening.of(listener),
+        extra,
       ],
     })
 
@@ -481,6 +526,7 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, hel
         spelling.reconfigure(spellAttrs(spellcheck)),
         indenting.reconfigure(indentSettings(indent)),
         helping.reconfigure(helpers(help)),
+        keyboard.reconfigure(keys ?? []),
         setFindMatches.of([]),
       ],
     }).state
@@ -530,21 +576,29 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, hel
     setHelpers(options) {
       view.dispatch({ effects: helping.reconfigure(helpers(options)) })
     },
+    // Another keyboard mode (the Vim extension), or null for the standard keys.
+    setKeys(ext) {
+      view.dispatch({ effects: keyboard.reconfigure(ext ?? []) })
+    },
     // Run a state command ({ state, dispatch }) without moving focus.
     apply: (cmd) => cmd(view),
     setIndent(indent) {
       view.dispatch({ effects: indenting.reconfigure(indentSettings(indent)) })
     },
 
-    // Replace the whole text after a change made elsewhere (another tab, a
-    // recovered copy). Ignores the page echoing back our own text.
-    setText(next) {
+    // Take text changed elsewhere (another tab, the other pane, a restored
+    // version). Ignores the page echoing back our own text. Only the part
+    // that differs is replaced, so cursors and folds elsewhere stay put.
+    // `history: false` keeps the change out of this editor's undo history
+    // (an edit typed in the other pane is undone there, not here).
+    setText(next, { history = true } = {}) {
       if (next === synced) return
       synced = next
-      const { from, to } = selection()
+      const change = textDiff(view.state.doc.toString(), next)
+      if (!change) return
       view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: next },
-        selection: EditorSelection.single(Math.min(from, next.length), Math.min(to, next.length)),
+        changes: change,
+        annotations: history ? [] : [Transaction.addToHistory.of(false)],
       })
     },
 

@@ -192,10 +192,10 @@ test('whitespace fixes for documents not open in an editor; Markdown keeps trail
   assert.equal(fixWhitespaceText('a  \nb', { trim: true, finalNewline: true }), 'a\nb\n')
   prefs.trimOnSave = true
   const md = store.createDoc('x.md', 'line  \n', { autoName: false })
-  saveall.prepareForSave(store.getDoc(md.id))
+  await saveall.prepareForSave(store.getDoc(md.id))
   assert.equal(store.getDoc(md.id).content, 'line  \n')
   const txt = store.createDoc('x.txt', 'line  \n', { autoName: false })
-  saveall.prepareForSave(store.getDoc(txt.id))
+  await saveall.prepareForSave(store.getDoc(txt.id))
   assert.equal(store.getDoc(txt.id).content, 'line\n')
 })
 

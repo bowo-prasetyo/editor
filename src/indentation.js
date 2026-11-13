@@ -10,12 +10,13 @@ const TABS = new Set(['go', 'mk', 'tsv'])
 const TAB_NAMES = new Set(['makefile', 'gnumakefile'])
 
 // What a new document of this type uses before it has any indented lines.
-export function defaultIndent(name = '') {
+// `fallback` is for types without a convention of their own (a setting).
+export function defaultIndent(name = '', fallback = { type: 'spaces', size: 2 }) {
   const base = name.trim().split(/[\\/]/).pop().toLowerCase()
   const ext = extension(name)
   if (TAB_NAMES.has(base) || TABS.has(ext)) return { type: 'tabs', size: 4 }
   if (FOUR.has(ext)) return { type: 'spaces', size: 4 }
-  return { type: 'spaces', size: 2 }
+  return { type: fallback.type, size: fallback.size }
 }
 
 // Guess the indentation from the text: tabs if most indented lines start
@@ -59,14 +60,19 @@ export function detectIndent(text, maxLines = 10_000) {
   return { type: 'spaces', size }
 }
 
-// The indentation to use: the document's own choice, else what its text
-// suggests, else the default for its file type.
-export function effectiveIndent(doc) {
+// The indentation to use: the document's own choice, else what the
+// project's .editorconfig says (`config`, see editorconfig.js), else what
+// its text suggests, else the default for its file type (`fallback` for
+// types without a convention).
+export function effectiveIndent(doc, { config = null, fallback } = {}) {
   if (doc?.indent?.type) return { type: doc.indent.type, size: doc.indent.size ?? 4, auto: false }
-  const fallback = defaultIndent(doc?.name)
+  if (config?.indent) return { ...config.indent, auto: true, from: 'editorconfig' }
+  const def = defaultIndent(doc?.name, fallback)
   const found = detectIndent(doc?.content ?? '')
-  if (!found) return { ...fallback, auto: true }
-  return { type: found.type, size: found.size ?? fallback.size, auto: true }
+  const type = found?.type ?? def.type
+  // .editorconfig may give just a size.
+  const size = config?.indentSize ?? (found?.type === 'spaces' ? found.size : null) ?? def.size
+  return { type, size, auto: true, ...(config?.indentSize ? { from: 'editorconfig' } : {}) }
 }
 
 export const indentUnitString = ({ type, size }) => (type === 'tabs' ? '\t' : ' '.repeat(size))

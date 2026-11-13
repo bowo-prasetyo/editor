@@ -17,11 +17,12 @@ export function isProse(name) {
 export const SPELLCHECK_LIMIT = 200_000
 
 // Effective view settings for a document: its own choice, else the default.
-export function viewSettings(doc) {
+// `defaults`: whether prose and code wrap unless the document says (settings).
+export function viewSettings(doc, { wrapProse = true, wrapCode = false } = {}) {
   const prose = isProse(doc?.name)
   const small = (doc?.content?.length ?? 0) <= SPELLCHECK_LIMIT
   return {
-    wrap: doc?.wrap ?? prose,
+    wrap: doc?.wrap ?? (prose ? wrapProse : wrapCode),
     spellcheck: doc?.spellcheck ?? (prose && small),
   }
 }

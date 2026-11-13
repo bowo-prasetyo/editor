@@ -84,3 +84,12 @@ test('go to line: "42" and "42:7", clamped to the document', () => {
   assert.equal(goToPosition(doc, 'abc'), null)
   assert.equal(goToPosition(doc, ''), null)
 })
+
+test('textDiff finds the smallest single change', async () => {
+  const { textDiff } = await import('../src/cm.js')
+  assert.equal(textDiff('abc', 'abc'), null)
+  assert.deepEqual(textDiff('hello world', 'hello brave world'), { from: 6, to: 6, insert: 'brave ' })
+  assert.deepEqual(textDiff('aaa', 'aa'), { from: 2, to: 3, insert: '' })
+  assert.deepEqual(textDiff('', 'x'), { from: 0, to: 0, insert: 'x' })
+  assert.deepEqual(textDiff('a😀b', 'a😃b'), { from: 1, to: 3, insert: '😃' })
+})

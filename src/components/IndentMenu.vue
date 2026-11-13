@@ -34,11 +34,11 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', outside))
       title="Indentation: what Tab inserts and how wide tabs are"
       @click="open = !open"
     >
-      {{ describeIndent(indent) }}{{ indent.auto ? '' : ' ✱' }}
+      {{ describeIndent(indent) }}{{ indent.auto ? '' : ' ✱' }}{{ indent.auto && indent.from === 'editorconfig' ? ' · .editorconfig' : '' }}
     </button>
     <div v-if="open" class="menu" role="menu">
       <button role="menuitemradio" :aria-checked="indent.auto" @click="choose(null)">
-        Detect from the file ({{ describeIndent(detected) }})
+        {{ detected.from === 'editorconfig' ? 'From .editorconfig' : 'Detect from the file' }} ({{ describeIndent(detected) }})
       </button>
       <hr />
       <button v-for="n in SIZES" :key="'s' + n" role="menuitemradio" :aria-checked="is('spaces', n)" @click="choose({ type: 'spaces', size: n })">

@@ -25,8 +25,10 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light dark;
 }
+/* Dark colours: with the system's dark mode unless Settings say Light, or
+   always when they say Dark (the theme is <html data-theme="…">). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #0d1117;
     --fg: #e6edf3;
     --muted: #8d96a0;
@@ -51,6 +53,32 @@
     --syn-deleted: #ffa198;
   }
 }
+:root[data-theme='dark'] {
+  --bg: #0d1117;
+  --fg: #e6edf3;
+  --muted: #8d96a0;
+  --border: #30363d;
+  --panel: #161b22;
+  --accent: #4493f8;
+  --danger: #f85149;
+  --syn-keyword: #ff7b72;
+  --syn-string: #a5d6ff;
+  --syn-number: #79c0ff;
+  --syn-comment: #8b949e;
+  --syn-function: #d2a8ff;
+  --syn-type: #ffa657;
+  --syn-property: #79c0ff;
+  --syn-variable: #ffa657;
+  --syn-punctuation: #b1bac4;
+  --syn-meta: #d2a8ff;
+  --syn-escape: #7ee787;
+  --syn-heading: #79c0ff;
+  --syn-link: #a5d6ff;
+  --syn-inserted: #7ee787;
+  --syn-deleted: #ffa198;
+}
+:root[data-theme='light'] { color-scheme: light; }
+:root[data-theme='dark'] { color-scheme: dark; }
 
 * { box-sizing: border-box; }
 html, body, #app { height: 100%; margin: 0; }
@@ -458,3 +486,33 @@ button.primary-mini { color: var(--accent); border-color: var(--accent); margin-
 .search-preview mark.replaced { background: color-mix(in srgb, var(--danger) 22%, transparent); text-decoration: line-through; }
 .search-preview ins { background: color-mix(in srgb, #2da44e 25%, transparent); text-decoration: none; border-radius: 2px; }
 .quick-list li.on-disk .quick-name { font-style: italic; }
+
+/* Split editor (see SplitPane.vue) */
+.split-pane { flex: 1 1 50%; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid var(--border); }
+.split-pane .source { border-right: 0 !important; }
+.split-head { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-bottom: 1px solid var(--border); background: var(--panel); font-size: 13px; }
+.split-head select { max-width: 70%; font: inherit; padding: 2px 4px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--fg); }
+.split-head select:hover, .split-head select:focus { border-color: var(--border); }
+.split-head .spacer { flex: 1; }
+.split-dirty { color: var(--accent); font-size: 10px; }
+button.mini.problems { color: var(--danger); }
+.cm-vim-panel { padding: 0 8px; font-family: var(--mono); font-size: 12px; }
+.cm-vim-panel input { font: inherit; color: var(--fg); background: transparent; border: 0; outline: none; }
+
+/* Settings (see SettingsView.vue) */
+.settings-page { width: 100%; max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
+.settings-group { border: 1px solid var(--border); border-radius: 8px; padding: 8px 16px 12px; margin: 16px 0 0; }
+.settings-group legend { font-weight: 600; padding: 0 6px; }
+.setting { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+.setting > span { flex: 0 0 13em; }
+.setting select, .setting input[type='text'] {
+  font: inherit; font-size: 14px; padding: 5px 6px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--fg); min-width: 14em;
+}
+.setting.check { gap: 8px; }
+.setting-note { margin: -2px 0 8px; font-size: 13px; }
+.font-sample { font-family: var(--mono); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; margin: 8px 0; tab-size: 4; overflow: auto; }
+@media (max-width: 600px) {
+  .setting { flex-wrap: wrap; gap: 4px; }
+  .setting > span { flex-basis: 100%; }
+}

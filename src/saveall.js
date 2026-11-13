@@ -1,20 +1,18 @@
 // "Save all": write every document with changes not saved to its file,
 // with the same whitespace fixes as saving one file (see EditorView.vue).
-import { prefs } from './prefs.js'
 import { saveAllToFiles, unsavedToDisk } from './fileaccess.js'
 import { fixWhitespaceText } from './textops.js'
 import { updateDoc } from './store.js'
-import { extension } from './filetype.js'
 import { showToast } from './toast.js'
+import { docEditorConfig, saveFixes } from './editorsetup.js'
 
-const isMarkdown = (name) => ['md', 'markdown', 'mdown'].includes(extension(name))
-
-// Trailing spaces and the final line break, if turned on (Markdown keeps
-// its trailing spaces: they mean a line break).
-export function prepareForSave(doc) {
-  const trim = prefs.trimOnSave && !isMarkdown(doc.name)
-  if (!trim && !prefs.finalNewline) return
-  const text = fixWhitespaceText(doc.content, { trim, finalNewline: prefs.finalNewline })
+// Trailing spaces and the final line break, if Settings or the project's
+// .editorconfig say so (Markdown keeps its trailing spaces: they mean a
+// line break).
+export async function prepareForSave(doc) {
+  const { trim, finalNewline } = saveFixes(doc, await docEditorConfig(doc))
+  if (!trim && !finalNewline) return
+  const text = fixWhitespaceText(doc.content, { trim, finalNewline })
   if (text !== doc.content) updateDoc(doc.id, { content: text })
 }
 
