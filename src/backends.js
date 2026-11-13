@@ -20,6 +20,8 @@
 // (about 5 MB, no file handles across reloads) is the fallback for browsers
 // where IndexedDB can't be opened.
 
+// Storage names predate the name Plumb. Don't rename them: browsers would lose
+// the documents already kept under them.
 const LS_PREFIX = 'editor.doc.'
 const LS_LEGACY_KEY = 'editor.documents.v1'
 
