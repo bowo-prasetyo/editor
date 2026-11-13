@@ -18,6 +18,7 @@ import { showToast } from '../toast'
 import { canSaveInPlace, saveDoc } from '../fileaccess'
 import { countWords } from '../stats'
 import { createEditor } from '../cm'
+import { EditorView } from '@codemirror/view'
 import { whitespaceFix } from '../textops'
 import { AUTO, PLAIN, findLanguage, languageNames, loadLanguage } from '../languages'
 import FindBar from '../components/FindBar.vue'
@@ -29,12 +30,13 @@ import HistoryPanel from '../components/HistoryPanel.vue'
 import { convertIndentation, detectIndent, effectiveIndent } from '../indentation'
 import { folderTree } from '../folders'
 import { closeTab, liveTabs, opened, saveSnapshot, takeSnapshot } from '../session'
-import { registerCommands } from '../commands'
+import { registerCommands, ui } from '../commands'
 import { cycleTab } from '../tabs'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const props = defineProps({ id: { type: String, required: true } })
 const router = useRouter()
+const route = useRoute()
 
 const doc = computed(() => getDoc(props.id))
 const host = ref(null) // where the editor is mounted
@@ -229,6 +231,22 @@ function mountEditor([, id] = [], [, oldId] = []) {
   editor.value.focus()
 }
 watch([host, () => props.id], mountEditor, { flush: 'post' })
+
+// Opened at a place (from search: ?at=from-to): select it, then tidy the URL.
+watch(
+  [editor, () => route.query.at],
+  ([ed, at]) => {
+    if (!ed || typeof at !== 'string' || editorFor !== props.id) return
+    const m = /^(\d+)-(\d+)$/.exec(at)
+    if (m) {
+      const len = content.value.length
+      ed.select(Math.min(+m[1], len), Math.min(+m[2], len), { focus: true })
+      ed.view.dispatch({ effects: EditorView.scrollIntoView(Math.min(+m[1], len), { y: 'center' }) })
+    }
+    router.replace({ name: 'edit', params: { id: props.id } })
+  },
+  { flush: 'post' },
+)
 
 // Keep the editor in step with the document and its settings.
 watch(content, (text) => current()?.setText(text))
@@ -497,12 +515,14 @@ const editorCommands = [
 
 onMounted(() => {
   unregister = registerCommands(editorCommands)
+  ui.selectedText = () => current()?.selectedText() ?? ''
   window.addEventListener('keydown', onWindowKeydown)
   window.addEventListener('beforeprint', beforePrint)
   window.addEventListener('afterprint', afterPrint)
 })
 onBeforeUnmount(() => {
   unregister()
+  ui.selectedText = null
   window.removeEventListener('keydown', onWindowKeydown)
   window.removeEventListener('beforeprint', beforePrint)
   window.removeEventListener('afterprint', afterPrint)

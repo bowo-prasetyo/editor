@@ -9,6 +9,8 @@ export default createRouter({
     { path: '/', name: 'home', component: HomeView },
     // The editor (with CodeMirror) loads on first use, keeping the list fast.
     { path: '/edit/:id', name: 'edit', component: () => import('./views/EditorView.vue'), props: true },
+    // Search across every document and the files in open folders.
+    { path: '/search', name: 'search', component: () => import('./views/SearchView.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

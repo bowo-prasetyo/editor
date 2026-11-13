@@ -13,6 +13,8 @@ export const SHORTCUTS = [
   { id: 'prevTab', group: 'Documents', label: 'Previous tab', keys: ['Alt+PageUp'] },
   { id: 'nextTab', group: 'Documents', label: 'Next tab', keys: ['Alt+PageDown'] },
   { id: 'shortcuts', group: 'Documents', label: 'Show keyboard shortcuts', keys: ['F1', '?'] },
+  { id: 'searchAll', group: 'Documents', label: 'Search (and replace) in all documents and folders', keys: ['Mod+Shift+F'] },
+  { id: 'saveAll', group: 'Documents', label: 'Save all changed files', keys: ['Mod+Alt+S'] },
   { id: 'sidebar', group: 'Documents', label: 'Show / hide the folder sidebar', keys: ['Mod+B'] },
   // Find
   { id: 'find', group: 'Find', label: 'Find', keys: ['Mod+F'] },

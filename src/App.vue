@@ -8,6 +8,8 @@ import QuickOpen from './components/QuickOpen.vue'
 import ShortcutsDialog from './components/ShortcutsDialog.vue'
 import FileTree from './components/FileTree.vue'
 import { canOpenFolder, forgetListings, loadWorkspaces, openFolder } from './workspace'
+import { saveAll } from './saveall'
+import { unsavedToDisk } from './fileaccess'
 import { registerCommands, ui } from './commands'
 import { createDoc, downloadBackup, requestPersistence } from './store'
 import { applyUpdate, initPwa, install, pwa } from './pwa'
@@ -25,7 +27,25 @@ const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
 
 // F1 anywhere, or "?" when not typing, shows the keyboard shortcuts.
 const typing = (el) => el?.closest?.('input, textarea, select, [contenteditable="true"], .cm-editor')
+// Ctrl/Cmd+Shift+F: search everywhere, starting with the editor's selection
+// (if it's a short piece of one line).
+function openSearch() {
+  const sel = ui.selectedText?.() ?? ''
+  const q = sel && sel.length <= 200 && !sel.includes('\n') ? sel : ''
+  router.push({ name: 'search', query: q ? { q } : {} })
+}
+
 function onKey(e) {
+  const mod = e.ctrlKey || e.metaKey
+  if (mod && e.shiftKey && !e.altKey && e.code === 'KeyF') {
+    e.preventDefault()
+    return openSearch()
+  }
+  // Ctrl/Cmd+Alt+S: save every changed file.
+  if (mod && e.altKey && !e.shiftKey && e.code === 'KeyS') {
+    e.preventDefault()
+    return saveAll()
+  }
   // Ctrl/Cmd+B: show or hide the folder sidebar.
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'b' && prefs.workspaces.length) {
     e.preventDefault()
@@ -78,6 +98,8 @@ registerCommands([
   },
   { id: 'goToDocument', title: 'Go to document…', group: 'Documents', shortcut: 'quickOpen', run: () => quickOpen.value.show() },
   { id: 'allDocuments', title: 'Show all documents', group: 'Documents', run: () => router.push({ name: 'home' }) },
+  { id: 'searchAll', title: 'Search in all documents and folders', group: 'Documents', shortcut: 'searchAll', run: openSearch },
+  { id: 'saveAll', title: 'Save all changed files', group: 'Files', shortcut: 'saveAll', when: () => unsavedToDisk().length > 0, run: saveAll },
   { id: 'openFolder', title: 'Open folder…', group: 'Files', when: canOpenFolder, run: onOpenFolder },
   {
     id: 'toggleSidebar', title: 'Show or hide the folder sidebar', group: 'Files', shortcut: 'sidebar',
@@ -137,6 +159,9 @@ onBeforeUnmount(() => Object.entries(events).forEach(([k, f]) => window.removeEv
       <span class="hint">{{ pwa.offline ? 'Offline · everything is saved in your browser' : 'Everything is saved in your browser' }}</span>
       <button v-if="pwa.canInstall" class="quick-button" title="Install the editor as an app that works offline" @click="install">
         Install
+      </button>
+      <button class="quick-button" :title="`Search in all documents and folders (${isMac ? '⌘⇧F' : 'Ctrl+Shift+F'})`" @click="openSearch">
+        Search
       </button>
       <button class="quick-button" :title="`Go to a document (${isMac ? '⌘' : 'Ctrl+'}P)`" @click="quickOpen.show()">
         Go to… <kbd>{{ isMac ? '⌘P' : 'Ctrl+P' }}</kbd>

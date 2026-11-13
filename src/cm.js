@@ -548,6 +548,8 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, hel
       })
     },
 
+    // The selected text (the main selection), for starting a search with it.
+    selectedText: () => view.state.sliceDoc(selection().from, selection().to),
     // For the find bar.
     getText: () => synced,
     getSelection: () => ({ from: selection().from, to: selection().to }),

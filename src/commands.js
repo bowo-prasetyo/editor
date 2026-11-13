@@ -28,4 +28,6 @@ export function availableCommands() {
     .sort((a, b) => groupRank(a.group) - groupRank(b.group) || a.group.localeCompare(b.group) || a.title.localeCompare(b.title))
 }
 
-export const ui = reactive({ shortcutsOpen: false })
+// selectedText(): the editor's selection, when a document is open (for
+// starting a search with it).
+export const ui = reactive({ shortcutsOpen: false, selectedText: null })

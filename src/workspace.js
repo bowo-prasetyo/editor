@@ -141,10 +141,82 @@ export async function loadListing(rootId, path, dir) {
   return listings.get(key)
 }
 
-// Read folders again (all of a root's, or everything).
+// Read folders again (all of a root's, or everything). The list of every
+// file goes too, and is made again when next needed.
 export function forgetListings(rootId = null) {
   for (const key of [...listings.keys()]) if (!rootId || key.startsWith(rootId + ':')) listings.delete(key)
+  forgetIndex(rootId)
 }
+
+// --- Every file in a folder (for the quick switcher and search) ----------------------
+
+// Folders that hold tools' and builds' files rather than the project's own:
+// left out of the list (the tree still shows them).
+export const IGNORED_DIRS = new Set([
+  '.git', '.hg', '.svn', 'node_modules', 'bower_components', 'dist', 'build', 'out', 'target',
+  '.next', '.nuxt', '.svelte-kit', '.cache', '.parcel-cache', '.turbo', 'coverage', '__pycache__',
+  '.venv', 'venv', '.tox', '.mypy_cache', '.pytest_cache', '.gradle', '.idea', '.vs', 'vendor',
+])
+export const MAX_INDEXED = 20_000
+
+// Every file under `dir`, as { path, handle }, folders first at each level,
+// skipping IGNORED_DIRS. Stops after `limit` files: { files, truncated }.
+export async function walkFiles(dir, { limit = MAX_INDEXED, ignore = IGNORED_DIRS, signal } = {}) {
+  const files = []
+  const queue = [['', dir]]
+  while (queue.length) {
+    if (signal?.aborted) break
+    const [path, handle] = queue.shift()
+    let entries
+    try {
+      entries = await listDirectory(handle)
+    } catch {
+      continue // unreadable: skip it
+    }
+    for (const e of entries) {
+      const p = joinPath(path, e.name)
+      if (e.kind === 'directory') {
+        if (!ignore.has(e.name)) queue.push([p, e])
+      } else {
+        files.push({ path: p, handle: e })
+        if (files.length >= limit) return { files, truncated: true }
+      }
+    }
+  }
+  return { files, truncated: false }
+}
+
+// rootId -> { files: [{ path, handle }], truncated, ready } while being made
+// and after. Made once per folder, and again after a refresh.
+export const fileIndex = shallowReactive(new Map())
+const building = new Map() // rootId -> Promise
+
+export function forgetIndex(rootId = null) {
+  for (const id of [...fileIndex.keys()]) if (!rootId || id === rootId) fileIndex.delete(id)
+  for (const id of [...building.keys()]) if (!rootId || id === rootId) building.delete(id)
+}
+
+// The list of files in an open folder we may read, made if needed.
+export function ensureIndex(rootId) {
+  const root = roots.get(rootId)
+  if (!root || root.permission !== 'granted') return Promise.resolve(null)
+  if (fileIndex.get(rootId)?.ready) return Promise.resolve(fileIndex.get(rootId))
+  if (!building.has(rootId)) {
+    fileIndex.set(rootId, { files: [], truncated: false, ready: false })
+    const job = walkFiles(root.handle).then((r) => {
+      // Ignore a list made for a folder that was refreshed or closed meanwhile.
+      if (building.get(rootId) !== job) return fileIndex.get(rootId)
+      const entry = { ...r, ready: true }
+      fileIndex.set(rootId, entry)
+      return entry
+    })
+    building.set(rootId, job)
+  }
+  return building.get(rootId)
+}
+
+// Lists for every open folder we may read.
+export const ensureAllIndexes = () => Promise.all(prefs.workspaces.map((w) => ensureIndex(w.id)))
 
 // --- Expanded folders in the tree ------------------------------------------------------
 
@@ -230,5 +302,6 @@ export async function createEntry(rootId, dir, dirPath, name, kind) {
   const handle =
     kind === 'directory' ? await dir.getDirectoryHandle(name, { create: true }) : await dir.getFileHandle(name, { create: true })
   await loadListing(rootId, dirPath, dir)
+  forgetIndex(rootId)
   return markRaw(handle)
 }
