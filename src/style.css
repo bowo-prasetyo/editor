@@ -531,3 +531,5 @@ button.mini.problems { color: var(--danger); }
 /* What this browser can't do, said plainly (see platform.js). */
 .platform-note { margin: -4px 0 12px; }
 .platform-banner { margin-bottom: 12px; border-radius: 6px; }
+
+.app-version { margin-top: 24px; }

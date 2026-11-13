@@ -63,6 +63,7 @@ Everything, with all the details: **[the reference](docs/reference.md)**.
 ## More
 
 - [Reference](docs/reference.md): every feature, the shortcuts, and the limits
+- [Changelog](CHANGELOG.md): what changed in each version
 - [Vision](VISION.md): what Plumb is for, its principles, and what's next
 - [Testing](TESTING.md): how Plumb is tested
 

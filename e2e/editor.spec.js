@@ -1,5 +1,6 @@
 // The editor screen (src/views/EditorView.vue): the everyday actions,
 // checked in a real browser.
+import fs from 'node:fs'
 import { test, expect } from '@playwright/test'
 import { editor, editorText, expectSaved, mod, newDocument } from './helpers.js'
 
@@ -85,4 +86,11 @@ test('word wrap is remembered per document', async ({ page }) => {
   await expectSaved(page)
   await page.reload()
   await expect(page.getByRole('button', { name: 'Wrap' })).not.toHaveAttribute('aria-pressed', before)
+})
+
+test('Settings shows the version, from package.json, with a link to the changelog', async ({ page }) => {
+  const { version } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  await page.goto('./#/settings')
+  await expect(page.locator('.app-version')).toContainText(`Plumb ${version}`)
+  await expect(page.getByRole('link', { name: 'What’s new' })).toHaveAttribute('href', /CHANGELOG\.md$/)
 })

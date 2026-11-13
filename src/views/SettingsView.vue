@@ -1,4 +1,6 @@
 <script setup>
+// The version, from package.json (see vite.config.js).
+const version = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev'
 import { computed } from 'vue'
 import { prefs, FONT_SIZES } from '../prefs'
 import { FONTS, THEMES } from '../appearance'
@@ -103,5 +105,10 @@ const sample = 'function hello(name) {\n\treturn `Hello, ${name}!` // 0O1lI|\n}'
         <code>insert_final_newline</code>), ahead of the settings above.
       </p>
     </fieldset>
+
+    <p class="hint app-version">
+      Plumb {{ version }} ·
+      <a href="https://github.com/bowo-prasetyo/plumb/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">What’s new</a>
+    </p>
   </section>
 </template>
