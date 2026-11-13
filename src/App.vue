@@ -69,7 +69,7 @@ function onKey(e) {
 // operating system ("Open with" the installed app; save in place works).
 initPwa({
   onUpdate: () =>
-    showToast('A new version of the editor is ready.', {
+    showToast('A new version of Plumb is ready.', {
       action: { label: 'Reload', run: applyUpdate },
       timeout: 60 * 60 * 1000,
     }),
@@ -126,7 +126,7 @@ registerCommands([
   { id: 'refreshFolders', title: 'Read folders from disk again', group: 'Files', when: () => prefs.workspaces.length > 0, run: () => forgetListings() },
   { id: 'exportBackup', title: 'Export all documents as a backup', group: 'Documents', run: downloadBackup },
   { id: 'shortcuts', title: 'Show keyboard shortcuts', group: 'Help', shortcut: 'shortcuts', run: () => (ui.shortcutsOpen = true) },
-  { id: 'install', title: 'Install the editor as an app', group: 'Help', when: () => pwa.canInstall, run: install },
+  { id: 'install', title: 'Install Plumb as an app', group: 'Help', when: () => pwa.canInstall, run: install },
   { id: 'update', title: 'Reload to use the new version', group: 'Help', when: () => pwa.updateReady, run: applyUpdate },
 ])
 const dragging = ref(false)
@@ -180,10 +180,10 @@ onBeforeUnmount(() => {
 
 <template>
   <header class="topbar">
-    <RouterLink to="/" class="brand">📝 Editor</RouterLink>
+    <RouterLink to="/" class="brand">📝 Plumb</RouterLink>
     <span class="topbar-right">
       <span class="hint">{{ pwa.offline ? 'Offline · everything is saved in your browser' : 'Everything is saved in your browser' }}</span>
-      <button v-if="pwa.canInstall" class="quick-button" title="Install the editor as an app that works offline" @click="install">
+      <button v-if="pwa.canInstall" class="quick-button" title="Install Plumb as an app that works offline" @click="install">
         Install
       </button>
       <button class="quick-button" :title="`Search in all documents and folders (${isMac ? '⌘⇧F' : 'Ctrl+Shift+F'})`" @click="openSearch">

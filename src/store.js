@@ -515,6 +515,7 @@ export function downloadDoc(doc) {
 
 // --- Backup ---------------------------------------------------------------
 
+// The format id predates the name Plumb; keep it so older backups still import.
 export const BACKUP_FORMAT = 'editor-backup'
 
 // Links to files on disk only make sense in this browser, so they're left out.
@@ -537,14 +538,14 @@ export function exportBackup() {
 export function downloadBackup() {
   const date = new Date().toISOString().slice(0, 10)
   const json = JSON.stringify(exportBackup(), null, 1)
-  download(`editor-backup-${date}.json`, new Blob([json], { type: 'application/json' }))
+  download(`plumb-backup-${date}.json`, new Blob([json], { type: 'application/json' }))
 }
 
 // Add the documents from a backup. Never overwrites: a document that is
 // already here unchanged is skipped; one that differs is added as a copy.
 export function importBackup(data) {
   if (data?.format !== BACKUP_FORMAT || !Array.isArray(data.docs)) {
-    throw new Error("This file isn't an editor backup.")
+    throw new Error("This file isn't a Plumb backup.")
   }
   let added = 0
   let skipped = 0

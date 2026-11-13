@@ -172,7 +172,7 @@ async function onBackup(e) {
         : `Restored ${docs(added)}.` + (skipped ? ` ${skipped} already here ${skipped === 1 ? 'was' : 'were'} skipped.` : ''),
     )
   } catch (err) {
-    showToast(err instanceof SyntaxError ? "This file isn't an editor backup." : err.message)
+    showToast(err instanceof SyntaxError ? "This file isn't a Plumb backup." : err.message)
   }
 }
 

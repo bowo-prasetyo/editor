@@ -1,8 +1,13 @@
 # Vision
 
-> **Status: draft.** This proposes a direction for the editor. Nothing here is
+> **Status: draft.** This proposes a direction for Plumb. Nothing here is
 > built yet unless it says so. Sections marked **Open question** need a decision
 > from the maintainer before work starts.
+
+## The name
+
+**Plumb.** A plumb line shows what is exactly true and straight. Plumb keeps
+your file the same way: true to what it was, plus only the changes you made.
 
 ## In one sentence
 
@@ -153,8 +158,9 @@ There's no telemetry, by design, so success is judged by things we can check:
 
 In order:
 
-1. **Agree on this document.** Settle the open questions and pick a name. "Editor"
-   is a description, not a name.
+1. **Agree on this document.** Settle the open questions. *(The name is decided:
+   **Plumb**. A plumb line shows what is exactly true, as the file stays true
+   to itself.)*
 2. **A stabilisation round, with no new features:**
    - End-to-end tests (Playwright) for saving, reloading, conflicts, the page
      closing mid-save, and byte-for-byte file round-trips.
@@ -169,7 +175,6 @@ In order:
 
 ## Open questions
 
-- **Name.** What is the product called?
 - **Drafts and labels.** Do drafts need grouping at all, or is search plus a
   sorted list enough? Today's virtual folders would become labels, or go away.
 - **Closing a folder with unsaved edits.** Offer to save them, keep them as
