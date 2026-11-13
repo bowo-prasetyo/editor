@@ -169,6 +169,10 @@ Markdown and keep the editor focused; the status bar folds its controls
 behind a details button. Ctrl/Cmd+Shift+E shows and hides the sidebar in
 Markdown too (`markdown.spec.js`).
 
+The folder sidebar (`folders.spec.js`): each folder's tree holds only tree
+items (the folder first, at level 1); arrow keys still move, expand and
+collapse; Enter on the folder's buttons presses them.
+
 ## Known gaps
 
 Problems the tests have found but that aren't fixed yet. Each is a

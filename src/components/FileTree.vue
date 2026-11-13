@@ -22,10 +22,11 @@ import { prepareForSave } from '../saveall'
 import { displayName } from '../naming'
 import CloseFolderDialog from './CloseFolderDialog.vue'
 
-// The folders opened from disk, as one tree. It's drawn as a flat list of
-// rows (folders are read only when expanded), and works like other file
-// trees from the keyboard: ↑/↓ move, → expands, ← collapses or goes to the
-// parent folder, Enter opens.
+// The folders opened from disk, one tree each. A tree is drawn as a flat
+// list of rows (folders are read only when expanded), starting with the
+// folder itself, and works like other file trees from the keyboard: ↑/↓
+// move, → expands, ← collapses or goes to the parent folder, Enter opens.
+// A folder's buttons sit outside its tree (a tree holds only tree items).
 const route = useRoute()
 const router = useRouter()
 
@@ -57,6 +58,15 @@ const tree = computed(() => {
   return { rows, missing }
 })
 const rows = computed(() => tree.value.rows)
+// The same rows by folder: each root with the rows inside it, one tree each.
+const groups = computed(() => {
+  const out = []
+  for (const row of rows.value) {
+    if (row.kind === 'root') out.push({ root: row, children: [] })
+    else out.at(-1)?.children.push(row)
+  }
+  return out
+})
 
 // Read folders as they come into view.
 const reading = new Set()
@@ -87,10 +97,15 @@ const unsaved = computed(
 const selected = ref(null)
 const listEl = ref(null)
 const focusable = computed(() => rows.value.filter((r) => r.kind !== 'note'))
-// The row that takes Tab focus: the selected one, else the active file, else the first.
-const tabStop = computed(() => {
-  const keys = focusable.value.map((r) => r.key)
-  return [selected.value, active.value].find((k) => keys.includes(k)) ?? keys[0]
+// The row that takes Tab focus in each folder's tree: the selected one, else
+// the active file, else the folder itself.
+const tabStops = computed(() => {
+  const stops = new Set()
+  for (const { root, children } of groups.value) {
+    const keys = [root.key, ...children.filter((r) => r.kind !== 'note').map((r) => r.key)]
+    stops.add([selected.value, active.value].find((k) => keys.includes(k)) ?? root.key)
+  }
+  return stops
 })
 
 async function select(row, { focus = true } = {}) {
@@ -111,7 +126,12 @@ function activate(row) {
 }
 
 function onKey(e) {
-  const list = focusable.value
+  // Only keys pressed on a row: a folder's buttons (New file, Put the edits
+  // back…) are inside the tree too, and Enter or Space must still press them.
+  if (!e.target.matches?.('[role="treeitem"]')) return
+  // Arrow keys stay in the folder's own tree.
+  const rootId = rows.value.find((r) => r.key === e.target.dataset.key)?.rootId
+  const list = focusable.value.filter((r) => r.rootId === rootId)
   const i = list.findIndex((r) => r.key === selected.value)
   const row = list[i]
   const go = (j) => list[j] && select(list[j])
@@ -249,16 +269,32 @@ const refresh = (rootId) => forgetListings(rootId)
 </script>
 
 <template>
-  <nav class="file-tree" aria-label="Folders on disk">
-    <ul ref="listEl" role="tree" aria-label="Files" @keydown="onKey">
-      <template v-for="row in rows" :key="row.key">
-        <li v-if="row.kind === 'root'" class="tree-root" role="none">
+  <nav ref="listEl" class="file-tree" aria-label="Folders on disk">
+    <section v-for="{ root: row, children } in groups" :key="row.key" class="tree-root">
+      <!-- Notes about the folder: outside its tree (a tree holds only items),
+           and before it, so they're read first; drawn under the folder's row,
+           which is pinned to the top of the section (style.css). -->
+      <p v-if="returning[row.rootId]?.length" class="tree-note" role="status">
+        {{ returning[row.rootId].length === 1 ? '1 draft has' : `${returning[row.rootId].length} drafts have` }}
+        edits to files in “{{ row.name }}”.
+        <button class="mini primary-mini" @click="onPutBack(row.rootId)">Put the edits back</button>
+        <button class="mini" @click="dismissReturning(row.rootId)">Not now</button>
+      </p>
+      <p v-if="!row.root" class="tree-note">
+        “{{ row.name }}” isn’t available in this browser any more. Close it and open it again.
+      </p>
+      <p v-else-if="row.root.permission !== 'granted'" class="tree-note">
+        The browser needs your permission to use “{{ row.name }}” again.
+        <button class="mini primary-mini" @click="onReconnect(row.rootId)">Allow access</button>
+      </p>
+      <ul role="tree" :aria-label="`Files in ${row.name}`" @keydown="onKey">
+        <li role="none" class="root-item">
           <div
             role="treeitem"
             :aria-level="1"
             aria-expanded="true"
             :data-key="row.key"
-            :tabindex="tabStop === row.key ? 0 : -1"
+            :tabindex="tabStops.has(row.key) ? 0 : -1"
             @focus="selected = row.key"
             class="tree-row root-row"
             :class="{ selected: selected === row.key }"
@@ -267,55 +303,53 @@ const refresh = (rootId) => forgetListings(rootId)
           >
             <span class="tree-name">{{ row.name }}</span>
           </div>
-          <span class="root-actions" role="group" :aria-label="`${row.name} actions`">
-            <template v-if="row.root?.permission === 'granted'">
-              <button class="mini" title="New file" aria-label="New file" @click="create(row.rootId, 'file')">+ File</button>
-              <button class="mini" title="New folder" aria-label="New folder" @click="create(row.rootId, 'directory')">+ Folder</button>
-              <button class="mini" title="Read the folder again" aria-label="Refresh" @click="refresh(row.rootId)">↻</button>
-            </template>
-            <button class="mini" :title="`Close ${row.name}`" :aria-label="`Close ${row.name}`" @click="onClose({ id: row.rootId, name: row.name })">×</button>
-          </span>
-          <p v-if="returning[row.rootId]?.length" class="tree-note" role="status">
-            {{ returning[row.rootId].length === 1 ? '1 draft has' : `${returning[row.rootId].length} drafts have` }}
-            edits to files in this folder.
-            <button class="mini primary-mini" @click="onPutBack(row.rootId)">Put the edits back</button>
-            <button class="mini" @click="dismissReturning(row.rootId)">Not now</button>
-          </p>
-          <p v-if="!row.root" class="tree-note">
-            This folder isn’t available in this browser any more. Close it and open it again.
-          </p>
-          <p v-else-if="row.root.permission !== 'granted'" class="tree-note">
-            The browser needs your permission to use this folder again.
-            <button class="mini primary-mini" @click="onReconnect(row.rootId)">Allow access</button>
-          </p>
         </li>
-        <li v-else-if="row.kind === 'note'" role="none" class="tree-note" :style="{ paddingLeft: 8 + row.depth * 14 + 'px' }">
-          {{ row.name }}
-        </li>
-        <li v-else role="none">
-          <div
+        <template v-for="child in children" :key="child.key">
+          <!-- "Loading…", "Empty": items you can't pick. -->
+          <li
+            v-if="child.kind === 'note'"
             role="treeitem"
-            :aria-level="row.depth + 1"
-            :aria-expanded="row.kind === 'directory' ? isExpanded(row.rootId, row.path) : undefined"
-            :aria-current="active === row.key ? 'page' : undefined"
-            :data-key="row.key"
-            :tabindex="tabStop === row.key ? 0 : -1"
-            @focus="selected = row.key"
-            class="tree-row"
-            :class="{ selected: selected === row.key, active: active === row.key, hidden: row.name.startsWith('.') }"
-            :style="{ paddingLeft: 8 + (row.depth - 1) * 14 + 'px' }"
-            :title="row.path"
-            @click="activate(row)"
+            aria-disabled="true"
+            :aria-level="child.depth + 1"
+            class="tree-note"
+            :style="{ paddingLeft: 8 + child.depth * 14 + 'px' }"
           >
-            <span class="tree-chevron" aria-hidden="true">{{
-              row.kind === 'directory' ? (isExpanded(row.rootId, row.path) ? '▾' : '▸') : ''
-            }}</span>
-            <span class="tree-name">{{ row.name }}</span>
-            <span v-if="unsaved.has(row.key)" class="tree-dirty" title="Changes not saved to the file">●</span>
-          </div>
-        </li>
-      </template>
-    </ul>
+            {{ child.name }}
+          </li>
+          <li v-else role="none">
+            <div
+              role="treeitem"
+              :aria-level="child.depth + 1"
+              :aria-expanded="child.kind === 'directory' ? isExpanded(child.rootId, child.path) : undefined"
+              :aria-current="active === child.key ? 'page' : undefined"
+              :data-key="child.key"
+              :tabindex="tabStops.has(child.key) ? 0 : -1"
+              @focus="selected = child.key"
+              class="tree-row"
+              :class="{ selected: selected === child.key, active: active === child.key, hidden: child.name.startsWith('.') }"
+              :style="{ paddingLeft: 8 + (child.depth - 1) * 14 + 'px' }"
+              :title="child.path"
+              @click="activate(child)"
+            >
+              <span class="tree-chevron" aria-hidden="true">{{
+                child.kind === 'directory' ? (isExpanded(child.rootId, child.path) ? '▾' : '▸') : ''
+              }}</span>
+              <span class="tree-name">{{ child.name }}</span>
+              <span v-if="unsaved.has(child.key)" class="tree-dirty" title="Changes not saved to the file">●</span>
+            </div>
+          </li>
+        </template>
+      </ul>
+      <!-- Outside the tree, drawn over the folder's row. -->
+      <span class="root-actions" role="group" :aria-label="`${row.name} actions`">
+        <template v-if="row.root?.permission === 'granted'">
+          <button class="mini" title="New file" aria-label="New file" @click="create(row.rootId, 'file')">+ File</button>
+          <button class="mini" title="New folder" aria-label="New folder" @click="create(row.rootId, 'directory')">+ Folder</button>
+          <button class="mini" title="Read the folder again" aria-label="Refresh" @click="refresh(row.rootId)">↻</button>
+        </template>
+        <button class="mini" :title="`Close ${row.name}`" :aria-label="`Close ${row.name}`" @click="onClose({ id: row.rootId, name: row.name })">×</button>
+      </span>
+    </section>
   </nav>
   <CloseFolderDialog
     v-if="closing"
