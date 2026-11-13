@@ -168,6 +168,22 @@ Markdown and keep the editor focused; the status bar folds its controls
 behind a details button. Ctrl/Cmd+Shift+E shows and hides the sidebar in
 Markdown too (`markdown.spec.js`).
 
+Translation (`test/i18n.test.js`, `e2e/i18n.spec.js`): messages fill in
+their parameters (numbers formatted for the locale), plural forms follow each
+language's rules (Russian's one/few/many), a message missing from a
+translation falls back to English, and a translation that fails to load leaves
+English; the browser's languages pick the best one there is; markup in a
+message becomes elements, and a parameter is never read as markup. The catalog
+check fails if the code asks for a message `en.json` lacks, if `en.json` has
+one nothing uses, if a plural message has no `other` form or its forms take
+different parameters, or if a translation has keys or placeholders English
+doesn't. In the browser, with the pseudo-language, every screen (the start
+page and the first visit, the editor with its preview, find and replace, go
+to line, history, split and indentation menu, the shortcuts, quick switcher,
+command palette and headings, Settings and Search) shows no text outside
+⟦…⟧ except names, keys and the user's own text; and Settings switches the
+language at once.
+
 Text in any language (`test/stats.test.js`, `test/naming.test.js`,
 `test/fuzzy.test.js`, `test/locale.test.js`): words are counted in scripts
 written without spaces (Japanese, Thai); names are never cut through an emoji
@@ -212,6 +228,11 @@ was fixed: see `src/lineends.js`.)
 - **Large files and performance budgets** ("first keystroke in under a
   second"). A measured check belongs in a later round.
 - **Accessibility checks** (for example axe). Worth adding, outside this round.
+- **Toasts, confirmations and rarer dialogs in the pseudo-language.** The
+  screens test covers what's on screen; toasts, `confirm()` questions, *Save to
+  folder…*, closing a folder and the storage-failure banner are covered only
+  by the catalog check (each message they use exists), not looked at.
+- **Right-to-left languages.** The layout isn't mirrored yet.
 
 ## Writing a new test
 

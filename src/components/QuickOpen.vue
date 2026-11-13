@@ -12,6 +12,7 @@ import { BinaryFileError } from '../store'
 import { showToast } from '../toast'
 import { ensureAllIndexes, fileIndex, openWorkspaceFile } from '../workspace'
 import { useModal } from '../modal'
+import { t } from '../i18n'
 
 // Ctrl/Cmd+P: jump to any document by typing part of its name or folder.
 // With nothing typed, recently opened documents come first.
@@ -182,7 +183,7 @@ function choose(i) {
     openWorkspaceFile(r.file.rootId, r.file.path, r.file.handle)
       .then(({ doc }) => router.push({ name: 'edit', params: { id: doc.id } }))
       .catch((e) =>
-        showToast(e instanceof BinaryFileError ? `Couldn't open “${r.name}”: it doesn't look like a text file.` : `Couldn't open “${r.name}”: ${e.message}`),
+        showToast(e instanceof BinaryFileError ? t('open.notTextOne', { name: r.name }) : t('open.failed', { name: r.name, error: e.message })),
       )
   } else if (createLabel.value) {
     // A new draft, named after what was typed ("Work/todo.md" -> "todo.md":
@@ -228,12 +229,12 @@ const id = (i) => `quick-open-${i}`
 
 <template>
   <div v-if="open" class="quick-backdrop" @mousedown.self="hide()">
-    <div ref="root" class="quick" role="dialog" aria-modal="true" :aria-label="commandMode ? 'Run a command' : headingMode ? 'Go to heading' : 'Go to document'">
+    <div ref="root" class="quick" role="dialog" aria-modal="true" :aria-label="t(commandMode ? 'quickOpen.commandsLabel' : headingMode ? 'quickOpen.headingsLabel' : 'quickOpen.documentsLabel')">
       <input
         ref="input"
         v-model="query"
         class="quick-input"
-        :placeholder="commandMode ? 'Run a command…' : headingMode ? 'Go to a heading…' : prefs.workspaces.length ? 'Go to a document or file… (> for commands, # for headings)' : 'Go to document… (> for commands, # for headings)'"
+        :placeholder="t(commandMode ? 'quickOpen.commandsPlaceholder' : headingMode ? 'quickOpen.headingsPlaceholder' : prefs.workspaces.length ? 'quickOpen.filesPlaceholder' : 'quickOpen.documentsPlaceholder')"
         role="combobox"
         aria-expanded="true"
         aria-controls="quick-open-list"
@@ -261,10 +262,10 @@ const id = (i) => `quick-open-${i}`
                 <mark v-if="run.hit">{{ run.text }}</mark><template v-else>{{ run.text }}</template>
               </template>
             </span>
-            <span class="quick-folder">H{{ r.heading.level }}</span>
+            <span class="quick-folder">{{ t('quickOpen.headingLevel', { level: String(r.heading.level) }) }}</span>
           </li>
           <li v-if="!headingResults.length" class="quick-empty">
-            {{ ui.headings ? 'No matching headings' : 'Open a Markdown document to go to its headings' }}
+            {{ t(ui.headings ? 'quickOpen.noHeadings' : 'quickOpen.headingsNeedMarkdown') }}
           </li>
         </template>
         <template v-else-if="commandMode">
@@ -284,10 +285,10 @@ const id = (i) => `quick-open-${i}`
                 <mark v-if="run.hit">{{ run.text }}</mark><template v-else>{{ run.text }}</template>
               </template>
             </span>
-            <span class="quick-folder">{{ r.recent ? 'Recently used' : groupName(r.command.group) }}</span>
+            <span class="quick-folder">{{ r.recent ? t('quickOpen.recentlyUsed') : groupName(r.command.group) }}</span>
             <kbd v-if="keysFor(r.command)" class="quick-keys">{{ keysFor(r.command) }}</kbd>
           </li>
-          <li v-if="!commandResults.length" class="quick-empty">No matching commands</li>
+          <li v-if="!commandResults.length" class="quick-empty">{{ t('quickOpen.noCommands') }}</li>
         </template>
         <template v-else>
         <li
@@ -298,7 +299,7 @@ const id = (i) => `quick-open-${i}`
           role="option"
           :aria-selected="i === active"
           :class="{ active: i === active, 'on-disk': !!r.file }"
-          :title="r.file ? 'In an open folder, not opened yet' : undefined"
+          :title="r.file ? t('quickOpen.notOpenedYet') : undefined"
           @mousemove="active = i"
           @click="choose(i)"
         >
@@ -324,10 +325,10 @@ const id = (i) => `quick-open-${i}`
           @mousemove="active = results.length"
           @click="choose(results.length)"
         >
-          + Create “{{ createLabel }}”
+          {{ t('quickOpen.create', { name: createLabel }) }}
         </li>
-        <li v-if="!count" class="quick-empty">{{ indexing ? 'Listing the files in your folders…' : 'No documents yet' }}</li>
-        <li v-else-if="indexing && query.trim()" class="quick-empty">Still listing the files in your folders…</li>
+        <li v-if="!count" class="quick-empty">{{ t(indexing ? 'quickOpen.listing' : 'quickOpen.noDocuments') }}</li>
+        <li v-else-if="indexing && query.trim()" class="quick-empty">{{ t('quickOpen.stillListing') }}</li>
         </template>
       </ul>
     </div>

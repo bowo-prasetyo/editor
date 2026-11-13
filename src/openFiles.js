@@ -1,6 +1,7 @@
 import { importFile, BinaryFileError, requestPersistence } from './store'
 import { openSingleFile } from './recent'
 import { showToast } from './toast'
+import { t } from './i18n'
 
 // Text-ish files the picker offers (anything can still be dropped; binary
 // files are detected and refused).
@@ -31,11 +32,11 @@ export async function openFiles(entries, router) {
   if (refused.length) {
     showToast(
       refused.length === 1
-        ? `Couldn't open "${refused[0]}": it doesn't look like a text file.`
-        : `Couldn't open ${refused.length} files: they don't look like text files.`,
+        ? t('open.notTextOne', { name: refused[0] })
+        : t('open.notText', { count: refused.length }),
     )
   } else if (opened.length > 1) {
-    showToast(`Opened ${opened.length} files.`)
+    showToast(t('open.opened', { count: opened.length }))
   }
   if (opened.length) {
     requestPersistence()

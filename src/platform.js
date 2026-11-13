@@ -3,6 +3,7 @@
 // files; Firefox and Safari get drafts and single files saved as downloads.
 import { canSaveInPlace } from './fileaccess.js'
 import { canOpenFolder } from './workspace.js'
+import { t } from './i18n.js'
 
 // "Firefox" or "Safari" (for the plain-words notes below), or null for any
 // other browser. Browser names aren't translated; what's said about an
@@ -16,17 +17,16 @@ export function browserName(ua = globalThis.navigator?.userAgent ?? '') {
 // Can't save straight back to files here: Save downloads a copy.
 export const savesAsDownloads = () => !canSaveInPlace()
 
-export const FOLDER_NOTE = 'Opening folders needs Chrome or Edge. Your browser can open single files.'
+export const folderNote = () => t('platform.folderNote')
 
 // The one-time note on the start page, in a browser that saves as downloads.
 export function downloadsNote(ua) {
   const name = browserName(ua)
-  const where = name ? `In ${name}` : 'In this browser'
-  return `${where}, Save downloads a copy. To save straight back to your files, use Chrome or Edge.`
+  return name ? t('platform.downloadsNote', { browser: name }) : t('platform.downloadsNoteHere')
 }
 
 // After Save downloaded a copy: where it went.
 export const downloadedMessage = (name) =>
-  `Saved a copy, “${name}”, to your downloads folder. The file you opened isn’t changed.`
+  t('platform.downloaded', { name })
 
 export { canOpenFolder, canSaveInPlace }

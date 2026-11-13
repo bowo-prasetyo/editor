@@ -3,6 +3,7 @@ import { getDoc } from './store.js'
 import { closeTab } from './session.js'
 import { displayName } from './naming.js'
 import { showToast } from './toast.js'
+import { t } from './i18n.js'
 
 // Close the tab for document `id`. If it was the one on screen (`active`),
 // show its neighbour, or the document list. A file with changes not saved
@@ -12,8 +13,8 @@ export function closeDocTab(router, id, active) {
   const doc = getDoc(id)
   const next = closeTab(id)
   if (doc?.linked && doc.diskDirty) {
-    showToast(`“${displayName(doc.name)}” has changes not saved to the file. They’re kept in this browser.`, {
-      action: { label: 'Reopen', run: () => router.push({ name: 'edit', params: { id } }) },
+    showToast(t('tabs.closedUnsaved', { name: displayName(doc.name) }), {
+      action: { label: t('tabs.reopen'), run: () => router.push({ name: 'edit', params: { id } }) },
       timeout: 8000,
     })
   }

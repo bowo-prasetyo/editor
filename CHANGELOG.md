@@ -8,6 +8,14 @@ minor version (0.x) can change how things work.
 
 ### Added
 
+- **Plumb can be translated.** Every word on screen (about 650 messages,
+  including the editor's own panels) now comes from one catalog,
+  `src/locales/en.json`, in the i18next JSON format translation tools use.
+  Plural forms follow each language's rules, and numbers and dates follow the
+  language. **Settings → Language** picks one, or follows the browser. Only
+  English so far: [Translating Plumb](docs/translating.md) explains how to add
+  a language. A pseudo-language (development builds only) shows anything left
+  untranslatable, and a test checks every screen with it.
 - **Screenshots in the README**, in light and dark (GitHub shows the one that
   matches your theme), and a **brand note**, [docs/brand.md](docs/brand.md):
   the name, the logo and how to use it, the palette and what each colour
@@ -81,6 +89,11 @@ minor version (0.x) can change how things work.
 
 ### Fixed
 
+- **Find no longer shows "NaN"** once a search has 1,000 matches or more.
+- **Small wording fixes** that came with translation: lists of names read
+  "a, b and c", quotation marks are curly everywhere, and versions kept before
+  reloading from disk or replacing in files are stored as a kind of version,
+  not English words, so they read in whatever language Plumb is in.
 - **Words in Chinese, Japanese, Thai, Lao, Khmer and Burmese are counted.**
   These languages don't put spaces between words, so a whole sentence counted
   as one word. The browser's word breaker now splits them.

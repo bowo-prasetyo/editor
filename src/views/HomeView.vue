@@ -25,9 +25,11 @@ import { prefs } from '../prefs'
 import { SORTS, labelsOf, sortDocs } from '../folders'
 import { togglePin } from '../drafts'
 import { forgetRecentFile, recentFiles } from '../recent'
-import { FOLDER_NOTE, downloadsNote, savesAsDownloads } from '../platform'
+import { folderNote, downloadsNote, savesAsDownloads } from '../platform'
 import { keyLabel } from '../keys'
-import { formatBytes, formatDateTime, formatNumber } from '../locale'
+import { formatBytes, formatDateTime } from '../locale'
+import { t } from '../i18n'
+import T from '../components/T'
 
 const router = useRouter()
 const fileInput = ref(null)
@@ -50,7 +52,7 @@ const recent = computed(() => {
   return recentFiles()
 })
 async function forgetFile(f) {
-  if (await forgetRecentFile(f.id)) showToast(`Removed “${displayName(f.name)}” from Recent files. The file is still on your disk.`)
+  if (await forgetRecentFile(f.id)) showToast(t('home.recentRemoved', { name: displayName(f.name) }))
 }
 
 // Copies of files kept by Plumb before it kept files and drafts apart (see
@@ -60,8 +62,8 @@ function trashCopies() {
   const list = copies.value.map((d) => d.id)
   for (const id of list) trashDoc(id)
   forgetCopies(list)
-  showToast(`Moved ${list.length} cop${list.length === 1 ? 'y' : 'ies'} to the Trash.`, {
-    action: { label: 'Undo', run: () => list.forEach((id) => restoreDoc(id)) },
+  showToast(t('home.copiesTrashed', { count: list.length }), {
+    action: { label: t('common.undo'), run: () => list.forEach((id) => restoreDoc(id)) },
     timeout: 10000,
   })
 }
@@ -80,8 +82,8 @@ const inView = computed(() => (label.value ? live.value.filter((d) => d.folder =
 function removeLabel(doc) {
   const old = doc.folder
   moveToFolder(doc.id, '')
-  showToast(`Removed the label “${old}” from “${displayName(doc.name)}”.`, {
-    action: { label: 'Undo', run: () => moveToFolder(doc.id, old) },
+  showToast(t('home.labelRemoved', { label: old, name: displayName(doc.name) }), {
+    action: { label: t('common.undo'), run: () => moveToFolder(doc.id, old) },
   })
 }
 
@@ -120,7 +122,7 @@ async function openPicker() {
     const picked = await pickFiles()
     if (picked.length) await openFiles(picked, router)
   } catch (e) {
-    showToast(`Couldn't open the files: ${e.message}`)
+    showToast(t('home.cantOpenFiles', { error: e.message }))
   }
 }
 
@@ -128,9 +130,9 @@ async function openPicker() {
 async function onOpenFolder() {
   try {
     const w = await openFolder()
-    if (w) showToast(`Opened “${w.name}”. Its files are in the sidebar (Ctrl/Cmd+Shift+E shows or hides it).`, { timeout: 5000 })
+    if (w) showToast(t('home.folderOpened', { name: w.name }), { timeout: 5000 })
   } catch (e) {
-    showToast(`Couldn't open the folder: ${e.message}`)
+    showToast(t('app.cantOpenFolder', { error: e.message }))
   }
 }
 
@@ -146,32 +148,31 @@ async function onBackup(e) {
   if (!file) return
   try {
     const { added, skipped } = importBackup(JSON.parse(await file.text()))
-    const docs = (n) => `${formatNumber(n)} document${n === 1 ? '' : 's'}`
     showToast(
       !added
-        ? `Nothing to restore: ${skipped === 1 ? 'that document is' : `all ${docs(skipped)} are`} already here.`
-        : `Restored ${docs(added)}.` + (skipped ? ` ${skipped} already here ${skipped === 1 ? 'was' : 'were'} skipped.` : ''),
+        ? t('home.backupNothing', { count: skipped })
+        : t('home.backupRestored', { count: added }) + (skipped ? ` ${t('home.backupSkipped', { count: skipped })}` : ''),
     )
   } catch (err) {
-    showToast(err instanceof SyntaxError ? "This file isn't a Plumb backup." : err.message)
+    showToast(err instanceof SyntaxError ? t('home.notBackup') : err.message)
   }
 }
 
 // Deleting is undoable, so no confirmation dialog: offer Undo instead.
 function remove(doc) {
   trashDoc(doc.id)
-  showToast(`Moved “${displayName(doc.name)}” to Trash.`, {
-    action: { label: 'Undo', run: () => restoreDoc(doc.id) },
+  showToast(t('home.trashed', { name: displayName(doc.name) }), {
+    action: { label: t('common.undo'), run: () => restoreDoc(doc.id) },
     timeout: 8000,
   })
 }
 
 function deleteForever(doc) {
-  if (confirm(`Delete "${displayName(doc.name)}" forever? This can't be undone.`)) deleteDoc(doc.id)
+  if (confirm(t('home.confirmDelete', { name: displayName(doc.name) }))) deleteDoc(doc.id)
 }
 function onEmptyTrash() {
   const n = trash.value.length
-  if (confirm(`Delete ${formatNumber(n)} document${n === 1 ? '' : 's'} in the Trash forever? This can't be undone.`))
+  if (confirm(t('home.confirmEmptyTrash', { count: n })))
     emptyTrash()
 }
 
@@ -179,7 +180,7 @@ function onEmptyTrash() {
 const usage = ref(null)
 onMounted(async () => {
   const est = await storageEstimate()
-  if (est?.quota) usage.value = `${formatBytes(est.usage ?? 0)} used of ${formatBytes(est.quota)} available`
+  if (est?.quota) usage.value = { used: formatBytes(est.usage ?? 0), quota: formatBytes(est.quota) }
 })
 
 const fmt = (t) => formatDateTime(t)
@@ -189,56 +190,56 @@ const daysLeft = (d) =>
 
 <template>
   <section class="home">
-    <h1 class="sr-only">Plumb: your drafts and files</h1>
+    <h1 class="sr-only">{{ t('home.heading') }}</h1>
     <div class="actions">
-      <button class="primary" @click="newDoc">New document</button>
-      <button @click="openPicker">Open files…</button>
+      <button class="primary" @click="newDoc">{{ t('common.newDocument') }}</button>
+      <button @click="openPicker">{{ t('home.openFiles') }}</button>
       <!-- Shown even where folders can't be opened, with the reason (see platform.js). -->
       <button
         :disabled="!canFolders"
         :aria-describedby="canFolders ? undefined : 'folder-note'"
-        :title="canFolders ? 'Open a folder from your computer and browse its files in the sidebar' : FOLDER_NOTE"
+        :title="canFolders ? t('home.openFolderTitle') : folderNote()"
         @click="onOpenFolder"
       >
-        Open folder…
+        {{ t('home.openFolder') }}
       </button>
       <input ref="fileInput" type="file" multiple :accept="TEXT_ACCEPT" hidden @change="onFiles" />
       <span class="spacer" />
-      <button title="Download every document as one backup file" @click="downloadBackup">
-        Export all
+      <button :title="t('home.exportTitle')" @click="downloadBackup">
+        {{ t('home.export') }}
       </button>
-      <button title="Add the documents from a backup file" @click="backupInput.click()">
-        Import backup…
+      <button :title="t('home.importTitle')" @click="backupInput.click()">
+        {{ t('home.import') }}
       </button>
       <input ref="backupInput" type="file" accept=".json,application/json" hidden @change="onBackup" />
     </div>
 
-    <p v-if="!canFolders" id="folder-note" class="hint platform-note">{{ FOLDER_NOTE }}</p>
+    <p v-if="!canFolders" id="folder-note" class="hint platform-note">{{ folderNote() }}</p>
     <div v-if="showDownloadsNote" class="banner info platform-banner" role="status">
       <span>{{ downloadsNote() }}</span>
       <span class="banner-actions">
-        <button @click="dismissDownloadsNote">OK</button>
+        <button @click="dismissDownloadsNote">{{ t('common.ok') }}</button>
       </span>
     </div>
 
     <div class="home-body" :class="{ single: firstVisit }">
-      <nav v-if="!firstVisit" class="folders" aria-label="Labels">
+      <nav v-if="!firstVisit" class="folders" :aria-label="t('home.labels')">
         <button
           class="folder-item"
           :class="{ active: !label }"
           :aria-current="!label ? 'true' : undefined"
           @click="label = ''"
         >
-          <span>All drafts</span><span class="count">{{ live.length }}</span>
+          <span>{{ t('home.allDrafts') }}</span><span class="count">{{ live.length }}</span>
         </button>
         <template v-if="labels.length">
-          <p class="hint labels-head">Labels</p>
+          <p class="hint labels-head">{{ t('home.labels') }}</p>
           <button
             v-for="l in labels"
             :key="l.label"
             class="folder-item"
             :class="{ active: label === l.label }"
-            :title="`Drafts labelled “${l.label}”`"
+            :title="t('home.labelledTitle', { label: l.label })"
             :aria-current="label === l.label ? 'true' : undefined"
             @click="label = l.label"
           >
@@ -250,40 +251,39 @@ const daysLeft = (d) =>
       <div class="list-pane">
         <div v-if="copies.length" class="banner info" role="status">
           <span>
-            <strong v-if="copies.length === 1">1 draft is a copy of a file on your disk.</strong>
-            <strong v-else>{{ copies.length }} drafts are copies of files on your disk.</strong>
-            Plumb no longer keeps copies of files: open them from disk instead.
+            <strong>{{ t('home.copies', { count: copies.length }) }}</strong>
+            {{ t('home.copiesHint') }}
           </span>
           <span class="banner-actions">
-            <button class="primary" @click="trashCopies">Move them to the Trash</button>
-            <button @click="forgetCopies()">Keep them</button>
-            <button title="Download every draft as one backup file first" @click="downloadBackup">Export a backup first</button>
+            <button class="primary" @click="trashCopies">{{ t('home.copiesTrash') }}</button>
+            <button @click="forgetCopies()">{{ t('home.copiesKeep') }}</button>
+            <button :title="t('home.copiesExportTitle')" @click="downloadBackup">{{ t('home.copiesExport') }}</button>
           </span>
         </div>
 
-        <section v-if="recent.length" class="recent-files" aria-label="Recent files">
-          <h2 class="section-title">Recent files</h2>
+        <section v-if="recent.length" class="recent-files" :aria-label="t('home.recentFiles')">
+          <h2 class="section-title">{{ t('home.recentFiles') }}</h2>
           <ul class="doc-list">
             <li v-for="f in recent" :key="f.id">
               <RouterLink :to="{ name: 'edit', params: { id: f.id } }" class="doc-link">
                 <strong>{{ displayName(f.name) }}</strong>
                 <small>
-                  <template v-if="f.diskDirty"><span class="unsaved-dot">●</span> Not saved to file · </template>
-                  Opened {{ fmt(f.openedAt ?? f.updatedAt) }}
+                  <template v-if="f.diskDirty"><span class="unsaved-dot">●</span> {{ t('file.notSaved') }} · </template>
+                  {{ t('home.openedAt', { when: fmt(f.openedAt ?? f.updatedAt) }) }}
                 </small>
               </RouterLink>
               <button
                 v-if="!f.diskDirty"
                 class="icon-button"
-                title="Remove from Recent files (the file stays on your disk)"
-                :aria-label="`Remove ${displayName(f.name)} from Recent files`"
+                :title="t('home.recentRemoveTitle')"
+                :aria-label="t('home.recentRemove', { name: displayName(f.name) })"
                 @click="forgetFile(f)"
               >
                 ✕
               </button>
             </li>
           </ul>
-          <h2 class="section-title">Drafts</h2>
+          <h2 class="section-title">{{ t('home.drafts') }}</h2>
         </section>
 
         <div v-if="live.length" class="list-tools">
@@ -291,12 +291,12 @@ const daysLeft = (d) =>
             v-model="query"
             class="filter"
             type="search"
-            placeholder="Filter drafts"
-            aria-label="Filter drafts by name or text"
+            :placeholder="t('home.filter')"
+            :aria-label="t('home.filterLabel')"
           />
           <label class="sort">
-            <span class="hint">Sort</span>
-            <select v-model="prefs.sort" aria-label="Sort drafts by">
+            <span class="hint">{{ t('home.sort') }}</span>
+            <select v-model="prefs.sort" :aria-label="t('home.sortLabel')">
               <option v-for="(s, key) in SORTS" :key="key" :value="key">{{ s.label }}</option>
             </select>
           </label>
@@ -304,32 +304,32 @@ const daysLeft = (d) =>
 
         <!-- First visit (nothing here yet): how Plumb works, in three lines. -->
         <div v-if="firstVisit" class="welcome">
-          <h2 class="welcome-title">Welcome to Plumb</h2>
+          <h2 class="welcome-title">{{ t('home.welcome.title') }}</h2>
           <ul>
-            <li><strong>Files stay on your disk.</strong> Open a file or a folder, edit it, and Save ({{ saveKey }}) writes it back{{ canSaveFiles ? '' : ' as a download' }}. Until then, your edits are kept in this browser.</li>
-            <li><strong>Drafts live in this browser.</strong> <em>New document</em> starts one: notes, pasted text, anything that isn't a file yet. They're saved as you type.</li>
-            <li><strong>Nothing leaves your computer.</strong> No account, no server; it works offline.</li>
+            <li><T :k="canSaveFiles ? 'home.welcome.files' : 'home.welcome.filesDownload'" :p="{ key: saveKey }" /></li>
+            <li><T k="home.welcome.drafts" /></li>
+            <li><T k="home.welcome.private" /></li>
           </ul>
-          <p class="hint">Drop files anywhere on this page to open them. Press {{ keyLabel('Mod+P') }} to find anything, F1 for all the shortcuts.</p>
+          <p class="hint">{{ t('home.welcome.hint', { key: keyLabel('Mod+P') }) }}</p>
         </div>
         <p v-else-if="!live.length" class="empty">
-          No drafts yet. Create one, open a file, or drop files anywhere on this page.
+          {{ t('home.noDrafts') }}
         </p>
-        <p v-else-if="!docs.length && query" class="empty">No drafts match “{{ query }}”.</p>
-        <p v-else-if="!docs.length" class="empty">No drafts have this label any more.</p>
+        <p v-else-if="!docs.length && query" class="empty">{{ t('home.noMatch', { query }) }}</p>
+        <p v-else-if="!docs.length" class="empty">{{ t('home.noLabelled') }}</p>
 
         <ul v-else class="doc-list">
           <li v-for="doc in docs" :key="doc.id">
             <RouterLink :to="{ name: 'edit', params: { id: doc.id } }" class="doc-link">
               <strong :class="{ untitled: !doc.name?.trim() }">{{ displayName(doc.name) }}</strong>
-              <small>{{ fmt(doc.updatedAt) }} · {{ formatNumber(doc.content.length) }} chars</small>
+              <small>{{ fmt(doc.updatedAt) }} · {{ t('common.chars', { count: doc.content.length }) }}</small>
             </RouterLink>
-            <span v-if="doc.folder" class="label-chip" :title="`Label: ${doc.folder}`">
+            <span v-if="doc.folder" class="label-chip" :title="t('home.labelTitle', { label: doc.folder })">
               {{ doc.folder }}
               <button
                 class="label-remove"
-                :aria-label="`Remove the label ${doc.folder} from ${displayName(doc.name)}`"
-                title="Remove this label"
+                :aria-label="t('home.removeLabel', { label: doc.folder, name: displayName(doc.name) })"
+                :title="t('home.removeLabelTitle')"
                 @click="removeLabel(doc)"
               >×</button>
             </span>
@@ -337,16 +337,16 @@ const daysLeft = (d) =>
               class="icon-button pin-button"
               :class="{ pinned: doc.pinned }"
               :aria-pressed="!!doc.pinned"
-              :title="doc.pinned ? 'Unpin' : 'Pin to the top of the list'"
-              :aria-label="`${doc.pinned ? 'Unpin' : 'Pin'} ${displayName(doc.name)}`"
+              :title="t(doc.pinned ? 'home.unpin' : 'home.pinTitle')"
+              :aria-label="t(doc.pinned ? 'home.unpinName' : 'home.pinName', { name: displayName(doc.name) })"
               @click="togglePin(doc.id)"
             >
               📌
             </button>
             <button
               class="danger"
-              :title="`Move ${displayName(doc.name)} to Trash`"
-              :aria-label="`Move ${displayName(doc.name)} to Trash`"
+              :title="t('home.trash', { name: displayName(doc.name) })"
+              :aria-label="t('home.trash', { name: displayName(doc.name) })"
               @click="remove(doc)"
             >
               ✕
@@ -359,29 +359,29 @@ const daysLeft = (d) =>
     <!-- Only once there's something stored: on a first visit it's just alarming. -->
     <p v-if="state.backend && !firstVisit" class="hint storage-info">
       <template v-if="state.backend === 'localStorage'">
-        Documents are kept in this browser's small localStorage (about 5 MB) because IndexedDB isn't available.
+        {{ t('home.storageLocal') }}
       </template>
-      <template v-else>Documents are kept in this browser{{ usage ? ` · ${usage}` : '' }}.</template>
-      <template v-if="!state.persisted"> The browser may clear them if the disk gets full: export a backup now and then.</template>
+      <template v-else>{{ usage ? t('home.storageUsage', usage) : t('home.storage') }}</template>
+      <template v-if="!state.persisted"> {{ t('home.storageNotPersisted') }}</template>
     </p>
 
     <div v-if="trash.length" class="trash">
       <div class="trash-head">
         <button class="link" :aria-expanded="showTrash" @click="showTrash = !showTrash">
-          {{ showTrash ? '▾' : '▸' }} Trash ({{ trash.length }})
+          {{ showTrash ? '▾' : '▸' }} {{ t('home.trashCount', { count: trash.length }) }}
         </button>
-        <button v-if="showTrash" class="danger" @click="onEmptyTrash">Empty trash</button>
+        <button v-if="showTrash" class="danger" @click="onEmptyTrash">{{ t('home.emptyTrash') }}</button>
       </div>
       <template v-if="showTrash">
-        <p class="hint">Documents in the Trash are deleted forever after {{ TRASH_DAYS }} days.</p>
+        <p class="hint">{{ t('home.trashNote', { count: TRASH_DAYS }) }}</p>
         <ul class="doc-list">
           <li v-for="doc in trash" :key="doc.id">
             <RouterLink :to="{ name: 'edit', params: { id: doc.id } }" class="doc-link">
               <strong>{{ displayName(doc.name) }}</strong>
-              <small>Deleted {{ fmt(doc.deletedAt) }} · {{ daysLeft(doc) }} days left</small>
+              <small>{{ t('home.deletedAt', { when: fmt(doc.deletedAt) }) }} · {{ t('home.daysLeft', { count: daysLeft(doc) }) }}</small>
             </RouterLink>
-            <button @click="restoreDoc(doc.id)">Restore</button>
-            <button class="danger" @click="deleteForever(doc)">Delete forever</button>
+            <button @click="restoreDoc(doc.id)">{{ t('common.restore') }}</button>
+            <button class="danger" @click="deleteForever(doc)">{{ t('home.deleteForever') }}</button>
           </li>
         </ul>
       </template>

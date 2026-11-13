@@ -7,10 +7,12 @@ import { computed, ref, watch } from 'vue'
 import { prefs } from '../prefs'
 import { readFileText, reconnect, requestFileAccess } from '../workspace'
 import { displayName } from '../naming'
+import { t } from '../i18n'
+import T from './T'
 
 const props = defineProps({ doc: { type: Object, required: true } })
 const state = ref('reading') // 'reading' | 'needs-access' | 'missing'
-const folder = computed(() => prefs.workspaces.find((w) => w.id === props.doc.source?.root)?.name ?? 'its folder')
+const folder = computed(() => prefs.workspaces.find((w) => w.id === props.doc.source?.root)?.name ?? t('unread.itsFolder'))
 const name = computed(() => displayName(props.doc.name))
 
 async function read() {
@@ -30,17 +32,12 @@ async function allow() {
 
 <template>
   <div class="unread-file" role="status">
-    <p v-if="state === 'reading'">Reading “{{ name }}” from disk…</p>
+    <p v-if="state === 'reading'">{{ t('unread.reading', { name }) }}</p>
     <template v-else-if="state === 'needs-access'">
-      <p>
-        <strong>Plumb needs your permission to read “{{ doc.source ? folder : name }}” again.</strong>
-        Files with no unsaved changes aren’t kept in the browser: their text is read from disk.
-      </p>
-      <button class="primary" @click="allow">Allow access</button>
+      <p><T k="unread.needsAccess" :p="{ name: doc.source ? folder : name }" /></p>
+      <button class="primary" @click="allow">{{ t('unread.allow') }}</button>
     </template>
-    <p v-else>
-      <strong>“{{ name }}” can’t be read.</strong> It isn’t on disk any more, or it isn’t a text file.
-    </p>
+    <p v-else><T k="unread.cantRead" :p="{ name }" /></p>
   </div>
 </template>
 

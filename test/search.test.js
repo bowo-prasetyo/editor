@@ -166,7 +166,7 @@ test('replace across files changes documents only; Save all then writes the file
   assert.equal(mainFile.text(), 'const hello = 1\nhello()\n', 'disk untouched')
   // A version from before the replace is kept.
   const versions = await store.listVersions(main.id)
-  assert.ok(versions.some((v) => v.label === 'Before replacing in files'))
+  assert.ok(versions.some((v) => v.kind === 'replace'))
 
   assert.equal(fa.unsavedToDisk().length, 2)
   prefs.finalNewline = true

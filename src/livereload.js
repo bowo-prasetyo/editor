@@ -111,7 +111,7 @@ export async function reloadFromDisk(id) {
   const file = await handle.getFile()
   const decoded = decodeBytes(new Uint8Array(await file.arrayBuffer()))
   if (decoded.binary) return false
-  await recordVersion(id, 'manual', 'Before reloading from disk')
+  await recordVersion(id, 'reload')
   if (decoded.text !== doc.content) updateDoc(id, { content: decoded.text })
   setDocOptions(id, fileFormat(decoded))
   await linkFile(id, handle, file.lastModified)

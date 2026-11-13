@@ -2,6 +2,7 @@
 // text, with defaults by file type, and convertible between the two.
 //   { type: 'spaces' | 'tabs', size: 2 | 4 | 8 }
 import { extension } from './filetype.js'
+import { t } from './i18n.js'
 
 export const SIZES = [2, 4, 8]
 
@@ -77,7 +78,7 @@ export function effectiveIndent(doc, { config = null, fallback } = {}) {
 
 export const indentUnitString = ({ type, size }) => (type === 'tabs' ? '\t' : ' '.repeat(size))
 
-export const describeIndent = ({ type, size }) => (type === 'tabs' ? `Tabs (${size} wide)` : `${size} spaces`)
+export const describeIndent = ({ type, size }) => (type === 'tabs' ? t('indent.tabs', { count: size }) : t('indent.spaces', { count: size }))
 
 // Re-indent every line from one setting to another. Leading whitespace is
 // measured in columns (tabs are `from.size` wide) and rewritten; partial

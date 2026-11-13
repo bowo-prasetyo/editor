@@ -60,6 +60,9 @@ export function formatRelative(t, now = Date.now()) {
   return rtf.format(0, 'second')
 }
 
+// ["a", "b", "c"] -> "a, b, and c" (in English).
+export const formatList = (items, type = 'conjunction') => cached(Intl.ListFormat, { type }).format(items)
+
 // --- Sorting --------------------------------------------------------------------
 
 // A collator for the current locale, e.g. collator({ numeric: true }).

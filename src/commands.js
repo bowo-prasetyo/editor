@@ -3,6 +3,7 @@
 //   { id, title, group: id in GROUPS, shortcut?: id in keys.js, run(), when?() }
 import { reactive, shallowReactive } from 'vue'
 import { collator } from './locale.js'
+import { translated } from './i18n.js'
 
 // Shallow: commands are stored as given, so unregistering can compare them.
 const registry = shallowReactive(new Map())
@@ -18,14 +19,14 @@ export function registerCommands(list) {
 // Groups, in the order the palette lists them, and the names it shows for
 // them. Commands refer to a group by its id, never by the name on screen.
 // Groups not listed here follow, A to Z.
-export const GROUPS = {
-  editor: 'Editor',
-  editing: 'Editing',
-  files: 'Files',
-  documents: 'Documents',
-  settings: 'Settings',
-  help: 'Help',
-}
+export const GROUPS = translated({
+  editor: 'commands.groups.editor',
+  editing: 'commands.groups.editing',
+  files: 'commands.groups.files',
+  documents: 'commands.groups.documents',
+  settings: 'commands.groups.settings',
+  help: 'commands.groups.help',
+})
 const GROUP_ORDER = Object.keys(GROUPS)
 const groupRank = (g) => {
   const i = GROUP_ORDER.indexOf(g)

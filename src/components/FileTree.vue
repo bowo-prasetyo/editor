@@ -18,6 +18,8 @@ import {
   setExpanded,
 } from '../workspace'
 import { dismissReturning, putBack, returning, saveFolderFiles, unsavedIn } from '../closing'
+import { t } from '../i18n'
+import { formatList } from '../locale'
 import { prepareForSave } from '../saveall'
 import { displayName } from '../naming'
 import CloseFolderDialog from './CloseFolderDialog.vue'
@@ -40,10 +42,10 @@ const tree = computed(() => {
     const note = (text) => rows.push({ key: `${rootId}:${dirPath}:note`, kind: 'note', name: text, depth, rootId })
     if (!list) {
       missing.push([rootId, dirPath, dir])
-      return note('Loading…')
+      return note(t('tree.loading'))
     }
-    if (list.error) return note('Couldn’t read this folder.')
-    if (!list.length) return note('Empty')
+    if (list.error) return note(t('tree.cantRead'))
+    if (!list.length) return note(t('tree.empty'))
     for (const handle of list) {
       const path = joinPath(dirPath, handle.name)
       rows.push({ key: `${rootId}:${path}`, kind: handle.kind, rootId, path, name: handle.name, depth, handle, dir, dirPath })
@@ -164,24 +166,24 @@ function onKey(e) {
 async function open(row) {
   try {
     const { doc, refreshed } = await openWorkspaceFile(row.rootId, row.path, row.handle)
-    if (refreshed === 'reloaded') showToast(`Reloaded “${row.name}”: it changed on disk.`, { timeout: 4000 })
+    if (refreshed === 'reloaded') showToast(t('tree.reloaded', { name: row.name }), { timeout: 4000 })
     if (refreshed === 'conflict') {
-      showToast(`“${row.name}” changed on disk, and you have changes not saved to it. Saving will ask before replacing it.`, {
+      showToast(t('tree.conflict', { name: row.name }), {
         timeout: 10000,
       })
     }
     router.push({ name: 'edit', params: { id: doc.id } })
   } catch (e) {
-    if (e instanceof BinaryFileError) showToast(`Couldn't open “${row.name}”: it doesn't look like a text file.`)
+    if (e instanceof BinaryFileError) showToast(t('open.notTextOne', { name: row.name }))
     else if (e?.name === 'NotAllowedError') {
       const root = roots.get(row.rootId)
       if (root) root.permission = 'prompt'
     } else if (e?.name === 'NotFoundError') {
-      showToast(`“${row.name}” isn't there any more.`)
+      showToast(t('tree.gone', { name: row.name }))
       forgetListings(row.rootId)
     } else {
       console.error(e)
-      showToast(`Couldn't open “${row.name}”: ${e.message}`)
+      showToast(t('open.failed', { name: row.name, error: e.message }))
     }
   }
 }
@@ -199,8 +201,8 @@ function targetDir(rootId) {
 
 async function create(rootId, kind) {
   const { dir, path, expand } = targetDir(rootId)
-  const where = path ? `in ${path}` : 'at the top of the folder'
-  const name = prompt(kind === 'file' ? `New file ${where}:` : `New folder ${where}:`, '')
+  const what = kind === 'file' ? 'tree.newFilePrompt' : 'tree.newFolderPrompt'
+  const name = prompt(path ? t(`${what}In`, { path }) : t(`${what}Top`), '')
   if (name === null) return
   try {
     const handle = await createEntry(rootId, dir, path, name, kind)
@@ -215,7 +217,7 @@ async function create(rootId, kind) {
 }
 
 async function onReconnect(rootId) {
-  if (!(await reconnect(rootId))) showToast('The browser didn’t allow access to the folder.')
+  if (!(await reconnect(rootId))) showToast(t('tree.accessRefused'))
 }
 
 // Closing a folder. With files not saved to disk, ask first (see closing.js):
@@ -225,7 +227,7 @@ async function onClose(w) {
   const unsaved = unsavedIn(w.id)
   if (!unsaved.length) {
     await closeFolder(w.id)
-    return showToast(`Closed “${w.name}”.`, { timeout: 3000 })
+    return showToast(t('tree.closed', { name: w.name }), { timeout: 3000 })
   }
   closing.value = { ...w, files: unsaved.map((d) => displayName(d.name)), busy: false }
 }
@@ -236,11 +238,11 @@ async function onCloseSave() {
   try {
     const { saved, left } = await saveFolderFiles(w.id, { prepare: prepareForSave })
     if (left.length) {
-      const names = left.map((d) => `“${displayName(d.name)}”`).join(', ')
-      return showToast(`“${w.name}” is still open: ${names} ${left.length === 1 ? 'wasn’t' : 'weren’t'} saved.`, { timeout: 10000 })
+      const names = formatList(left.map((d) => t('common.quoted', { text: displayName(d.name) })))
+      return showToast(t('tree.stillOpen', { name: w.name, names, count: left.length }), { timeout: 10000 })
     }
     await closeFolder(w.id)
-    showToast(`Saved ${saved === 1 ? '1 file' : `${saved} files`} and closed “${w.name}”.`, { timeout: 4000 })
+    showToast(t('tree.savedAndClosed', { name: w.name, count: saved }), { timeout: 4000 })
   } finally {
     closing.value = null
   }
@@ -250,18 +252,15 @@ async function onCloseKeep() {
   const w = closing.value
   closing.value = null
   const kept = await closeFolder(w.id)
-  showToast(
-    `Closed “${w.name}”. ${kept === 1 ? '1 file with unsaved changes was kept as a draft' : `${kept} files with unsaved changes were kept as drafts`}: open the folder again to put the edits back.`,
-    { timeout: 8000 },
-  )
+  showToast(t('tree.closedKept', { name: w.name, count: kept }), { timeout: 8000 })
 }
 
 // Opening a folder again: offer to put kept drafts' edits back into their files.
 async function onPutBack(rootId) {
   const { back, changed, missing } = await putBack(rootId)
-  const parts = [`Put back the edits to ${back === 1 ? '1 file' : `${back} files`}.`]
-  if (changed) parts.push(`${changed === 1 ? '1 file' : `${changed} files`} changed on disk meanwhile: check before saving.`)
-  if (missing) parts.push(`${missing === 1 ? '1 file isn’t' : `${missing} files aren’t`} in the folder any more and stayed ${missing === 1 ? 'a draft' : 'drafts'}.`)
+  const parts = [t('tree.putBack', { count: back })]
+  if (changed) parts.push(t('tree.putBackChanged', { count: changed }))
+  if (missing) parts.push(t('tree.putBackMissing', { count: missing }))
   showToast(parts.join(' '), { timeout: changed || missing ? 10000 : 4000 })
 }
 
@@ -269,25 +268,24 @@ const refresh = (rootId) => forgetListings(rootId)
 </script>
 
 <template>
-  <nav ref="listEl" class="file-tree" aria-label="Folders on disk">
+  <nav ref="listEl" class="file-tree" :aria-label="t('tree.label')">
     <section v-for="{ root: row, children } in groups" :key="row.key" class="tree-root">
       <!-- Notes about the folder: outside its tree (a tree holds only items),
            and before it, so they're read first; drawn under the folder's row,
            which is pinned to the top of the section (style.css). -->
       <p v-if="returning[row.rootId]?.length" class="tree-note" role="status">
-        {{ returning[row.rootId].length === 1 ? '1 draft has' : `${returning[row.rootId].length} drafts have` }}
-        edits to files in “{{ row.name }}”.
-        <button class="mini primary-mini" @click="onPutBack(row.rootId)">Put the edits back</button>
-        <button class="mini" @click="dismissReturning(row.rootId)">Not now</button>
+        {{ t('tree.returning', { count: returning[row.rootId].length, name: row.name }) }}
+        <button class="mini primary-mini" @click="onPutBack(row.rootId)">{{ t('tree.putBackButton') }}</button>
+        <button class="mini" @click="dismissReturning(row.rootId)">{{ t('tree.notNow') }}</button>
       </p>
       <p v-if="!row.root" class="tree-note">
-        “{{ row.name }}” isn’t available in this browser any more. Close it and open it again.
+        {{ t('tree.unavailable', { name: row.name }) }}
       </p>
       <p v-else-if="row.root.permission !== 'granted'" class="tree-note">
-        The browser needs your permission to use “{{ row.name }}” again.
-        <button class="mini primary-mini" @click="onReconnect(row.rootId)">Allow access</button>
+        {{ t('tree.needsPermission', { name: row.name }) }}
+        <button class="mini primary-mini" @click="onReconnect(row.rootId)">{{ t('unread.allow') }}</button>
       </p>
-      <ul role="tree" :aria-label="`Files in ${row.name}`" @keydown="onKey">
+      <ul role="tree" :aria-label="t('tree.filesIn', { name: row.name })" @keydown="onKey">
         <li role="none" class="root-item">
           <div
             role="treeitem"
@@ -335,19 +333,19 @@ const refresh = (rootId) => forgetListings(rootId)
                 child.kind === 'directory' ? (isExpanded(child.rootId, child.path) ? '▾' : '▸') : ''
               }}</span>
               <span class="tree-name">{{ child.name }}</span>
-              <span v-if="unsaved.has(child.key)" class="tree-dirty" title="Changes not saved to the file">●</span>
+              <span v-if="unsaved.has(child.key)" class="tree-dirty" :title="t('tree.dirty')">●</span>
             </div>
           </li>
         </template>
       </ul>
       <!-- Outside the tree, drawn over the folder's row. -->
-      <span class="root-actions" role="group" :aria-label="`${row.name} actions`">
+      <span class="root-actions" role="group" :aria-label="t('tree.actions', { name: row.name })">
         <template v-if="row.root?.permission === 'granted'">
-          <button class="mini" title="New file" aria-label="New file" @click="create(row.rootId, 'file')">+ File</button>
-          <button class="mini" title="New folder" aria-label="New folder" @click="create(row.rootId, 'directory')">+ Folder</button>
-          <button class="mini" title="Read the folder again" aria-label="Refresh" @click="refresh(row.rootId)">↻</button>
+          <button class="mini" :title="t('tree.newFile')" :aria-label="t('tree.newFile')" @click="create(row.rootId, 'file')">{{ t('tree.newFileButton') }}</button>
+          <button class="mini" :title="t('tree.newFolder')" :aria-label="t('tree.newFolder')" @click="create(row.rootId, 'directory')">{{ t('tree.newFolderButton') }}</button>
+          <button class="mini" :title="t('tree.refreshTitle')" :aria-label="t('tree.refresh')" @click="refresh(row.rootId)">↻</button>
         </template>
-        <button class="mini" :title="`Close ${row.name}`" :aria-label="`Close ${row.name}`" @click="onClose({ id: row.rootId, name: row.name })">×</button>
+        <button class="mini" :title="t('tree.close', { name: row.name })" :aria-label="t('tree.close', { name: row.name })" @click="onClose({ id: row.rootId, name: row.name })">×</button>
       </span>
     </section>
   </nav>

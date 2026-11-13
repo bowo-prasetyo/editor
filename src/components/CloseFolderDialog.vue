@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useModal } from '../modal'
+import { t } from '../i18n'
 
 // Closing a folder that has files with unsaved changes: save them all, keep
 // them as drafts, or cancel. Nothing unsaved is ever thrown away.
@@ -18,22 +19,22 @@ onMounted(() => first.value?.focus())
 
 <template>
   <div class="quick-backdrop" @mousedown.self="!busy && emit('cancel')">
-    <div ref="root" class="quick dialog" role="dialog" aria-modal="true" :aria-label="`Close ${folder}`">
+    <div ref="root" class="quick dialog" role="dialog" aria-modal="true" :aria-label="t('closeFolder.label', { folder })">
       <h2 class="dialog-title">
-        “{{ folder }}” has {{ files.length === 1 ? '1 file' : `${files.length} files` }} with unsaved changes
+        {{ t('closeFolder.title', { folder, count: files.length }) }}
       </h2>
       <ul class="close-files">
         <li v-for="f in files.slice(0, 8)" :key="f">{{ f }}</li>
-        <li v-if="files.length > 8" class="hint">and {{ files.length - 8 }} more</li>
+        <li v-if="files.length > 8" class="hint">{{ t('common.andMore', { count: files.length - 8 }) }}</li>
       </ul>
       <p class="hint dialog-hint">
-        Save them to disk, or keep them as drafts: open the folder again later to put the edits back.
+        {{ t('closeFolder.hint') }}
       </p>
       <div class="dialog-actions">
-        <button type="button" :disabled="busy" @click="emit('cancel')">Cancel</button>
-        <button type="button" :disabled="busy" @click="emit('keep')">Keep as drafts</button>
+        <button type="button" :disabled="busy" @click="emit('cancel')">{{ t('common.cancel') }}</button>
+        <button type="button" :disabled="busy" @click="emit('keep')">{{ t('closeFolder.keep') }}</button>
         <button ref="first" type="button" class="primary" :disabled="busy" @click="emit('save')">
-          {{ busy ? 'Saving…' : 'Save all to disk' }}
+          {{ busy ? t('common.saving') : t('closeFolder.saveAll') }}
         </button>
       </div>
     </div>

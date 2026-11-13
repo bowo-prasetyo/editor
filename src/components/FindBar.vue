@@ -6,6 +6,7 @@ const last = { query: '', replacement: '', matchCase: false, wholeWord: false, r
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { formatNumber } from '../locale'
+import { t } from '../i18n'
 import {
   MAX_MATCHES,
   escapeRegExp,
@@ -63,17 +64,18 @@ function refresh() {
 onBeforeUnmount(() => clearTimeout(refreshTimer))
 
 const matches = computed(() => findMatches(searched.value, query.value, options.value, MAX_MATCHES))
+// How many matches, formatted ("1,234", or "100,000+" at the limit).
 const total = computed(() => {
   const n = formatNumber(matches.value.length)
-  return matches.value.length >= MAX_MATCHES ? `${n}+` : n
+  return matches.value.length >= MAX_MATCHES ? t('find.atLeast', { n }) : n
 })
 
 const count = computed(() => {
   if (message.value) return message.value
   if (!query.value) return ''
   if (error.value) return error.value
-  if (!matches.value.length) return 'No results'
-  return current.value >= 0 ? `${formatNumber(current.value + 1)} of ${formatNumber(total.value)}` : `${formatNumber(total.value)} found`
+  if (!matches.value.length) return t('find.noResults')
+  return current.value >= 0 ? t('find.position', { current: current.value + 1, total: total.value }) : t('find.found', { total: total.value })
 })
 
 const selection = () => props.editor?.getSelection() ?? { from: 0, to: 0 }
@@ -154,7 +156,7 @@ async function replaceAll() {
   props.editor.replace(edit.from, edit.to, edit.insert)
   await nextTick()
   current.value = -1
-  message.value = `Replaced ${formatNumber(edit.count)}`
+  message.value = t('find.replaced', { count: edit.count })
 }
 
 // Alt+C, Alt+W, Alt+R toggle match case, whole word and regex (by key
@@ -213,8 +215,8 @@ defineExpose({ open })
         ref="queryInput"
         v-model="query"
         type="search"
-        :placeholder="regex ? 'Find (regular expression)' : 'Find'"
-        aria-label="Find"
+        :placeholder="t(regex ? 'find.placeholderRegex' : 'find.placeholder')"
+        :aria-label="t('find.placeholder')"
         spellcheck="false"
         autocomplete="off"
         :class="{ invalid: !!error }"
@@ -222,44 +224,44 @@ defineExpose({ open })
         @keydown="onQueryKey"
       />
       <span class="find-count" :class="{ error: !!error }" aria-live="polite">{{ count }}</span>
-      <button class="icon" :aria-pressed="matchCase" title="Match case (Alt+C)" aria-label="Match case" @click="matchCase = !matchCase">Aa</button>
-      <button class="icon" :aria-pressed="wholeWord" title="Whole word (Alt+W)" aria-label="Whole word" @click="wholeWord = !wholeWord">
+      <button class="icon" :aria-pressed="matchCase" :title="t('find.matchCaseTitle')" :aria-label="t('find.matchCase')" @click="matchCase = !matchCase">Aa</button>
+      <button class="icon" :aria-pressed="wholeWord" :title="t('find.wholeWordTitle')" :aria-label="t('find.wholeWord')" @click="wholeWord = !wholeWord">
         <u>ab</u>
       </button>
       <button
         class="icon mono"
         :aria-pressed="regex"
-        title="Regular expression (Alt+R)"
-        aria-label="Regular expression"
+        :title="t('find.regexTitle')"
+        :aria-label="t('find.regex')"
         @click="regex = !regex"
       >
         .*
       </button>
-      <button class="icon" title="Previous (Shift+Enter)" aria-label="Previous match" @click="prev">↑</button>
-      <button class="icon" title="Next (Enter)" aria-label="Next match" @click="next">↓</button>
+      <button class="icon" :title="t('find.previousTitle')" :aria-label="t('find.previous')" @click="prev">↑</button>
+      <button class="icon" :title="t('find.nextTitle')" :aria-label="t('find.next')" @click="next">↓</button>
       <button
         class="icon"
         :aria-pressed="showReplace"
-        title="Replace (Ctrl/Cmd+H)"
-        aria-label="Show replace"
+        :title="t('find.showReplaceTitle')"
+        :aria-label="t('find.showReplace')"
         @click="showReplace = !showReplace"
       >
         ⇄
       </button>
-      <button class="icon" title="Close (Esc)" aria-label="Close find" @click="close">✕</button>
+      <button class="icon" :title="t('common.closeEsc')" :aria-label="t('find.close')" @click="close">✕</button>
     </div>
     <div v-if="showReplace" class="find-row">
       <input
         ref="replaceInput"
         v-model="replacement"
-        :placeholder="regex ? 'Replace with ($1, $<name>, \\n…)' : 'Replace with'"
-        :title="regex ? 'Use $1, $2… or $<name> for groups, $& for the whole match, $$ for a $; \\n and \\t for a new line and tab' : ''"
-        aria-label="Replace with"
+        :placeholder="t(regex ? 'find.replaceWithRegex' : 'find.replaceWith')"
+        :title="regex ? t('find.replaceRegexHelp') : ''"
+        :aria-label="t('find.replaceWith')"
         spellcheck="false"
         @keydown="onReplaceKey"
       />
-      <button title="Replace (Enter)" @click="replaceOne">Replace</button>
-      <button title="Replace all (Ctrl/Cmd+Enter)" @click="replaceAll">All</button>
+      <button :title="t('find.replaceTitle')" @click="replaceOne">{{ t('find.replace') }}</button>
+      <button :title="t('find.replaceAllTitle')" @click="replaceAll">{{ t('find.replaceAll') }}</button>
     </div>
   </div>
 </template>

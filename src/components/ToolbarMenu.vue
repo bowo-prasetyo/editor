@@ -1,5 +1,6 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { t } from '../i18n'
 
 // A button that opens a short menu of actions, for toolbars too narrow to
 // show them all. Items: { id, label, run(), checked? } — `checked` (true or
@@ -8,7 +9,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 // Keys: Enter, Space or ↓ opens it on the first item; ↑ and ↓ move;
 // Home and End jump; Escape and Tab close it (Escape returns to the button).
 defineProps({
-  label: { type: String, default: 'More' },
+  label: { type: String, default: '' }, // '' = More
   title: { type: String, default: '' },
   items: { type: Array, required: true },
 })
@@ -73,9 +74,9 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', outside))
       @click="open ? hide() : show()"
       @keydown="onButtonKey"
     >
-      {{ label }} <span aria-hidden="true">▾</span>
+      {{ label || t('common.more') }} <span aria-hidden="true">▾</span>
     </button>
-    <div v-if="open" ref="menu" class="menu menu-down" :class="{ 'align-end': alignEnd }" role="menu" :aria-label="label" @keydown="onMenuKey">
+    <div v-if="open" ref="menu" class="menu menu-down" :class="{ 'align-end': alignEnd }" role="menu" :aria-label="label || t('common.more')" @keydown="onMenuKey">
       <button
         v-for="item in items"
         :key="item.id"

@@ -15,6 +15,7 @@ import { liveTabs } from '../session'
 import { saveDoc } from '../fileaccess'
 import { showToast } from '../toast'
 import { collator } from '../locale'
+import { t } from '../i18n'
 import { whitespaceFix } from '../textops'
 import { docEditorConfig, editedInOtherPane, helpOptions, keysFor, noteEdit, saveFixes } from '../editorsetup'
 
@@ -143,10 +144,10 @@ async function onKeydown(e) {
       const { trim, finalNewline } = saveFixes(doc.value, config.value)
       if (trim || finalNewline) current()?.apply(whitespaceFix({ trim, finalNewline }))
       const r = await saveDoc(getDoc(props.id), { saveAs: e.shiftKey })
-      if (r.result === 'saved') showToast(`Saved to “${r.name}”.`, { timeout: 3000 })
+      if (r.result === 'saved') showToast(t('save.saved', { name: r.name }), { timeout: 3000 })
       if (r.result === 'downloaded') showToast(downloadedMessage(r.name), { timeout: 6000 })
     } catch (err) {
-      showToast(`Couldn't save the file: ${err.message}`, { timeout: 10000 })
+      showToast(t('save.failed', { error: err.message }), { timeout: 10000 })
     } finally {
       saving = false
     }
@@ -163,17 +164,17 @@ defineExpose({ focus: () => editor.value?.focus() })
 <template>
   <div class="split-pane" @keydown="onKeydown">
     <div class="split-head">
-      <select v-model="chosen" aria-label="Document shown in the right-hand pane" title="Document shown here">
-        <optgroup v-if="choices.tabs.length" label="Open tabs">
+      <select v-model="chosen" :aria-label="t('split.chooseLabel')" :title="t('split.chooseTitle')">
+        <optgroup v-if="choices.tabs.length" :label="t('split.openTabs')">
           <option v-for="d in choices.tabs" :key="d.id" :value="d.id">{{ d.label }}</option>
         </optgroup>
-        <optgroup v-if="choices.rest.length" label="Other documents">
+        <optgroup v-if="choices.rest.length" :label="t('split.otherDocuments')">
           <option v-for="d in choices.rest" :key="d.id" :value="d.id">{{ d.label }}</option>
         </optgroup>
       </select>
-      <span v-if="doc?.linked && doc.diskDirty" class="split-dirty" title="Changes not saved to the file (Ctrl/Cmd+S)">●</span>
+      <span v-if="doc?.linked && doc.diskDirty" class="split-dirty" :title="t('split.dirty')">●</span>
       <span class="spacer" />
-      <button class="mini" title="Close the split (Ctrl/Cmd+\)" aria-label="Close the split" @click="emit('close')">×</button>
+      <button class="mini" :title="t('split.closeTitle')" :aria-label="t('split.close')" @click="emit('close')">×</button>
     </div>
     <UnreadFile v-if="doc?.unread" :doc="doc" class="source" />
     <div v-else ref="host" class="source" />

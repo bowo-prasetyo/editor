@@ -9,6 +9,7 @@ import { reactive } from 'vue'
 import { findMatches, replaceAllEdit, searchRegExp } from './find.js'
 import { MAX_FILE_BYTES, cacheSize, isCached, MAX_CACHE_CHARS, readText } from './filecache.js'
 import { displayName } from './naming.js'
+import { translated } from './i18n.js'
 import { prefs } from './prefs.js'
 import { getDoc, recordVersion, state, updateDoc } from './store.js'
 import { ensureAllIndexes, fileIndex, findWorkspaceDoc, openWorkspaceFile, readFileText, trustSince } from './workspace.js'
@@ -97,7 +98,7 @@ export function searchText(text, query, options = {}, limit = Infinity) {
 
 // Where to look: 'all', 'documents' (in the browser) or 'folders' (files
 // in open folders, including those opened as documents).
-export const SCOPES = { all: 'Everything', documents: 'Drafts', folders: 'Open folders' }
+export const SCOPES = translated({ all: 'search.scopes.all', documents: 'search.scopes.documents', folders: 'search.scopes.folders' })
 
 const docPath = (doc) => (doc.folder ? `${doc.folder}/` : '') + displayName(doc.name)
 
@@ -247,7 +248,7 @@ export async function replaceInTarget(target, query, options, replacement) {
   const text = doc.content
   const edit = replaceAllEdit(text, findMatches(text, query, options), replacement, options.regex)
   if (!edit) return { doc, count: 0 }
-  await recordVersion(doc.id, 'manual', 'Before replacing in files')
+  await recordVersion(doc.id, 'replace')
   updateDoc(doc.id, { content: text.slice(0, edit.from) + edit.insert + text.slice(edit.to) })
   return { doc: getDoc(doc.id), count: edit.count }
 }

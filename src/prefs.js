@@ -40,6 +40,7 @@ const defaults = {
   wrapProse: true,
   wrapCode: false,
   split: null, // the document shown in the right-hand pane, if split
+  language: '', // the interface language ('' = the browser's; see i18n.js)
 }
 
 function load() {

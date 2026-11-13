@@ -60,6 +60,7 @@ import {
 import { tags as t } from '@lezer/highlight'
 import { highlightSelectionMatches, selectNextOccurrence, selectSelectionMatches } from '@codemirror/search'
 import { commentTokensFor } from './filetype.js'
+import { editorPhrases, t as tr } from './i18n.js'
 import { indentUnitString } from './indentation.js'
 import {
   joinLines,
@@ -433,7 +434,7 @@ export function textDiff(a, b) {
 function foldMarker(open) {
   const span = document.createElement('span')
   span.textContent = open ? '▾' : '▸'
-  span.title = open ? 'Fold' : 'Unfold'
+  span.title = open ? tr('editor.fold') : tr('editor.unfold')
   return span
 }
 
@@ -446,6 +447,7 @@ const listening = new Compartment() // the page's change listener
 const indenting = new Compartment()
 const helping = new Compartment() // see helpers()
 const keyboard = new Compartment() // another keyboard mode (Vim), or none
+const phrasing = new Compartment() // CodeMirror's own words, in the interface language
 
 const spellAttrs = (on) => EditorView.contentAttributes.of({ spellcheck: on ? 'true' : 'false' })
 
@@ -527,7 +529,8 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, hel
         helping.of(helpers(help)),
         findMatchesField,
         findHighlighter,
-        EditorView.contentAttributes.of({ 'aria-label': 'Document text', autocapitalize: 'off' }),
+        EditorView.contentAttributes.of({ 'aria-label': tr('editor.documentText'), autocapitalize: 'off' }),
+        phrasing.of(EditorState.phrases.of(editorPhrases())),
         listening.of(listener),
         extra,
       ],
@@ -543,6 +546,7 @@ export function createEditor({ parent, text, name, wrap, spellcheck, indent, hel
         indenting.reconfigure(indentSettings(indent)),
         helping.reconfigure(helpers(help)),
         keyboard.reconfigure(keys ?? []),
+        phrasing.reconfigure(EditorState.phrases.of(editorPhrases())),
         setFindMatches.of([]),
       ],
     }).state

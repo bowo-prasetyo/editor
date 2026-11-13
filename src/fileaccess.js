@@ -2,6 +2,7 @@
 // API (Chrome, Edge and other Chromium browsers). Elsewhere, saving falls
 // back to a download.
 import { ENCODINGS } from './textcodec.js'
+import { t } from './i18n.js'
 import { pruneRecentFiles } from './recent.js'
 import { docBlob, downloadDoc, getDoc, getFileHandle, linkFile, recordVersion, setDocOptions, state } from './store.js'
 
@@ -76,7 +77,7 @@ export const isWriting = (id) => writing.has(id)
 export async function saveDoc(doc, { saveAs = false, confirm: confirmFn = (m) => globalThis.confirm(m) } = {}) {
   // A file whose text hasn't been read from disk yet has nothing to write:
   // writing its empty placeholder would wipe the file.
-  if (doc.unread) throw new Error('Its text hasn’t been read from disk yet.')
+  if (doc.unread) throw new Error(t('errors.unread'))
   if (!canSaveInPlace()) return { result: 'downloaded', name: doc.name || 'untitled.txt', ...downloadDoc(doc) }
 
   let handle = saveAs ? null : await getFileHandle(doc.id)

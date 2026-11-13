@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useModal } from '../modal'
+import { t } from '../i18n'
 
 // "Save to folder…": where to save a draft, as a file in an open folder.
 const props = defineProps({
@@ -31,13 +32,13 @@ onMounted(() => {
       class="quick dialog"
       role="dialog"
       aria-modal="true"
-      aria-label="Save to folder"
+      :aria-label="t('saveToFolder.title')"
       @submit.prevent="emit('submit', { rootId, path })"
     >
-      <h2 class="dialog-title">Save to folder</h2>
+      <h2 class="dialog-title">{{ t('saveToFolder.title') }}</h2>
       <label v-if="folders.length > 1" class="dialog-field">
-        <span class="hint">Folder</span>
-        <select v-model="rootId" aria-label="Folder">
+        <span class="hint">{{ t('saveToFolder.folder') }}</span>
+        <select v-model="rootId" :aria-label="t('saveToFolder.folder')">
           <option v-for="f in folders" :key="f.id" :value="f.id">{{ f.name }}</option>
         </select>
       </label>
@@ -47,17 +48,16 @@ onMounted(() => {
         class="quick-input"
         autocomplete="off"
         spellcheck="false"
-        aria-label="File name"
-        :placeholder="`File name in ${folders.find((f) => f.id === rootId)?.name ?? 'the folder'}`"
+        :aria-label="t('saveToFolder.fileName')"
+        :placeholder="t('saveToFolder.placeholder', { folder: folders.find((f) => f.id === rootId)?.name ?? t('saveToFolder.theFolder') })"
       />
       <p v-if="error" class="dialog-error" role="alert">{{ error }}</p>
       <p v-else class="hint dialog-hint">
-        Saved in “{{ folders.find((f) => f.id === rootId)?.name }}”. Use / for a folder inside it, e.g. notes/todo.md.
-        An existing file is never replaced.
+        {{ t('saveToFolder.hint', { folder: folders.find((f) => f.id === rootId)?.name }) }}
       </p>
       <div class="dialog-actions">
-        <button type="button" :disabled="busy" @click="emit('cancel')">Cancel</button>
-        <button type="submit" class="primary" :disabled="busy">Save</button>
+        <button type="button" :disabled="busy" @click="emit('cancel')">{{ t('common.cancel') }}</button>
+        <button type="submit" class="primary" :disabled="busy">{{ t('common.save') }}</button>
       </div>
     </form>
   </div>
