@@ -30,6 +30,14 @@ minor version (0.x) can change how things work.
 
 ### Changed
 
+- **Plumb's own colours.** The interface takes the logo's ink blue, with greys
+  that lean towards it, in place of GitHub's palette. **Brass** now means
+  "notice this, nothing is lost": changes not yet saved to a file (the dot on
+  tabs, in the sidebar and on the start page, and *Not saved to file* in the
+  status bar, which was red), find matches, and the banner for a file changed
+  or deleted on disk. Red is kept for real problems, such as a failed save. The
+  text cursor is blue, and the browser's or installed app's title bar matches
+  the top bar in light and dark instead of staying bright blue.
 - **The save status is honest about files on disk.** The status bar used to
   say "Saved ✓ · Not saved to file" for an edited file, and the header
   "Everything is saved in your browser". Now a file's own state comes first,
@@ -53,6 +61,10 @@ minor version (0.x) can change how things work.
 
 ### Fixed
 
+- **Contrast in dark mode:** primary buttons (white on light blue, 3.1:1) and
+  *added* lines in History (3.7:1) now pass 4.5:1, and so do code comments on
+  the current line in light mode (4.2:1). A test checks every text colour on
+  its backgrounds in both themes.
 - **Dialogs keep the keyboard to themselves.** In the shortcuts list, the
   quick switcher and command palette, *Save to folder* and *Close folder*,
   Tab and Shift+Tab now stay inside the dialog, Escape closes it wherever

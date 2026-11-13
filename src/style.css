@@ -1,19 +1,29 @@
 :root {
+  /* The Plumb palette, from the logo: ink blue for the interface, and brass
+     for "notice this, nothing is wrong" (changes not saved to disk, find
+     matches, a file changed on disk). Red is kept for real problems. The
+     greys lean slightly towards the blue. test/palette.test.js checks that
+     every text colour keeps 4.5:1 on its backgrounds, in both themes. */
   --bg: #ffffff;
-  --fg: #1f2328;
-  --muted: #656d76;
-  --border: #d0d7de;
-  --panel: #f6f8fa;
-  --accent: #0969da;
-  --danger: #cf222e;
+  --fg: #1b2330;
+  --muted: #59657a;
+  --border: #d3dae6;
+  --panel: #f4f6fa;
+  --accent: #1559c4; /* links, focus, current item */
+  --accent-fill: #1559c4; /* behind white text: primary buttons */
+  --brass: #8a5c00; /* text and marks that ask for attention, calmly */
+  --highlight: #f5c04a; /* the brass of the logo, mixed into backgrounds */
+  --danger: #c4262e;
+  --success: #1a7f37;
+  --theme-bar: #f4f6fa; /* the browser's or installed app's title bar */
   /* Accent-coloured text on an accent-tinted background (pressed toggles, the
      current item): darker than --accent so it keeps 4.5:1 in both themes. */
   --accent-text: color-mix(in srgb, var(--accent) 80%, var(--fg));
-  /* Syntax colours (GitHub-like) */
+  /* Syntax colours (GitHub-like, so code reads as people expect) */
   --syn-keyword: #cf222e;
   --syn-string: #0a3069;
   --syn-number: #0550ae;
-  --syn-comment: #6e7781;
+  --syn-comment: #5f6a7b;
   --syn-function: #8250df;
   --syn-type: #953800;
   --syn-property: #0550ae;
@@ -29,16 +39,22 @@
   color-scheme: light dark;
 }
 /* Dark colours: with the system's dark mode unless Settings say Light, or
-   always when they say Dark (the theme is <html data-theme="…">). */
+   always when they say Dark (the theme is <html data-theme="…">). The two
+   blocks must stay the same (test/palette.test.js checks). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #0d1117;
-    --fg: #e6edf3;
-    --muted: #8d96a0;
-    --border: #30363d;
-    --panel: #161b22;
-    --accent: #4493f8;
-    --danger: #f85149;
+    --bg: #0e131b;
+    --fg: #e3e8f0;
+    --muted: #909bad;
+    --border: #2c3542;
+    --panel: #151c26;
+    --accent: #6ea8ff;
+    --accent-fill: #1f6fe0;
+    --brass: #f2c25a;
+    --highlight: #d9a530;
+    --danger: #ff6b62;
+    --success: #4cc265;
+    --theme-bar: #151c26;
     --syn-keyword: #ff7b72;
     --syn-string: #a5d6ff;
     --syn-number: #79c0ff;
@@ -57,13 +73,18 @@
   }
 }
 :root[data-theme='dark'] {
-  --bg: #0d1117;
-  --fg: #e6edf3;
-  --muted: #8d96a0;
-  --border: #30363d;
-  --panel: #161b22;
-  --accent: #4493f8;
-  --danger: #f85149;
+  --bg: #0e131b;
+  --fg: #e3e8f0;
+  --muted: #909bad;
+  --border: #2c3542;
+  --panel: #151c26;
+  --accent: #6ea8ff;
+  --accent-fill: #1f6fe0;
+  --brass: #f2c25a;
+  --highlight: #d9a530;
+  --danger: #ff6b62;
+  --success: #4cc265;
+  --theme-bar: #151c26;
   --syn-keyword: #ff7b72;
   --syn-string: #a5d6ff;
   --syn-number: #79c0ff;
@@ -110,7 +131,7 @@ button {
   cursor: pointer;
 }
 button:hover { border-color: var(--muted); }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
 button.danger { color: var(--danger); background: transparent; border-color: transparent; }
 
 .topbar {
@@ -171,6 +192,8 @@ button.danger { color: var(--danger); background: transparent; border-color: tra
 }
 .banner-actions { display: flex; gap: 8px; }
 .save.error { color: var(--danger); font-weight: 600; }
+/* Changes not yet written to the file: safe in the browser, so brass, not red. */
+.save.notice { color: var(--brass); font-weight: 600; }
 
 /* Toggles and wrapping */
 button.toggle[aria-pressed='true'] {
@@ -181,6 +204,12 @@ button.toggle[aria-pressed='true'] {
 .banner.info {
   background: color-mix(in srgb, var(--accent) 10%, var(--bg));
   border-bottom-color: var(--accent);
+}
+/* Something changed that needs a decision, but nothing is lost (a file changed
+   or deleted on disk): brass, not red. */
+.banner.notice {
+  background: color-mix(in srgb, var(--highlight) 16%, var(--bg));
+  border-bottom-color: var(--brass);
 }
 
 /* Find bar */
@@ -306,7 +335,7 @@ button.icon.mono { font-family: var(--mono); font-weight: 600; }
 .tab.trashed .tab-name { text-decoration: line-through; }
 .tab-link { display: flex; align-items: center; gap: 4px; min-width: 0; padding: 6px 4px 6px 12px; color: inherit; text-decoration: none; }
 .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tab-dirty { color: var(--accent); font-size: 10px; }
+.tab-dirty { color: var(--brass); font-size: 10px; }
 .tab-close, .tab-new {
   border: 0; background: transparent; color: var(--muted); padding: 2px 8px; border-radius: 4px; line-height: 1; font-size: 16px;
   min-width: 24px; min-height: 24px;
@@ -415,7 +444,7 @@ button.icon-button:hover { opacity: 1; border-color: var(--border); }
 .history-size { color: var(--muted); font-size: 12px; }
 .history-diff { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .history-diff-head { font-size: 13px; }
-.history-diff .added { color: #1a7f37; font-weight: 600; }
+.history-diff .added { color: var(--success); font-weight: 600; }
 .history-diff .removed { color: var(--danger); font-weight: 600; }
 .history-view { flex: 1; min-height: 0; overflow: hidden; font-family: var(--mono); font-size: 13px; }
 .history-view .cm-editor { height: 100%; }
@@ -467,7 +496,7 @@ button.icon-button:hover { opacity: 1; border-color: var(--border); }
 .root-actions button.mini { padding: 0 5px; font-size: 11px; }
 .tree-chevron { flex: none; width: 1em; color: var(--muted); text-align: center; }
 .tree-name { overflow: hidden; text-overflow: ellipsis; }
-.tree-dirty { margin-left: auto; color: var(--accent); font-size: 10px; }
+.tree-dirty { margin-left: auto; color: var(--brass); font-size: 10px; }
 .tree-note { margin: 0; padding: 2px 8px; color: var(--muted); font-size: 12px; line-height: 18px; }
 p.tree-note { padding: 4px 10px 6px; white-space: normal; }
 button.primary-mini { color: var(--accent); border-color: var(--accent); margin-left: 4px; }
@@ -505,9 +534,9 @@ button.primary-mini { color: var(--accent); border-color: var(--accent); margin-
 .search-line:hover, .search-line:focus-visible { background: var(--panel); }
 .search-ln { flex: none; min-width: 3.5ch; text-align: right; color: var(--muted); }
 .search-preview { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
-.search-preview mark { background: color-mix(in srgb, #f5c400 45%, transparent); color: inherit; border-radius: 2px; }
+.search-preview mark { background: color-mix(in srgb, var(--highlight) 40%, transparent); color: inherit; border-radius: 2px; }
 .search-preview mark.replaced { background: color-mix(in srgb, var(--danger) 22%, transparent); text-decoration: line-through; }
-.search-preview ins { background: color-mix(in srgb, #2da44e 25%, transparent); text-decoration: none; border-radius: 2px; }
+.search-preview ins { background: color-mix(in srgb, var(--success) 25%, transparent); text-decoration: none; border-radius: 2px; }
 .quick-list li.on-disk .quick-name { font-style: italic; }
 
 /* Split editor (see SplitPane.vue) */
@@ -517,7 +546,7 @@ button.primary-mini { color: var(--accent); border-color: var(--accent); margin-
 .split-head select { max-width: 70%; font: inherit; padding: 2px 4px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--fg); }
 .split-head select:hover, .split-head select:focus { border-color: var(--border); }
 .split-head .spacer { flex: 1; }
-.split-dirty { color: var(--accent); font-size: 10px; }
+.split-dirty { color: var(--brass); font-size: 10px; }
 button.mini.problems { color: var(--danger); }
 .cm-vim-panel { padding: 0 8px; font-family: var(--mono); font-size: 12px; }
 .cm-vim-panel input { font: inherit; color: var(--fg); background: transparent; border: 0; outline: none; }
@@ -549,7 +578,7 @@ button.mini.problems { color: var(--danger); }
 /* Recent files, above the drafts on the start page (see recent.js). */
 .section-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .recent-files .doc-list { margin-bottom: 20px; }
-.unsaved-dot { color: var(--accent); }
+.unsaved-dot { color: var(--brass); }
 
 /* What this browser can't do, said plainly (see platform.js). */
 .platform-note { margin: -4px 0 12px; }
