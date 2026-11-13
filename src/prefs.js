@@ -32,6 +32,7 @@ const defaults = {
   keymap: 'standard', // 'standard' | 'vim'
   lint: true, // check JSON and YAML as you type
   editorConfig: true, // follow .editorconfig files in open folders
+  liveReload: true, // reload documents whose files change on disk (see livereload.js)
   indentDefault: { type: 'spaces', size: 2 }, // for file types without a convention
   wrapProse: true,
   wrapCode: false,

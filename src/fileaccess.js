@@ -61,6 +61,11 @@ async function write(handle, blob) {
   return (await handle.getFile()).lastModified
 }
 
+// Documents being written to their files right now. A change on disk
+// reported meanwhile is our own write (see livereload.js).
+const writing = new Set()
+export const isWriting = (id) => writing.has(id)
+
 // Save a document.
 //   - Linked to a file and allowed to write it: write the file in place.
 //   - Otherwise, where the browser can: ask where to save it, then link it.
@@ -101,8 +106,13 @@ export async function saveDoc(doc, { saveAs = false, confirm: confirmFn = (m) =>
 
   const blob = bytesFor(doc, confirmFn)
   if (!blob) return { result: 'cancelled' }
-  const lastModified = await write(handle, blob)
-  await linkFile(doc.id, handle, lastModified)
+  writing.add(doc.id)
+  try {
+    const lastModified = await write(handle, blob)
+    await linkFile(doc.id, handle, lastModified)
+  } finally {
+    writing.delete(doc.id)
+  }
   recordVersion(doc.id, 'saved')
   if (handle.name && handle.name !== doc.name) setDocOptions(doc.id, { name: handle.name, autoName: false })
   return { result: 'saved', name: handle.name }

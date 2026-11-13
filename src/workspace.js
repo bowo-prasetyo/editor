@@ -226,6 +226,9 @@ function onChanges(rootId, w, records) {
     const from = r.relativePathMovedFrom
     // Writing a file through its swap copy is just a change to the file.
     const type = r.type === 'moved' && isSwap(from) ? 'modified' : r.type
+    if (to.length && !isSwap(to)) {
+      emitFileEvent({ rootId, type, path: to.join('/'), from: type === 'moved' ? from?.join('/') : undefined })
+    }
     for (const parts of [to, type === 'moved' ? from : null]) {
       if (!parts?.length || isSwap(parts)) continue
       const path = parts.join('/')
@@ -241,6 +244,33 @@ function onChanges(rootId, w, records) {
   }
   if (structure) forgetIndex(rootId)
   for (const dir of dirs) if (listings.has(listingKey(rootId, dir))) relist(rootId, dir)
+}
+
+// Changes to files in open folders, for whoever wants them (see
+// livereload.js): fn({ rootId, type: 'appeared' | 'disappeared' | 'modified' | 'moved', path, from? }).
+const fileListeners = new Set()
+export function onFileEvent(fn) {
+  fileListeners.add(fn)
+  return () => fileListeners.delete(fn)
+}
+function emitFileEvent(event) {
+  for (const fn of fileListeners) {
+    try {
+      fn(event)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+}
+
+// The handle for a file at `path` in an open folder (throws if it's not there).
+export async function resolveFile(rootId, path) {
+  const root = roots.get(rootId)
+  if (!root) throw Object.assign(new Error('Folder not open'), { name: 'NotFoundError' })
+  const parts = path.split('/')
+  let dir = root.handle
+  for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part)
+  return markRaw(await dir.getFileHandle(parts.at(-1)))
 }
 
 // Read a folder shown in the tree again, in place (no "Loading…").
@@ -412,9 +442,15 @@ export const findWorkspaceDoc = (rootId, path) =>
 //   'conflict'  both changed: the document's unsaved changes are kept (saving asks first)
 export async function refreshFromDisk(doc, file, handle) {
   if (!doc.diskModified || file.lastModified <= doc.diskModified) return 'same'
-  if (doc.diskDirty) return 'conflict'
   const decoded = decodeBytes(new Uint8Array(await file.arrayBuffer()))
   if (decoded.binary) return 'same'
+  // The file now holds exactly this text (our own save, or the same edit
+  // made elsewhere): nothing to reload, and nothing unsaved any more.
+  if (decoded.text === doc.content) {
+    await linkFile(doc.id, handle, file.lastModified)
+    return 'same'
+  }
+  if (doc.diskDirty) return 'conflict'
   if (decoded.text !== doc.content) {
     await recordVersion(doc.id, 'auto')
     updateDoc(doc.id, { content: decoded.text })

@@ -22,6 +22,7 @@ import { EditorView } from '@codemirror/view'
 import { whitespaceFix } from '../textops'
 import { docEditorConfig, editedInOtherPane, helpOptions, keysFor, noteEdit, saveFixes } from '../editorsetup'
 import SplitPane from '../components/SplitPane.vue'
+import { checkDoc, diskNotices, keepMine, reloadFromDisk } from '../livereload'
 import { AUTO, PLAIN, findLanguage, languageNames, loadLanguage } from '../languages'
 import FindBar from '../components/FindBar.vue'
 import GoToBar from '../components/GoToBar.vue'
@@ -97,6 +98,7 @@ const eol = computed({
 const inPlace = canSaveInPlace()
 const fileStatus = computed(() => {
   if (!doc.value?.linked) return ''
+  if (diskNotices[props.id]?.kind === 'deleted') return 'File not on disk'
   return doc.value.diskDirty ? 'Not saved to file' : 'Saved to file'
 })
 let saving = false
@@ -129,6 +131,19 @@ function fixWhitespace() {
   const { trim, finalNewline } = saveFixes(doc.value, projectConfig.value)
   if (!trim && !finalNewline) return
   current()?.apply(whitespaceFix({ trim, finalNewline }))
+}
+
+// --- The file changed on disk (see livereload.js) ------------------------------------
+
+// Shown a document: catch up with its file (changes made while it wasn't watched).
+watch(() => props.id, (id) => checkDoc(id).catch(() => {}), { immediate: true })
+const diskNotice = computed(() => diskNotices[props.id] ?? null)
+async function onReloadFromDisk() {
+  try {
+    if (await reloadFromDisk(props.id)) showToast('Reloaded from disk. Your text was kept as a version (see History).', { timeout: 5000 })
+  } catch (e) {
+    showToast(`Couldn't read the file: ${e.message}`)
+  }
 }
 
 // --- The project's .editorconfig (documents opened from a folder) ------------------
@@ -660,6 +675,26 @@ onBeforeUnmount(() => {
       </span>
     </div>
 
+    <div v-if="diskNotice?.kind === 'changed'" class="banner info" role="alert">
+      <span v-if="doc.diskDirty">
+        <strong>“{{ name }}” changed on disk</strong>, and you have changes not saved to it.
+        Reload to take the file's text (yours is kept in History), or keep yours (Save will ask before replacing the file).
+      </span>
+      <span v-else><strong>“{{ name }}” changed on disk.</strong></span>
+      <span class="banner-actions">
+        <button class="primary" @click="onReloadFromDisk">Reload from disk</button>
+        <button @click="keepMine(doc.id)">{{ doc.diskDirty ? 'Keep mine' : 'Not now' }}</button>
+      </span>
+    </div>
+    <div v-else-if="diskNotice?.kind === 'deleted'" class="banner info" role="status">
+      <span>
+        <strong>“{{ name }}” was deleted or moved on disk.</strong> Your text is still here; Save asks where to save it.
+      </span>
+      <span class="banner-actions">
+        <button @click="keepMine(doc.id)">OK</button>
+      </span>
+    </div>
+
     <div v-if="status === 'error'" class="banner" role="alert">
       <span>
         <strong>Not saved.</strong> Your browser's storage is full or unavailable, so these changes
@@ -750,8 +785,8 @@ onBeforeUnmount(() => {
         <template v-if="fileStatus">
           ·
           <span
-            :class="['save', { error: doc.diskDirty }]"
-            :title="doc.diskDirty ? 'Press Ctrl/Cmd+S to write your changes to the file' : 'The file on disk matches'"
+            :class="['save', { error: doc.diskDirty || fileStatus === 'File not on disk' }]"
+            :title="fileStatus === 'File not on disk' ? 'The file was deleted or moved: Save asks where to save' : doc.diskDirty ? 'Press Ctrl/Cmd+S to write your changes to the file' : 'The file on disk matches'"
           >{{ fileStatus }}</span>
         </template>
       </span>

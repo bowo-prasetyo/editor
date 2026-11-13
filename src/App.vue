@@ -9,6 +9,8 @@ import ShortcutsDialog from './components/ShortcutsDialog.vue'
 import FileTree from './components/FileTree.vue'
 import { canOpenFolder, forgetListings, loadWorkspaces, openFolder } from './workspace'
 import { saveAll } from './saveall'
+import { checkOpenDocs, setReloadedHandler, startLiveReload } from './livereload'
+import { displayName } from './naming'
 import { unsavedToDisk } from './fileaccess'
 import { registerCommands, ui } from './commands'
 import { createDoc, downloadBackup, requestPersistence } from './store'
@@ -82,6 +84,16 @@ if ('launchQueue' in window) {
 
 // Folders opened from disk, shown in the sidebar (Chrome, Edge).
 loadWorkspaces()
+
+// Live reload: documents follow changes to their files on disk (see
+// livereload.js). Files are checked again when the window comes back.
+startLiveReload()
+setReloadedHandler((doc) => {
+  if (route.name === 'edit' && route.params.id === doc?.id) {
+    showToast(`Reloaded “${displayName(doc.name)}”: it changed on disk.`, { timeout: 2500 })
+  }
+})
+const onVisible = () => document.visibilityState === 'visible' && checkOpenDocs()
 const showSidebar = computed(() => prefs.sidebar && prefs.workspaces.length > 0 && canOpenFolder())
 async function onOpenFolder() {
   try {
@@ -154,8 +166,16 @@ function onDrop(e) {
 }
 
 const events = { dragenter: onDragEnter, dragleave: onDragLeave, dragover: onDragOver, drop: onDrop, keydown: onKey }
-onMounted(() => Object.entries(events).forEach(([k, f]) => window.addEventListener(k, f)))
-onBeforeUnmount(() => Object.entries(events).forEach(([k, f]) => window.removeEventListener(k, f)))
+onMounted(() => {
+  Object.entries(events).forEach(([k, f]) => window.addEventListener(k, f))
+  window.addEventListener('focus', checkOpenDocs)
+  document.addEventListener('visibilitychange', onVisible)
+})
+onBeforeUnmount(() => {
+  Object.entries(events).forEach(([k, f]) => window.removeEventListener(k, f))
+  window.removeEventListener('focus', checkOpenDocs)
+  document.removeEventListener('visibilitychange', onVisible)
+})
 </script>
 
 <template>

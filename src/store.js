@@ -358,6 +358,13 @@ export async function linkFile(id, handle, lastModified) {
 export const storedHandle = (key) => backend?.getHandle(key) ?? Promise.resolve(null)
 export const storeHandle = (key, handle) => backend.putHandle(key, handle)
 
+// The file moved or was renamed on disk: the document now goes with the
+// handle for its new place. Nothing else changes (unsaved changes stay unsaved).
+export async function relinkFile(id, handle) {
+  handleCache.set(id, handle)
+  await backend.putHandle(id, handle)
+}
+
 export async function unlinkFile(id) {
   handleCache.delete(id)
   await backend.putHandle(id, null)

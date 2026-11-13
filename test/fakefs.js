@@ -11,6 +11,7 @@ export class FakeFile {
     this.lastModified = (this.lastModified ?? 1000) + 1
   }
   async getFile() {
+    if (this.missing) throw Object.assign(new Error('gone'), { name: 'NotFoundError' })
     return new File([this.bytes], this.name, { lastModified: this.lastModified })
   }
   async createWritable() {
