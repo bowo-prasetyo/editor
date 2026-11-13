@@ -12,7 +12,7 @@ export default [
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
-      globals: { ...globals.browser },
+      globals: { ...globals.browser, __APP_VERSION__: 'readonly' }, // set by vite.config.js
     },
     rules: {
       // `catch (e) {}` and unused `_`-prefixed arguments are deliberate here.
