@@ -168,8 +168,12 @@ async function recoverRescued() {
     }
     const local = isDoc(doc) && getDoc(doc.id)
     if (isDoc(doc) && (!local || (doc.updatedAt ?? 0) >= (local.updatedAt ?? 0))) {
-      if (local) Object.assign(local, doc)
-      else state.docs.push(doc)
+      if (local) {
+        // The copy is the whole document as it was: fields removed since the
+        // last write (e.g. deletedAt, after restoring from the Trash) go too.
+        for (const k of Object.keys(local)) if (!(k in doc)) delete local[k]
+        Object.assign(local, doc)
+      } else state.docs.push(doc)
       state.status[doc.id] = 'pending'
       await flush(doc.id) // drops the copy once written
     } else {

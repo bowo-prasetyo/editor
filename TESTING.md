@@ -74,6 +74,7 @@ The scenarios follow the principles in [VISION.md](VISION.md#principles).
 | Text typed just before the tab closes is kept | `storage.spec.js` |
 | Browser storage fails: the problem is shown, and *Try again* saves once there's room | `storage.spec.js` |
 | Browser storage fails and the tab is closed: the browser warns, and a rescue copy brings the text back | `storage.spec.js` |
+| A rescue copy brings back fields removed since the last write too (a draft restored from the Trash just before the page closed stays restored) | `test/store.test.js` |
 | A document edited in one tab shows up in another | `storage.spec.js` |
 | Deleting a document can be undone | `storage.spec.js` |
 | A file changed on disk never replaces unsaved text: *Keep mine* keeps it, and Save still asks | `livereload.spec.js` |

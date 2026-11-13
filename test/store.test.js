@@ -312,6 +312,22 @@ test('indexedDB: a write cut off by closing the page is recovered from the rescu
   assert.equal(s3.getDoc(d.id).content, 'typed just before closing')
 })
 
+test('indexedDB: a rescue copy also brings back fields removed since the last write (restored from the Trash)', async () => {
+  useIDB()
+  const s = await load()
+  const d = s.createDoc('a.txt', 'keep me')
+  await s.trashDoc(d.id) // in IndexedDB: in the Trash
+  // Restored, and the page closes before that write lands: only the rescue copy has it.
+  delete s.getDoc(d.id).deletedAt
+  s.state.status[d.id] = 'pending'
+  assert.equal(s.rescueUnsaved(), true)
+
+  const s2 = await load()
+  assert.equal(s2.getDoc(d.id).deletedAt, undefined, 'out of the Trash, as it was when the page closed')
+  const s3 = await load()
+  assert.equal(s3.getDoc(d.id).deletedAt, undefined)
+})
+
 test('indexedDB: an older rescue copy never replaces a newer saved version', async () => {
   useIDB()
   const s = await load()
