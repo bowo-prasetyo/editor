@@ -218,7 +218,7 @@ test('backup round trip adds missing docs, skips identical ones, copies changed 
   assert.ok(s.state.docs.find((d) => d.name === 'a.txt (from backup)' && d.content === 'A'))
 
   assert.deepEqual(s.importBackup(backup), { added: 0, skipped: 2 }, 'importing twice adds nothing')
-  assert.throws(() => s.importBackup({ docs: [] }), /isn't an editor backup\./)
+  assert.throws(() => s.importBackup({ docs: [] }), /isn't a Plumb backup\./)
 })
 
 // --- IndexedDB ---------------------------------------------------------------

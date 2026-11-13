@@ -1,6 +1,6 @@
-# editor
+# Plumb
 
-A minimal, client-only text editor that runs entirely in the browser. Built with Vue 3, Vue Router and Vite.
+Plumb is a minimal, client-only text editor that runs entirely in the browser. Built with Vue 3, Vue Router and Vite.
 
 - No server: documents are stored in your browser, in IndexedDB (hundreds of MB; falls back to `localStorage`, about 5 MB, where IndexedDB isn't available). Documents from earlier versions, which used `localStorage`, are moved over automatically. Saving happens shortly after you stop typing; the status bar shows *Saving… / Saved / Not saved*. If the page closes mid-save, a rescue copy is recovered on the next visit. The document list shows how much space is used, and the app asks the browser to keep its storage when you create or open a document.
 - Safe across tabs: documents created or edited in another tab show up live; if two tabs change the same document, the other tab's version is kept as a copy.

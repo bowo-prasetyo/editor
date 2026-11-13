@@ -1,4 +1,4 @@
-// Service worker: makes the editor work offline. Generated at build time
+// Service worker: makes Plumb work offline. Generated at build time
 // (see build/pwa.js), which fills in the version and the list of files.
 const VERSION = __VERSION__
 const FILES = __FILES__ // every built file, relative to this script
