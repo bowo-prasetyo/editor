@@ -8,6 +8,12 @@ minor version (0.x) can change how things work.
 
 ### Added
 
+- **Plumb in Japanese (日本語).** Every message, including the editor's own
+  panels, with Japanese number and date formats and 「」 quotation marks. A
+  browser set to Japanese gets it from the first visit; **Settings →
+  Language** picks it anywhere. The words used are in
+  [Translating Plumb](docs/translating.md#japanese); corrections from native
+  speakers are welcome.
 - **Plumb in Indonesian (Bahasa Indonesia).** Every message, including the
   editor's own panels, with Indonesian number and date formats. A browser set
   to Indonesian gets it from the first visit; **Settings → Language** picks

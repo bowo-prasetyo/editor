@@ -168,11 +168,12 @@ Markdown and keep the editor focused; the status bar folds its controls
 behind a details button. Ctrl/Cmd+Shift+E shows and hides the sidebar in
 Markdown too (`markdown.spec.js`).
 
-Indonesian (`test/i18n.test.js`, `e2e/i18n.spec.js`): the catalog has every
-English message (only `_other` plural forms, as Indonesian has one); a
-browser set to Indonesian gets Plumb in Indonesian from the first visit, with
-"Bahasa Indonesia" in Settings; counts, numbers and new drafts' names read as
-Indonesian; and on every screen no text matches an English message (a check
+The translations, Indonesian and Japanese (`test/i18n.test.js`,
+`e2e/i18n.spec.js`): every translation has every English message, in exactly
+the plural forms its language uses (`Intl.PluralRules`); a browser set to the
+language gets Plumb in it from the first visit, with the language named in
+its own words in Settings; counts, numbers and new drafts' names read as that
+language; and on every screen no text matches an English message (a check
 shown to find English on the English start page).
 
 Translation (`test/i18n.test.js`, `e2e/i18n.spec.js`): messages fill in

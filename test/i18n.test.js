@@ -189,19 +189,30 @@ test('translations use the catalog’s keys and the same placeholders as English
   }
 })
 
-// --- Indonesian -------------------------------------------------------------------
+// --- The translations that ship ---------------------------------------------------
 
-const id = JSON.parse(readFileSync(new URL('../src/locales/id.json', import.meta.url)))
+const shipped = readdirSync(new URL('../src/locales/', import.meta.url))
+  .filter((f) => f.endsWith('.json') && f !== 'en.json')
+  .map((f) => [f.replace(/\.json$/, ''), JSON.parse(readFileSync(new URL(`../src/locales/${f}`, import.meta.url)))])
 
-test('Indonesian has every message (one plural form, so no _one keys)', () => {
-  const have = new Set(flatten(id).map(([key]) => baseKey(key)))
-  const missing = [...new Set(messages.map(([key]) => baseKey(key)))].filter((key) => !have.has(key))
-  assert.deepEqual(missing, [])
-  assert.deepEqual(flatten(id).filter(([key]) => /_(zero|one|two|few|many)$/.test(key)), [], 'Indonesian plurals are all "other"')
+test('every translation has every message, in the plural forms its language uses', () => {
+  assert.ok(shipped.length >= 2, 'Indonesian and Japanese at least')
+  const englishKeys = [...new Set(messages.map(([key]) => baseKey(key)))]
+  const englishPlurals = new Set(messages.filter(([key]) => PLURAL.test(key)).map(([key]) => baseKey(key)))
+  for (const [lang, catalog] of shipped) {
+    const categories = new Intl.PluralRules(lang).resolvedOptions().pluralCategories
+    const keys = new Set(flatten(catalog).map(([key]) => key))
+    const missing = englishKeys.filter((key) =>
+      englishPlurals.has(key) ? !categories.every((c) => keys.has(`${key}_${c}`)) : !keys.has(key),
+    )
+    assert.deepEqual(missing, [], `${lang}: missing`)
+    const stray = [...keys].filter((key) => PLURAL.test(key) && !categories.includes(key.match(PLURAL)[1]))
+    assert.deepEqual(stray, [], `${lang}: plural forms the language doesn't have`)
+  }
 })
 
-test('in Indonesian: its words, its plural, its numbers and dates', async () => {
-  registerCatalogs({ id: async () => id })
+test('in Indonesian and Japanese: their words, plurals, numbers and dates', async () => {
+  registerCatalogs(Object.fromEntries(shipped.map(([lang, catalog]) => [lang, async () => catalog])))
   try {
     assert.equal(await useLanguage('', ['id-ID']), 'id')
     assert.equal(t('common.newDocument'), 'Dokumen baru')
@@ -210,6 +221,13 @@ test('in Indonesian: its words, its plural, its numbers and dates', async () => 
     assert.equal(t('home.trashNote', { count: 30 }), 'Dokumen di Tempat Sampah dihapus selamanya setelah 30 hari.')
     assert.equal(locale(), 'id')
     assert.equal(languageName('id'), 'Bahasa Indonesia')
+
+    assert.equal(await useLanguage('', ['ja-JP', 'en']), 'ja')
+    assert.equal(t('common.newDocument'), '新しいドキュメント')
+    assert.equal(t('editor.words', { count: 1234 }), '1,234 語')
+    assert.equal(t('save.saved', { name: 'メモ.txt' }), '「メモ.txt」に保存しました。')
+    assert.equal(locale(), 'ja')
+    assert.equal(languageName('ja'), '日本語')
   } finally {
     await useLanguage('en')
   }

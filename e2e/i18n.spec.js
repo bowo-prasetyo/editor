@@ -168,20 +168,22 @@ test('the language can be changed in Settings, and applies at once', async ({ pa
   await expect(page.locator('html')).toHaveAttribute('lang', 'en')
 })
 
-// --- Indonesian -------------------------------------------------------------------
+// --- The translations that ship ------------------------------------------------
 
-// English messages that read differently in Indonesian, as patterns that match
-// the whole text ({{placeholders}} match anything). Seeing one means a word
-// on screen didn't come through the translation.
+// English messages that read differently in a translation, as patterns that
+// match the whole text ({{placeholders}} match anything). Seeing one means a
+// word on screen didn't come through the translation.
 const catalog = (lang) => JSON.parse(readFileSync(new URL(`../src/locales/${lang}.json`, import.meta.url)))
 const flatten = (node, path = '') =>
   Object.entries(node).flatMap(([k, v]) => (typeof v === 'string' ? [[path + k, v]] : flatten(v, `${path}${k}.`)))
-const indonesian = new Map(flatten(catalog('id')).map(([k, v]) => [k.replace(/_other$/, ''), v]))
-const ENGLISH = flatten(catalog('en'))
-  .filter(([k, v]) => !v.includes('<') && indonesian.get(k.replace(/_(one|other)$/, '')) !== v)
-  .map(([, v]) => `^${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\{\\\{\s*\w+\s*\\\}\\\}/g, '.+')}$`)
+function englishPatterns(lang) {
+  const translated = new Map(flatten(catalog(lang)).map(([k, v]) => [k.replace(/_other$/, ''), v]))
+  return flatten(catalog('en'))
+    .filter(([k, v]) => !v.includes('<') && translated.get(k.replace(/_(one|other)$/, '')) !== v)
+    .map(([, v]) => `^${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\{\\\{\s*\w+\s*\\\}\\\}/g, '.+')}$`)
+}
 
-async function englishLeft(page) {
+async function englishLeft(page, lang) {
   return page.evaluate((patterns) => {
     const english = patterns.map((p) => new RegExp(p))
     const visible = (el) => el && el.getClientRects().length > 0
@@ -196,43 +198,62 @@ async function englishLeft(page) {
     }
     const clean = (s) => s.replace(/^[\s·▸▾]+|[\s·]+$/g, '')
     return [...new Set(texts.map(clean))].filter((s) => s && english.some((re) => re.test(s)))
-  }, ENGLISH)
+  }, englishPatterns(lang))
 }
 
-test.describe('in Indonesian', () => {
-  test.use({ locale: 'id-ID' })
+// What each language should show: the browser's locale, a few words, and a
+// short text typed with the counts it should give.
+const LANGUAGES = [
+  {
+    lang: 'id', locale: 'id-ID', name: 'Indonesian',
+    welcome: 'Selamat datang di Plumb', newDocument: 'Dokumen baru', languageLabel: 'Bahasa',
+    auto: 'Sama dengan peramban (Bahasa Indonesia)', openDocuments: 'Dokumen yang terbuka', untitled: 'Tanpa judul.md',
+    type: 'satu dua tiga', counts: /^1 baris · 3 kata · 13 karakter/,
+  },
+  {
+    lang: 'ja', locale: 'ja-JP', name: 'Japanese',
+    welcome: 'Plumb へようこそ', newDocument: '新しいドキュメント', languageLabel: '言語',
+    auto: 'ブラウザーと同じ（日本語）', openDocuments: '開いているドキュメント', untitled: '無題.md',
+    type: 'こんにちは 世界', counts: /^1 行 · 2 語 · 8 文字/,
+  },
+]
 
-  test('a browser in Indonesian gets Plumb in Indonesian, from the first visit', async ({ page }) => {
-    await page.goto('./')
-    await expect(page.locator('html')).toHaveAttribute('lang', 'id')
-    await expect(page.getByRole('heading', { name: 'Selamat datang di Plumb' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Dokumen baru' })).toBeVisible()
-    expect(await englishLeft(page)).toEqual([])
-    await page.goto('./#/settings')
-    await expect(page.getByRole('combobox', { name: 'Bahasa' }).locator('option').first()).toHaveText('Sama dengan peramban (Bahasa Indonesia)')
-  })
+for (const l of LANGUAGES) {
+  test.describe(`in ${l.name}`, () => {
+    test.use({ locale: l.locale })
 
-  test('no English is left on any screen', async ({ page }) => {
-    await useFakeDisk(page)
-    await page.goto('./')
-    const seen = {}
-    await visitEveryScreen(page, async (screen) => (seen[screen] = await englishLeft(page)))
-    expect(nonEmpty(seen)).toEqual({})
-  })
+    test(`a browser in ${l.name} gets Plumb in ${l.name}, from the first visit`, async ({ page }) => {
+      await page.goto('./')
+      await expect(page.locator('html')).toHaveAttribute('lang', l.lang)
+      await expect(page.getByRole('heading', { name: l.welcome })).toBeVisible()
+      await expect(page.getByRole('button', { name: l.newDocument })).toBeVisible()
+      expect(await englishLeft(page, l.lang)).toEqual([])
+      await page.goto('./#/settings')
+      await expect(page.getByRole('combobox', { name: l.languageLabel }).locator('option').first()).toHaveText(l.auto)
+    })
 
-  test('counts, numbers and new drafts read as Indonesian', async ({ page }) => {
-    await page.goto('./')
-    await page.getByRole('button', { name: 'Dokumen baru' }).click()
-    await expect(page.getByRole('navigation', { name: 'Dokumen yang terbuka' })).toContainText('Tanpa judul.md')
-    await editor(page).click()
-    await page.keyboard.type('satu dua tiga')
-    await expect(page.locator('.status-counts')).toHaveText(/^1 baris · 3 kata · 13 karakter/)
+    test('no English is left on any screen', async ({ page }) => {
+      await useFakeDisk(page)
+      await page.goto('./')
+      const seen = {}
+      await visitEveryScreen(page, async (screen) => (seen[screen] = await englishLeft(page, l.lang)))
+      expect(nonEmpty(seen)).toEqual({})
+    })
+
+    test(`counts, numbers and new drafts read as ${l.name}`, async ({ page }) => {
+      await page.goto('./')
+      await page.getByRole('button', { name: l.newDocument }).click()
+      await expect(page.getByRole('navigation', { name: l.openDocuments })).toContainText(l.untitled)
+      await editor(page).click()
+      await page.keyboard.type(l.type)
+      await expect(page.locator('.status-counts')).toHaveText(l.counts)
+    })
   })
-})
+}
 
 test('the check for English left over finds it (on the English start page)', async ({ page }) => {
   await page.goto('./')
-  const found = await englishLeft(page)
+  const found = await englishLeft(page, 'ja')
   expect(found).toContain('Welcome to Plumb')
   expect(found).toContain('New document')
 })

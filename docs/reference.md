@@ -418,8 +418,8 @@ anything that matters to a file.
 Open them with ⚙ in the header, or Ctrl+,. They're kept in this browser and
 applied at once.
 
-- **Language:** the browser's, or one you choose: English or Indonesian
-  (Bahasa Indonesia) so far. Numbers and dates follow it.
+- **Language:** the browser's, or one you choose: English, Indonesian
+  (Bahasa Indonesia) or Japanese (日本語) so far. Numbers and dates follow it.
   [Translations are welcome](translating.md).
 - **Theme:** same as the system, light or dark.
 - **Font:** the system's monospace font, a common coding font (JetBrains Mono,
