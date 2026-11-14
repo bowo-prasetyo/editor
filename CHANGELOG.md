@@ -4,143 +4,12 @@ What changed in each version of Plumb, newest first. Versions follow
 [semantic versioning](https://semver.org/); while Plumb is below 1.0, a new
 minor version (0.x) can change how things work.
 
-## Unreleased
+## [0.2.0] – 2026-11-14
 
-### Added
-
-- **Plumb in Japanese (日本語).** Every message, including the editor's own
-  panels, with Japanese number and date formats and 「」 quotation marks. A
-  browser set to Japanese gets it from the first visit; **Settings →
-  Language** picks it anywhere. The words used are in
-  [Translating Plumb](docs/translating.md#japanese); corrections from native
-  speakers are welcome.
-- **Plumb in Indonesian (Bahasa Indonesia).** Every message, including the
-  editor's own panels, with Indonesian number and date formats. A browser set
-  to Indonesian gets it from the first visit; **Settings → Language** picks
-  it anywhere. Native speakers' corrections are welcome: the words used are in
-  [Translating Plumb](docs/translating.md#indonesian).
-- **New drafts are named in the interface language** ("Untitled.md",
-  "Tanpa judul.md"), and so is a document without a name.
-- **Plumb can be translated.** Every word on screen (about 650 messages,
-  including the editor's own panels) now comes from one catalog,
-  `src/locales/en.json`, in the i18next JSON format translation tools use.
-  Plural forms follow each language's rules, and numbers and dates follow the
-  language. **Settings → Language** picks one, or follows the browser. Only
-  English so far: [Translating Plumb](docs/translating.md) explains how to add
-  a language. A pseudo-language (development builds only) shows anything left
-  untranslatable, and a test checks every screen with it.
-- **Screenshots in the README**, in light and dark (GitHub shows the one that
-  matches your theme), and a **brand note**, [docs/brand.md](docs/brand.md):
-  the name, the logo and how to use it, the palette and what each colour
-  means, type, and how Plumb talks. `npm run screenshots` and
-  `npm run palette` redraw the pictures, and a test fails if the palette
-  picture falls out of date.
-- **A logo and favicon.** The text cursor hangs true as a plumb line, ending in
-  a brass plumb bob. New app icons, a favicon (SVG, with a `.ico` for older
-  browsers), the mark in the header, and a logo with a wordmark in the README.
-  Regenerate the bitmaps with `npm run icons`.
-- **A welcome on the first visit.** Until there's anything to list, the start
-  page explains files (on your disk; Save writes them back) and drafts (in
-  this browser), instead of one line and a storage warning.
-- **Ctrl/Cmd+Shift+E shows or hides the folder sidebar** in any document,
-  Markdown included. Ctrl/Cmd+B still does outside Markdown, where it isn't
-  bold.
-- **A Split button** in the editor's toolbar (it was only Ctrl/Cmd+\\ or the
-  palette).
-- **Recently used commands first** in the command palette.
-- **Closing the tab of a file with unsaved changes says they're kept**, with
-  *Reopen*.
-- **Phones and tablets:** on narrow screens the toolbar keeps *Preview*,
-  *Find* and *Save* and puts the rest under *More*, and the status bar folds
-  its controls behind **⋯**, which leaves about twice the room for text. On
-  touch screens, Markdown documents get **B** and *I* buttons.
-
-### Changed
-
-- **Groundwork for translating Plumb.** Numbers, dates, sizes and sorting all
-  use one locale, set in one place (`src/locale.js`). It is still the
-  browser's own, so nothing looks different, except that the status bar and
-  find counts now group digits (*1,206 words*) like the rest of the app, and
-  version history says *now* for a version made in the last minute. Command
-  groups, shortcut groups and a file's status are now kept as ids with the
-  words shown looked up separately, so a translated word can't change how Plumb
-  behaves.
-- **The docs are easier to follow.** The reference names the parts of the
-  screen before using them, says plainly that drafts live in this browser
-  only (and what deletes them), and has a new *Troubleshooting* section. Its
-  keyboard shortcuts are grouped as in the F1 list, with the missing ones
-  added (next and previous match, replace all, select the line) and the Mac
-  and redo keys corrected.
-- **Plumb's own colours.** The interface takes the logo's ink blue, with greys
-  that lean towards it, in place of GitHub's palette. **Brass** now means
-  "notice this, nothing is lost": changes not yet saved to a file (the dot on
-  tabs, in the sidebar and on the start page, and *Not saved to file* in the
-  status bar, which was red), find matches, and the banner for a file changed
-  or deleted on disk. Red is kept for real problems, such as a failed save. The
-  text cursor is blue, and the browser's or installed app's title bar matches
-  the top bar in light and dark instead of staying bright blue.
-- **The save status is honest about files on disk.** The status bar used to
-  say "Saved ✓ · Not saved to file" for an edited file, and the header
-  "Everything is saved in your browser". Now a file's own state comes first,
-  the browser part reads *Edits kept in browser ✓* until you save, and the
-  header says edits are kept in your browser until you save them.
-- **Easier to see and to hit:**
-  - The status bar's controls, the tab close buttons and the sidebar's folder
-    buttons are at least 24×24 px.
-  - Pressed toggles (*Wrap*, *Spelling*, *Preview*) and the current item in
-    lists use a darker blue, above 4.5:1 contrast in both themes.
-  - The file name has a faint border, so it reads as something you can
-    rename.
-  - Messages sit above the status bar instead of covering it.
-- **For screen readers and voice control:**
-  - The open documents are a list of links, the current one marked, each
-    with its own close button. Before, they were ARIA tabs with a button
-    inside.
-  - Every screen has a top-level heading.
-  - The text size buttons are named *Smaller text* and *Larger text* by their
-    content, not by a label that differs from what's on screen.
-
-### Fixed
-
-- **Find no longer shows "NaN"** once a search has 1,000 matches or more.
-- **Small wording fixes** that came with translation: lists of names read
-  "a, b and c", quotation marks are curly everywhere, and versions kept before
-  reloading from disk or replacing in files are stored as a kind of version,
-  not English words, so they read in whatever language Plumb is in.
-- **Words in Chinese, Japanese, Thai, Lao, Khmer and Burmese are counted.**
-  These languages don't put spaces between words, so a whole sentence counted
-  as one word. The browser's word breaker now splits them.
-- **A draft named after a long first line no longer ends in half an emoji**
-  (or a letter without its accent): the name is cut between characters as you
-  see them.
-- **The quick switcher matches accented letters however they're stored.**
-  Typing *café* finds a file whose name macOS stored as *cafe* plus a separate
-  accent, and the highlight covers the whole letter. Letters such as *İ*, which
-  turn into two characters when lowercased, no longer move the highlight.
-- **Contrast in dark mode:** primary buttons (white on light blue, 3.1:1) and
-  *added* lines in History (3.7:1) now pass 4.5:1, and so do code comments on
-  the current line in light mode (4.2:1). A test checks every text colour on
-  its backgrounds in both themes.
-- **Dialogs keep the keyboard to themselves.** In the shortcuts list, the
-  quick switcher and command palette, *Save to folder* and *Close folder*,
-  Tab and Shift+Tab now stay inside the dialog, Escape closes it wherever
-  focus is, and focus goes back where it was when it closes. Before, Tab
-  could move focus to the page behind, where keys typed for the dialog
-  edited the document (`src/modal.js`).
-- **The folder sidebar is a proper tree for screen readers.** Each open
-  folder is its own tree, holding only tree items: the folder's row, its
-  files and folders, and *Loading…* / *Empty* as items you can't pick. The
-  folder's buttons and notes (*Put the edits back*, *Allow access*) sit next
-  to its tree rather than inside it, where they made the tree invalid.
-- **Enter and Space press the sidebar's buttons.** On *+ File*, *+ Folder*,
-  *Put the edits back* and the others, the tree's own keys used to take them,
-  so the buttons couldn't be pressed from the keyboard.
-
-## [0.2.0] – 2026-11-13
-
-The first release since the product review. The editor became **Plumb**,
-with a written [vision](VISION.md) and one clear model:
-**files stay on your disk, and the browser holds drafts.**
+**Plumb's first release.** The editor became **Plumb**, with a written
+[vision](VISION.md) and one clear model: **files stay on your disk, and the
+browser holds drafts.** It also has its own look, and speaks English,
+Indonesian and Japanese.
 
 ### Highlights
 
@@ -173,6 +42,19 @@ with a written [vision](VISION.md) and one clear model:
   reason, a one-time note explains that Save downloads a copy, and each
   download says where it went.
   ([#31](https://github.com/bowo-prasetyo/plumb/pull/31))
+- **Plumb in Indonesian and Japanese**, and ready for more languages.
+  ([#41](https://github.com/bowo-prasetyo/plumb/pull/41),
+  [#42](https://github.com/bowo-prasetyo/plumb/pull/42),
+  [#43](https://github.com/bowo-prasetyo/plumb/pull/43),
+  [#44](https://github.com/bowo-prasetyo/plumb/pull/44))
+- **Its own look:** a logo, and a palette of ink blue with brass for calm
+  notices.
+  ([#34](https://github.com/bowo-prasetyo/plumb/pull/34),
+  [#38](https://github.com/bowo-prasetyo/plumb/pull/38))
+- **Easier to use, from the keyboard, with a screen reader, and on a phone.**
+  ([#35](https://github.com/bowo-prasetyo/plumb/pull/35),
+  [#36](https://github.com/bowo-prasetyo/plumb/pull/36),
+  [#37](https://github.com/bowo-prasetyo/plumb/pull/37))
 
 ### Added
 
@@ -181,17 +63,72 @@ with a written [vision](VISION.md) and one clear model:
   ([#18](https://github.com/bowo-prasetyo/plumb/pull/18),
   [#20](https://github.com/bowo-prasetyo/plumb/pull/20),
   [#21](https://github.com/bowo-prasetyo/plumb/pull/21))
-- The **Folders** button in the header shows or hides the folder sidebar.
-  ([#29](https://github.com/bowo-prasetyo/plumb/pull/29))
-- *Go to heading…* in the command palette.
-  ([#30](https://github.com/bowo-prasetyo/plumb/pull/30))
+- **Plumb in Japanese (日本語).** Every message, including the editor's own
+  panels, with Japanese number and date formats and 「」 quotation marks. A
+  browser set to Japanese gets it from the first visit; **Settings →
+  Language** picks it anywhere. The words used are in
+  [Translating Plumb](docs/translating.md#japanese); corrections from native
+  speakers are welcome.
+  ([#44](https://github.com/bowo-prasetyo/plumb/pull/44))
+- **Plumb in Indonesian (Bahasa Indonesia).** Every message, including the
+  editor's own panels, with Indonesian number and date formats. A browser set
+  to Indonesian gets it from the first visit; **Settings → Language** picks
+  it anywhere. Native speakers' corrections are welcome: the words used are in
+  [Translating Plumb](docs/translating.md#indonesian).
+  ([#43](https://github.com/bowo-prasetyo/plumb/pull/43))
+- **Plumb can be translated.** Every word on screen (about 650 messages,
+  including the editor's own panels) comes from one catalog,
+  `src/locales/en.json`, in the i18next JSON format translation tools use.
+  Plural forms follow each language's rules, and numbers and dates follow the
+  language. **Settings → Language** picks one, or follows the browser.
+  [Translating Plumb](docs/translating.md) explains how to add a language.
+  ([#41](https://github.com/bowo-prasetyo/plumb/pull/41),
+  [#42](https://github.com/bowo-prasetyo/plumb/pull/42))
+- **New drafts are named in the interface language** ("Untitled.md",
+  "Tanpa judul.md"), and so is a document without a name.
+  ([#43](https://github.com/bowo-prasetyo/plumb/pull/43))
+- **A logo and favicon.** The text cursor hangs true as a plumb line, ending in
+  a brass plumb bob. New app icons, a favicon (SVG, with a `.ico` for older
+  browsers), the mark in the header, and a logo with a wordmark in the README.
+  ([#34](https://github.com/bowo-prasetyo/plumb/pull/34))
+- **A welcome on the first visit.** Until there's anything to list, the start
+  page explains files (on your disk; Save writes them back) and drafts (in
+  this browser), instead of one line and a storage warning.
+  ([#36](https://github.com/bowo-prasetyo/plumb/pull/36))
+- The **Folders** button in the header shows or hides the folder sidebar, and
+  so does **Ctrl/Cmd+Shift+E** in any document, Markdown included.
+  ([#29](https://github.com/bowo-prasetyo/plumb/pull/29),
+  [#36](https://github.com/bowo-prasetyo/plumb/pull/36))
+- **A Split button** in the editor's toolbar (it was only Ctrl/Cmd+\\ or the
+  palette).
+  ([#36](https://github.com/bowo-prasetyo/plumb/pull/36))
+- **Recently used commands first** in the command palette, and *Go to
+  heading…* in it.
+  ([#30](https://github.com/bowo-prasetyo/plumb/pull/30),
+  [#36](https://github.com/bowo-prasetyo/plumb/pull/36))
+- **Closing the tab of a file with unsaved changes says they're kept**, with
+  *Reopen*.
+  ([#36](https://github.com/bowo-prasetyo/plumb/pull/36))
+- **Phones and tablets:** on narrow screens the toolbar keeps *Preview*,
+  *Find* and *Save* and puts the rest under *More*, and the status bar folds
+  its controls behind **⋯**, which leaves about twice the room for text. On
+  touch screens, Markdown documents get **B** and *I* buttons.
+  ([#36](https://github.com/bowo-prasetyo/plumb/pull/36))
 - **Mixed line endings:** the status bar says *Mixed*, and each line keeps its
   own ending. Picking one ending converts the file.
   ([#23](https://github.com/bowo-prasetyo/plumb/pull/23))
 - **The version is shown in Settings**, with a link to this changelog.
-- **Docs:** a short [README](README.md), with every detail in
-  [the reference](docs/reference.md).
-  ([#32](https://github.com/bowo-prasetyo/plumb/pull/32))
+  ([#33](https://github.com/bowo-prasetyo/plumb/pull/33))
+- **Docs:**
+  - a short [README](README.md) with screenshots in light and dark;
+  - every detail in [the reference](docs/reference.md), with a
+    *Troubleshooting* section;
+  - a [brand note](docs/brand.md) covering the name, the logo, the palette and
+    how Plumb talks.
+
+  ([#32](https://github.com/bowo-prasetyo/plumb/pull/32),
+  [#39](https://github.com/bowo-prasetyo/plumb/pull/39),
+  [#40](https://github.com/bowo-prasetyo/plumb/pull/40))
 
 ### Changed
 
@@ -217,6 +154,41 @@ with a written [vision](VISION.md) and one clear model:
   ([#25](https://github.com/bowo-prasetyo/plumb/pull/25))
 - **Backups** hold drafts and unsaved file edits, not copies of saved files.
   ([#25](https://github.com/bowo-prasetyo/plumb/pull/25))
+- **The save status is honest about files on disk.** A file's own state comes
+  first. The browser part reads *Edits kept in browser ✓* until you save, and
+  the header says edits are kept in your browser until you save them. Before,
+  the status bar said "Saved ✓ · Not saved to file", and the header said
+  "Everything is saved in your browser".
+  ([#35](https://github.com/bowo-prasetyo/plumb/pull/35))
+- **Plumb's own colours.** The interface takes the logo's ink blue, with greys
+  that lean towards it.
+  - **Brass** means "notice this, nothing is lost". It marks changes not yet
+    saved to a file (the dot, and *Not saved to file*, which was red), find
+    matches, and the banner for a file changed or deleted on disk.
+  - Red is kept for real problems, such as a failed save.
+  - The browser's or installed app's title bar matches the top bar.
+
+  ([#38](https://github.com/bowo-prasetyo/plumb/pull/38))
+- **Numbers, dates, sizes and sorting** follow the interface language. Counts
+  group their digits (*1,206 words*).
+  ([#41](https://github.com/bowo-prasetyo/plumb/pull/41))
+- **Easier to see and to hit:**
+  - controls are at least 24×24 px;
+  - pressed toggles and the current item in lists are above 4.5:1 contrast in
+    both themes;
+  - the file name has a faint border;
+  - messages sit above the status bar instead of covering it.
+
+  ([#36](https://github.com/bowo-prasetyo/plumb/pull/36))
+- **For screen readers and voice control:**
+  - the open documents are a list of links, the current one marked, each with
+    its own close button;
+  - every screen has a top-level heading;
+  - buttons are named for what they show, and the find options (*Aa*, *ab*,
+    *.\**) are drawn as icons, so their names (*Match case*, *Whole word*,
+    *Regular expression*) are the only labels.
+
+  ([#36](https://github.com/bowo-prasetyo/plumb/pull/36))
 
 ### Fixed
 
@@ -235,13 +207,50 @@ with a written [vision](VISION.md) and one clear model:
   ([#28](https://github.com/bowo-prasetyo/plumb/pull/28))
 - **Opening the same file again** made another copy each time.
   ([#28](https://github.com/bowo-prasetyo/plumb/pull/28))
+- **Dialogs keep the keyboard to themselves.**
+  - This covers the shortcuts list, the quick switcher and command palette,
+    *Save to folder* and *Close folder*.
+  - Tab stays inside the dialog, Escape closes it wherever focus is, and focus
+    goes back where it was.
+  - Before, Tab could reach the page behind, where keys typed for the dialog
+    edited the document.
+  - The shortcuts list can now also be scrolled from the keyboard.
+
+  ([#35](https://github.com/bowo-prasetyo/plumb/pull/35))
+- **The folder sidebar is a proper tree for screen readers**, and Enter and
+  Space press its buttons (*+ File*, *Put the edits back*…), which the tree's
+  keys used to take.
+  ([#37](https://github.com/bowo-prasetyo/plumb/pull/37))
+- **Contrast** of primary buttons and of History's *added* lines in dark mode,
+  and of comments on the current line in light mode, now passes 4.5:1.
+  ([#36](https://github.com/bowo-prasetyo/plumb/pull/36))
+- **Small wording fixes** that came with translation: lists of names read
+  "a, b and c", and quotation marks are curly everywhere.
+  ([#42](https://github.com/bowo-prasetyo/plumb/pull/42))
+- **Find no longer shows "NaN"** once a search has 1,000 matches or more.
+  ([#41](https://github.com/bowo-prasetyo/plumb/pull/41))
+- **Words in Chinese, Japanese, Thai, Lao, Khmer and Burmese are counted.**
+  These languages don't put spaces between words, so a whole sentence used to
+  count as one word.
+  ([#42](https://github.com/bowo-prasetyo/plumb/pull/42))
+- **A draft named after a long first line no longer ends in half an emoji**
+  (or a letter without its accent).
+  ([#42](https://github.com/bowo-prasetyo/plumb/pull/42))
+- **The quick switcher matches accented letters however they're stored**: typing
+  *café* finds a name that macOS stored with a separate accent.
+  ([#42](https://github.com/bowo-prasetyo/plumb/pull/42))
 
 ### Under the hood
 
 - **End-to-end tests** in a real browser for every way text could be lost or
   changed. They test saving, reloading, conflicts, the page closing mid-save,
-  and files that must come back byte for byte. Each phase of the work added
-  more: 78 tests now, alongside 242 unit tests.
+  and files that must come back byte for byte. That's 111 tests, alongside 278
+  unit tests.
+- **Automated checks** keep the release from drifting:
+  - an accessibility scan (axe) of the main screens and dialogs, in light and
+    dark;
+  - a contrast check of every text colour;
+  - a pseudo-language run that shows anything left untranslatable.
 - **Linting in CI**, and a testing guide, [`TESTING.md`](TESTING.md).
   ([#22](https://github.com/bowo-prasetyo/plumb/pull/22))
 

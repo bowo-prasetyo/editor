@@ -136,6 +136,14 @@ The scenarios follow the principles in [VISION.md](VISION.md#principles).
 | A one-time note says Save downloads a copy, naming the browser; once dismissed it stays away | `platform.spec.js`, `test/platform.test.js` |
 | Save downloads a faithful copy (name, line endings) and says where it went | `platform.spec.js` |
 
+### Accessibility
+
+`accessibility.spec.js` runs an automated scan (axe) in light and dark, and
+fails on any *serious* or *critical* finding. It covers the start page, the
+editor with its find bar, the quick switcher, the keyboard shortcuts,
+Settings and search. It doesn't replace trying Plumb with a screen reader:
+axe finds about a third of real problems.
+
 ### The editor screen
 
 Settings shows the version from `package.json`, with a link to the changelog.
@@ -235,7 +243,6 @@ was fixed: see `src/lineends.js`.)
   is hard to time reliably end to end.
 - **Large files and performance budgets** ("first keystroke in under a
   second"). A measured check belongs in a later round.
-- **Accessibility checks** (for example axe). Worth adding, outside this round.
 - **Toasts, confirmations and rarer dialogs in the pseudo-language.** The
   screens test covers what's on screen; toasts, `confirm()` questions, *Save to
   folder…*, closing a folder and the storage-failure banner are covered only

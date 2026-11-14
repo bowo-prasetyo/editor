@@ -237,9 +237,9 @@ const lineLabel = (m) => `${m.line}`
           :aria-invalid="!!error"
           @keydown="onQueryKey"
         />
-        <button class="icon" :aria-pressed="search.matchCase" :title="t('find.matchCaseTitle')" :aria-label="t('find.matchCase')" @click="search.matchCase = !search.matchCase">Aa</button>
-        <button class="icon" :aria-pressed="search.wholeWord" :title="t('find.wholeWordTitle')" :aria-label="t('find.wholeWord')" @click="search.wholeWord = !search.wholeWord"><u>ab</u></button>
-        <button class="icon mono" :aria-pressed="search.regex" :title="t('find.regexTitle')" :aria-label="t('find.regex')" @click="search.regex = !search.regex">.*</button>
+        <button class="icon" :aria-pressed="search.matchCase" :title="t('find.matchCaseTitle')" :aria-label="t('find.matchCase')" @click="search.matchCase = !search.matchCase"><span class="glyph" data-glyph="Aa" aria-hidden="true"></span></button>
+        <button class="icon" :aria-pressed="search.wholeWord" :title="t('find.wholeWordTitle')" :aria-label="t('find.wholeWord')" @click="search.wholeWord = !search.wholeWord"><span class="glyph underline" data-glyph="ab" aria-hidden="true"></span></button>
+        <button class="icon mono" :aria-pressed="search.regex" :title="t('find.regexTitle')" :aria-label="t('find.regex')" @click="search.regex = !search.regex"><span class="glyph" data-glyph=".*" aria-hidden="true"></span></button>
       </div>
       <div v-if="search.showReplace" class="find-row">
         <span class="icon-spacer" />
