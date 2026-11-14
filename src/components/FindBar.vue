@@ -224,9 +224,9 @@ defineExpose({ open })
         @keydown="onQueryKey"
       />
       <span class="find-count" :class="{ error: !!error }" aria-live="polite">{{ count }}</span>
-      <button class="icon" :aria-pressed="matchCase" :title="t('find.matchCaseTitle')" :aria-label="t('find.matchCase')" @click="matchCase = !matchCase">Aa</button>
+      <button class="icon" :aria-pressed="matchCase" :title="t('find.matchCaseTitle')" :aria-label="t('find.matchCase')" @click="matchCase = !matchCase"><span class="glyph" data-glyph="Aa" aria-hidden="true"></span></button>
       <button class="icon" :aria-pressed="wholeWord" :title="t('find.wholeWordTitle')" :aria-label="t('find.wholeWord')" @click="wholeWord = !wholeWord">
-        <u>ab</u>
+        <span class="glyph underline" data-glyph="ab" aria-hidden="true"></span>
       </button>
       <button
         class="icon mono"
@@ -235,7 +235,7 @@ defineExpose({ open })
         :aria-label="t('find.regex')"
         @click="regex = !regex"
       >
-        .*
+        <span class="glyph" data-glyph=".*" aria-hidden="true"></span>
       </button>
       <button class="icon" :title="t('find.previousTitle')" :aria-label="t('find.previous')" @click="prev">↑</button>
       <button class="icon" :title="t('find.nextTitle')" :aria-label="t('find.next')" @click="next">↓</button>

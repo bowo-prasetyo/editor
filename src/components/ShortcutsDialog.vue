@@ -34,7 +34,8 @@ onMounted(() => input.value?.focus())
         <button class="icon" :aria-label="t('common.close')" :title="t('common.closeEsc')" @click="emit('close')">✕</button>
       </div>
       <input ref="input" v-model="query" class="quick-input" :placeholder="t('shortcuts.filter')" :aria-label="t('shortcuts.filter')" />
-      <div class="shortcuts-body">
+      <!-- Focusable, so the list scrolls from the keyboard too. -->
+      <div class="shortcuts-body" tabindex="0" role="region" :aria-label="t('shortcuts.title')">
         <p v-if="!groups.length" class="hint">{{ t('shortcuts.noMatch', { query }) }}</p>
         <section v-for="[group, items] in groups" :key="group">
           <h3>{{ group }}</h3>
